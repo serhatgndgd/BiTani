@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 
+import { Wordmark } from '../components/Brand';
 import { supabase } from '../lib/supabase';
 import type { AuthStackParamList } from '../navigation/types';
 
@@ -69,8 +70,9 @@ export default function LoginScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.inner}>
-          <Text style={styles.brand}>BiTanı</Text>
-          <Text style={styles.tagline}>Sağlığın için akıllı asistan</Text>
+          <View style={styles.wordmarkWrap}>
+            <Wordmark height={36} onDark showIcon />
+          </View>
           <Text style={styles.heading}>Giriş Yap</Text>
           <Text style={styles.label}>E-posta</Text>
           <TextInput
@@ -142,18 +144,10 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     alignSelf: 'center',
   },
-  brand: {
-    color: '#ffffff',
-    fontSize: 28,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  tagline: {
-    color: '#888',
-    fontSize: 14,
-    textAlign: 'center',
+  wordmarkWrap: {
+    alignItems: 'center',
     marginBottom: 28,
+    marginTop: 8,
   },
   heading: {
     color: '#ffffff',

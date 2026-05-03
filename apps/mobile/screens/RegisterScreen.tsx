@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { Wordmark } from '../components/Brand';
 import { supabase } from '../lib/supabase';
 import type { AuthStackParamList } from '../navigation/types';
 
@@ -132,6 +133,9 @@ export default function RegisterScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.inner}>
+          <View style={styles.wordmarkWrap}>
+            <Wordmark height={36} onDark showIcon />
+          </View>
           <Text style={styles.heading}>Hesap oluştur</Text>
           <Text style={styles.label}>E-posta</Text>
           <TextInput
@@ -244,6 +248,11 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     alignSelf: 'center',
+  },
+  wordmarkWrap: {
+    alignItems: 'center',
+    marginBottom: 28,
+    marginTop: 8,
   },
   heading: {
     color: '#ffffff',
