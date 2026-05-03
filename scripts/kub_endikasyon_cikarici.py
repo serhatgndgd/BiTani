@@ -14,6 +14,9 @@ ve conditions_catalog ile anahtar kelime eşleştirmesi yaparak condition_medica
   - 4.1 bulunamazsa PDF metninin ilk 500 karakteri yazdırılır.
   - 4.1 bulunur ama hastalık eşleşmezse endikasyon metni yazdırılır.
 
+İsteğe bağlı durdurma: STOP_AT_CONDITION_MEDICATIONS=1000
+  - Toplam condition_medications satırı bu sayıya ulaşınca (veya geçince) döngü biter.
+
 Gerekli: Supabase service_role (RLS bypass).
 """
 
@@ -47,6 +50,8 @@ BATCH_SIZE = 10  # İleride paralel iş için ayrıldı; şu an sıralı işleni
 SLEEP_BETWEEN = 1.0
 _max_raw = _env("MAX_MEDICATIONS")
 MAX_MEDICATIONS: int | None = int(_max_raw) if _max_raw.isdigit() else None
+_stop_cm_raw = _env("STOP_AT_CONDITION_MEDICATIONS")
+STOP_AT_CM_ROWS: int | None = int(_stop_cm_raw) if _stop_cm_raw.isdigit() else None
 # ───────────────────────────────────────────────────────────────────────────
 
 _PLACEHOLDER_SERVICE = "your_service_role_key_here"
@@ -256,6 +261,12 @@ def extract_section_41_from_text(full_text: str) -> str | None:
     return section[:2000] if section else None
 
 
+def count_condition_medication_rows() -> int:
+    """condition_medications tablosundaki toplam satır sayısı."""
+    r = supabase.table("condition_medications").select("medication_id", count="exact", head=True).execute()
+    return int(r.count) if r.count is not None else 0
+
+
 def save_condition_medications(medication_id: str, condition_ids: list[str]) -> int:
     """condition_medications tablosuna kaydet (duplicate'leri atla)."""
     if not condition_ids:
@@ -293,7 +304,25 @@ def main() -> None:
     conditions = fetch_conditions()
 
     print(f"İlaç sayısı: {len(medications)}")
-    print(f"Hastalık sayısı: {len(conditions)}\n")
+    print(f"Hastalık sayısı: {len(conditions)}")
+    if STOP_AT_CM_ROWS is not None:
+        cm0 = count_condition_medication_rows()
+        print(f"condition_medications şu an: {cm0} satır — ≥{STOP_AT_CM_ROWS} olunca durdurulacak.\n")
+    else:
+        print()
+
+    if STOP_AT_CM_ROWS is not None:
+        cm_start = count_condition_medication_rows()
+        if cm_start >= STOP_AT_CM_ROWS:
+            print(
+                f"condition_medications zaten {cm_start} satır (limit ≥{STOP_AT_CM_ROWS}). "
+                "Çıkılıyor; limiti artır veya satır sil, sonra tekrar çalıştır."
+            )
+            print("\n── Özet ──────────────────────────────")
+            print(f"Toplam ilaç       : {len(medications)}")
+            print(f"CM satır (başta)  : {cm_start}")
+            print("──────────────────────────────────────")
+            return
 
     stats = {
         "toplam": len(medications),
@@ -303,11 +332,14 @@ def main() -> None:
         "kayit_eklendi": 0,
         "hata": 0,
         "brosur_atlandi": 0,
+        "limit_durduruldu": False,
     }
 
     for i, med in enumerate(medications):
         name = (med.get("ilac_adi") or "")[:50]
         print(f"[{i + 1}/{len(medications)}] {name}...")
+
+        stop_after_sleep = False
 
         pdf_path = download_pdf(med["kub_url"])
         if not pdf_path:
@@ -348,6 +380,15 @@ def main() -> None:
                 count = save_condition_medications(med["id"], matched_ids)
                 stats["kayit_eklendi"] += count
                 print(f"  ✓ {len(matched_ids)} hastalık eşleşti, {count} kayıt eklendi")
+                if STOP_AT_CM_ROWS is not None:
+                    cm_after = count_condition_medication_rows()
+                    if cm_after >= STOP_AT_CM_ROWS:
+                        print(
+                            f"  Limit: condition_medications = {cm_after} satır "
+                            f"(≥{STOP_AT_CM_ROWS}). Durduruluyor; sonra tekrar çalıştırabilirsin."
+                        )
+                        stats["limit_durduruldu"] = True
+                        stop_after_sleep = True
             else:
                 print("  - Eşleşen hastalık bulunamadı")
                 if _debug_kub():
@@ -362,6 +403,8 @@ def main() -> None:
                 pass
 
         time.sleep(SLEEP_BETWEEN)
+        if stop_after_sleep:
+            break
 
     print("\n── Özet ──────────────────────────────")
     print(f"Toplam ilaç       : {stats['toplam']}")
@@ -371,6 +414,9 @@ def main() -> None:
     print(f"Kayıt eklendi     : {stats['kayit_eklendi']}")
     print(f"Hata              : {stats['hata']}")
     print(f"Hasta broşürü atla: {stats['brosur_atlandi']}")
+    if STOP_AT_CM_ROWS is not None:
+        print(f"CM satır limiti   : ≥{STOP_AT_CM_ROWS} (durduruldu: {stats['limit_durduruldu']})")
+        print(f"CM satır (son)    : {count_condition_medication_rows()}")
     print("──────────────────────────────────────")
 
 
