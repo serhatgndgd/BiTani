@@ -14,9 +14,6 @@ ve conditions_catalog ile anahtar kelime eşleştirmesi yaparak condition_medica
   - 4.1 bulunamazsa PDF metninin ilk 500 karakteri yazdırılır.
   - 4.1 bulunur ama hastalık eşleşmezse endikasyon metni yazdırılır.
 
-İsteğe bağlı durdurma: STOP_AT_CONDITION_MEDICATIONS=1000
-  - Toplam condition_medications satırı bu sayıya ulaşınca (veya geçince) döngü biter.
-
 Gerekli: Supabase service_role (RLS bypass).
 """
 
@@ -50,8 +47,7 @@ BATCH_SIZE = 10  # İleride paralel iş için ayrıldı; şu an sıralı işleni
 SLEEP_BETWEEN = 1.0
 _max_raw = _env("MAX_MEDICATIONS")
 MAX_MEDICATIONS: int | None = int(_max_raw) if _max_raw.isdigit() else None
-_stop_cm_raw = _env("STOP_AT_CONDITION_MEDICATIONS")
-STOP_AT_CM_ROWS: int | None = int(_stop_cm_raw) if _stop_cm_raw.isdigit() else None
+_MEDICATIONS_PAGE = 500  # PostgREST URL sınırı; NOT IN yerine sayfalama + filtre
 # ───────────────────────────────────────────────────────────────────────────
 
 _PLACEHOLDER_SERVICE = "your_service_role_key_here"
@@ -76,9 +72,126 @@ def text_for_match(s: str) -> str:
     return t.lower()
 
 
+# Uzundan kısaya — sondan eşleşen ilk ek kırpılır (enfeksiyonun → enfeksiyon vb.)
+_SUFFIXES_LONGEST_FIRST: tuple[str, ...] = (
+    "lerinden",
+    "larından",
+    "lerimize",
+    "larımıza",
+    "larının",
+    "lerinin",
+    "larına",
+    "lerine",
+    "larında",
+    "lerinde",
+    "larıyla",
+    "leriyle",
+    "ımızda",
+    "imizde",
+    "unuzda",
+    "ünüzde",
+    "lığında",
+    "liğinde",
+    "lığı",
+    "liği",
+    "luğu",
+    "lüğü",
+    "ımızı",
+    "inizi",
+    "undaki",
+    "ündeki",
+    "ununuz",
+    "ününüz",
+    "larım",
+    "lerim",
+    "ınız",
+    "iniz",
+    "ımız",
+    "imiz",
+    "unun",
+    "ünün",
+    "ının",
+    "inin",
+    "nın",
+    "nin",
+    "nun",
+    "nün",
+    "ları",
+    "leri",
+    "sinde",
+    "sında",
+    "sine",
+    "sına",
+    "inden",
+    "ından",
+    "imize",
+    "ınıza",
+    "sı",
+    "si",
+    "su",
+    "sü",
+    "da",
+    "de",
+    "ta",
+    "te",
+    "dan",
+    "den",
+    "tan",
+    "ten",
+    "la",
+    "le",
+    "na",
+    "ne",
+    "ya",
+    "ye",
+    "ın",
+    "in",
+    "un",
+    "ün",
+    "a",
+    "e",
+    "ı",
+    "i",
+    "u",
+    "ü",
+)
+
+
+def _strip_turkish_suffix_chain(word: str, max_steps: int = 6) -> frozenset[str]:
+    """Kelimenin sondan Türkçe ek kırpılmış varyantları (min 4 karakter)."""
+    out: set[str] = {word}
+    cur = word
+    for _ in range(max_steps):
+        nxt = cur
+        for suf in _SUFFIXES_LONGEST_FIRST:
+            if cur.endswith(suf) and len(cur) - len(suf) >= 4:
+                nxt = cur[: -len(suf)]
+                break
+        if nxt == cur:
+            break
+        out.add(nxt)
+        cur = nxt
+    return frozenset(out)
+
+
 # Katalog `name` normalize edilmiş halinde bu alt dizgilerden biri geçerse ek arama terimleri.
 # (endikasyon metninde case-insensitive alt dize aranır.)
+# Önce daha uzun / spesifik anahtarlar (hepatit b / c ayrımı vb.).
 _CATALOG_SUBSTRING_TO_EXTRAS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("hepatit b", ("hepatit b", "hbv", "kronik hepatit b", "anti-hbv", "anti hbv", "hbsag", "hepatit")),
+    ("hepatit c", ("hepatit c", "hcv", "kronik hepatit c", "anti-hcv", "anti hcv", "hepatit")),
+    ("demir eksikliği", ("demir eksikliği", "demir yetersizliği", "demir yetersizligi", "sideropenik", "sideropenk", "sideropeni", "fe eksikliği", "fe eksikligi", "iron deficiency", "anemi")),
+    ("demir eksikligi", ("demir eksikliği", "demir yetersizliği", "sideropenik", "sideropenk", "anemi")),
+    ("bakteri", ("bakteriyel", "bakteri", "antibiyotik", "antibiyotik endikasyon", "gram negatif", "gram pozitif", "mikroorganizma", "sepsis", "septisemi")),
+    ("bakteriyel", ("bakteriyel", "bakteri", "antibiyotik", "sepsis")),
+    ("viral enfeksiyon", ("viral", "virüs", "virus", "antiviral", "viral enfeksiyon")),
+    ("akne", ("akne", "sivilce", "propionibacterium", "akne vulgaris", "ak vulgaris", "komedon", "comedon")),
+    ("tüberküloz", ("tüberküloz", "tuberkuloz", "tuberculosis", "tbc", "mikobakter", "mantoux", "ppd")),
+    ("tuberkuloz", ("tüberküloz", "tbc", "mikobakter")),
+    ("hiv", ("hiv", "aids", "antiretrovir", "antiretroviral", "art tedav", "cd4", "acquired immunodeficiency")),
+    ("aids", ("hiv", "aids", "antiretrovir", "antiretroviral")),
+    ("sinüzit", ("sinüzit", "sinus", "sinüs", "sinusitis", "paranazal", "maksiller sinüs", "maksiller sinus")),
+    ("sinuzit", ("sinüzit", "sinüs", "paranazal")),
     ("diyabet", ("diabet", "tip 2", "tip 1", "tip ii", "tip i", "şeker hastalığı", "şeker", "seker", "glisemi", "hiperglisemi", "hipoglisemi", "insülin", "insulin", "dm")),
     ("diabet", ("tip 2", "tip 1", "glisemi")),
     ("hipertansiyon", ("yüksek tansiyon", "yüksek kan basıncı", "arteriyel hipertansiyon", "hipertansif", "kan basıncı")),
@@ -104,10 +217,13 @@ _CATALOG_SUBSTRING_TO_EXTRAS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("demans", ("alzheimer", "bilişsel", "bilissel", "bunama")),
     ("parkinson", ("parkinsonizm", "bazal ganglion")),
     ("skleroz", ("ms ", "multipl skleroz", "multıpl skleroz")),
-    ("hepatit", ("karaciğer iltihabı", "karaciger iltihabi", "hvc", "hvb")),
+    ("hepatit", ("hepatit", "viral hepatit", "karaciğer iltihabı", "karaciger iltihabi", "otoimmün hepatit", "otoimmun hepatit")),
     ("siroz", ("karaciğer sirozu", "karaciger sirozu", "hepatik yetmezlik")),
-    ("pnömoni", ("pnonomi", "pnömoni", "pneumonia", "akciğer enfeksiyonu", "akciger enfeksiyonu")),
-    ("enfeksiyon", ("antibiyotik", "bakteri", "sepsis", "septisemi")),
+    (
+        "pnömoni",
+        ("pnonomi", "pnömoni", "pneumonia", "akciğer enfeksiyonu", "akciger enfeksiyonu", "zatürre", "zaturre", "lobar pnömoni"),
+    ),
+    ("enfeksiyon", ("antibiyotik", "bakteri", "enfeksiyon", "sepsis", "septisemi", "septik")),
     ("alerji", ("allergik", "anafilaksi", "urtiker", "kaşıntı", "kasinti")),
     ("psoriasis", ("sedef hastalığı", "sedef hastaligi", "plak psoriasis")),
     ("egzema", ("ekzema", "atopik dermatit", "dermatit")),
@@ -115,6 +231,7 @@ _CATALOG_SUBSTRING_TO_EXTRAS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("uykusuzluk", ("insomni", "uyku bozukluğu", "uyku bozuklugu")),
     ("obezite", ("obez", "kilolu", "şişman", "sisman", "bmi")),
     ("poliartrit", ("juvenil artrit", "çocuk romatizması", "cocuk romatizmasi")),
+    ("anemi", ("anemi", "anemisi", "anemisinin", "demir eksikliği", "sideropenik", "hemoglobin", "hemoglobin düşüklüğü")),
 )
 
 
@@ -126,6 +243,23 @@ def _split_name_fragments(name: str) -> set[str]:
         if len(q) >= 3:
             out.add(q)
     return out
+
+
+def _word_fragment_keywords(normalized_name: str) -> set[str]:
+    """Katalog adındaki sözcüklerden kısa kökler (ör. hepatit, demir); min 4 karakter."""
+    frag: set[str] = set()
+    for tok in re.split(r"\s+", normalized_name):
+        tok = tok.strip()
+        if len(tok) < 4:
+            continue
+        frag.add(tok)
+        if len(tok) >= 5 and len(tok[:-1]) >= 4:
+            frag.add(tok[:-1])
+        if len(tok) >= 6 and len(tok[:-2]) >= 4:
+            frag.add(tok[:-2])
+        if len(tok) >= 7 and len(tok[:-3]) >= 4:
+            frag.add(tok[:-3])
+    return frag
 
 
 def keywords_for_condition(catalog_name: str) -> set[str]:
@@ -140,6 +274,8 @@ def keywords_for_condition(catalog_name: str) -> set[str]:
     for frag in _split_name_fragments(raw):
         terms.add(frag)
 
+    terms |= _word_fragment_keywords(n)
+
     for sub, extras in _CATALOG_SUBSTRING_TO_EXTRAS:
         if sub in n:
             terms.update(extras)
@@ -152,6 +288,16 @@ def normalized_keywords_for_condition(catalog_name: str) -> frozenset[str]:
     return frozenset(text_for_match(k) for k in keywords_for_condition(catalog_name) if k)
 
 
+def _keyword_matches_haystack(hay: str, nkw: str) -> bool:
+    """Alt dize + Türkçe ek kırpılmış varyantlarla eşleşme."""
+    if len(nkw) < 2:
+        return False
+    for v in _strip_turkish_suffix_chain(nkw):
+        if len(v) >= 2 and v in hay:
+            return True
+    return False
+
+
 def match_conditions_by_keywords(endikasyon_text: str, conditions: list) -> list[str]:
     """Endikasyon metninde katalog anahtar kelimelerini ara; eşleşen condition id'lerini döndür."""
     hay = text_for_match(endikasyon_text)
@@ -162,7 +308,7 @@ def match_conditions_by_keywords(endikasyon_text: str, conditions: list) -> list
         if not cid or not name:
             continue
         for nkw in normalized_keywords_for_condition(name):
-            if len(nkw) >= 2 and nkw in hay:
+            if _keyword_matches_haystack(hay, nkw):
                 matched.append(cid)
                 break
     return matched
@@ -183,13 +329,62 @@ _require_env()
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
-def fetch_medications():
-    """Supabase'den kub_url'i olan ilaçları çek."""
-    query = supabase.table("medications").select("id, ilac_adi, kub_url").not_.is_("kub_url", "null")
-    if MAX_MEDICATIONS:
-        query = query.limit(MAX_MEDICATIONS)
-    result = query.execute()
-    return result.data or []
+def fetch_processed_medication_id_set() -> set[str]:
+    """condition_medications'ta en az bir satırı olan ilaç id'leri (sayfalı)."""
+    ids: set[str] = set()
+    offset = 0
+    while True:
+        res = (
+            supabase.table("condition_medications")
+            .select("medication_id")
+            .order("medication_id")
+            .order("condition_id")
+            .range(offset, offset + _MEDICATIONS_PAGE - 1)
+            .execute()
+        )
+        rows = res.data or []
+        for row in rows:
+            mid = row.get("medication_id")
+            if isinstance(mid, str) and mid:
+                ids.add(mid)
+        if len(rows) < _MEDICATIONS_PAGE:
+            break
+        offset += _MEDICATIONS_PAGE
+    return ids
+
+
+def fetch_medications(processed_ids: set[str] | None = None) -> list:
+    """kub_url dolu ve henüz condition_medications'ta olmayan ilaçları çek.
+
+    Çok sayıda işlenmiş id için PostgREST `not.in` URL sınırına takılmaması adına
+    ilaçlar id sırasıyla sayfalanır, işlenmiş olanlar yerelde elenir.
+    """
+    if processed_ids is None:
+        processed_ids = fetch_processed_medication_id_set()
+
+    out: list = []
+    offset = 0
+    while True:
+        q = (
+            supabase.table("medications")
+            .select("id, ilac_adi, kub_url")
+            .not_.is_("kub_url", "null")
+            .order("id")
+            .range(offset, offset + _MEDICATIONS_PAGE - 1)
+        )
+        result = q.execute()
+        rows = result.data or []
+        for med in rows:
+            mid = med.get("id")
+            if not mid or mid in processed_ids:
+                continue
+            out.append(med)
+            if MAX_MEDICATIONS is not None and len(out) >= MAX_MEDICATIONS:
+                return out
+        if len(rows) < _MEDICATIONS_PAGE:
+            break
+        offset += _MEDICATIONS_PAGE
+    return out
 
 
 def fetch_conditions():
@@ -261,12 +456,6 @@ def extract_section_41_from_text(full_text: str) -> str | None:
     return section[:2000] if section else None
 
 
-def count_condition_medication_rows() -> int:
-    """condition_medications tablosundaki toplam satır sayısı."""
-    r = supabase.table("condition_medications").select("medication_id", count="exact", head=True).execute()
-    return int(r.count) if r.count is not None else 0
-
-
 def save_condition_medications(medication_id: str, condition_ids: list[str]) -> int:
     """condition_medications tablosuna kaydet (duplicate'leri atla)."""
     if not condition_ids:
@@ -300,29 +489,13 @@ def main() -> None:
     else:
         print()
 
-    medications = fetch_medications()
+    processed_ids = fetch_processed_medication_id_set()
+    medications = fetch_medications(processed_ids)
     conditions = fetch_conditions()
 
-    print(f"İlaç sayısı: {len(medications)}")
-    print(f"Hastalık sayısı: {len(conditions)}")
-    if STOP_AT_CM_ROWS is not None:
-        cm0 = count_condition_medication_rows()
-        print(f"condition_medications şu an: {cm0} satır — ≥{STOP_AT_CM_ROWS} olunca durdurulacak.\n")
-    else:
-        print()
-
-    if STOP_AT_CM_ROWS is not None:
-        cm_start = count_condition_medication_rows()
-        if cm_start >= STOP_AT_CM_ROWS:
-            print(
-                f"condition_medications zaten {cm_start} satır (limit ≥{STOP_AT_CM_ROWS}). "
-                "Çıkılıyor; limiti artır veya satır sil, sonra tekrar çalıştır."
-            )
-            print("\n── Özet ──────────────────────────────")
-            print(f"Toplam ilaç       : {len(medications)}")
-            print(f"CM satır (başta)  : {cm_start}")
-            print("──────────────────────────────────────")
-            return
+    print(f"Zaten eşlemesi olan (atlanan): {len(processed_ids)} ilaç")
+    print(f"Bu koşuda işlenecek ilaç: {len(medications)}")
+    print(f"Hastalık sayısı: {len(conditions)}\n")
 
     stats = {
         "toplam": len(medications),
@@ -332,14 +505,11 @@ def main() -> None:
         "kayit_eklendi": 0,
         "hata": 0,
         "brosur_atlandi": 0,
-        "limit_durduruldu": False,
     }
 
     for i, med in enumerate(medications):
         name = (med.get("ilac_adi") or "")[:50]
         print(f"[{i + 1}/{len(medications)}] {name}...")
-
-        stop_after_sleep = False
 
         pdf_path = download_pdf(med["kub_url"])
         if not pdf_path:
@@ -380,15 +550,6 @@ def main() -> None:
                 count = save_condition_medications(med["id"], matched_ids)
                 stats["kayit_eklendi"] += count
                 print(f"  ✓ {len(matched_ids)} hastalık eşleşti, {count} kayıt eklendi")
-                if STOP_AT_CM_ROWS is not None:
-                    cm_after = count_condition_medication_rows()
-                    if cm_after >= STOP_AT_CM_ROWS:
-                        print(
-                            f"  Limit: condition_medications = {cm_after} satır "
-                            f"(≥{STOP_AT_CM_ROWS}). Durduruluyor; sonra tekrar çalıştırabilirsin."
-                        )
-                        stats["limit_durduruldu"] = True
-                        stop_after_sleep = True
             else:
                 print("  - Eşleşen hastalık bulunamadı")
                 if _debug_kub():
@@ -403,8 +564,6 @@ def main() -> None:
                 pass
 
         time.sleep(SLEEP_BETWEEN)
-        if stop_after_sleep:
-            break
 
     print("\n── Özet ──────────────────────────────")
     print(f"Toplam ilaç       : {stats['toplam']}")
@@ -414,9 +573,6 @@ def main() -> None:
     print(f"Kayıt eklendi     : {stats['kayit_eklendi']}")
     print(f"Hata              : {stats['hata']}")
     print(f"Hasta broşürü atla: {stats['brosur_atlandi']}")
-    if STOP_AT_CM_ROWS is not None:
-        print(f"CM satır limiti   : ≥{STOP_AT_CM_ROWS} (durduruldu: {stats['limit_durduruldu']})")
-        print(f"CM satır (son)    : {count_condition_medication_rows()}")
     print("──────────────────────────────────────")
 
 
