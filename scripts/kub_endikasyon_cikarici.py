@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
-BiTanı - KÜB Endikasyon Çıkarıcı
-TİTCK KÜB PDF'lerinden "4.1 Terapötik Endikasyonlar" bölümünü çıkarır
-ve conditions_catalog ile anahtar kelime eşleştirmesi yaparak condition_medications tablosunu doldurur.
+BiTanı - KÜB + KT Endikasyon Çıkarıcı
+TİTCK KÜB ve KT PDF'lerinden endikasyonları çıkarır:
+  - KÜB: "4.1 Terapötik Endikasyonlar" bölümü
+  - KT : "Ne için kullanılır" / "Neyin için kullanılır" bölümü
+Her iki kaynaktan gelen eşleşmeler condition_medications tablosuna yazılır.
 
 Çalıştırma:
   cd scripts && python -m venv .venv && source .venv/bin/activate
@@ -10,9 +12,10 @@ ve conditions_catalog ile anahtar kelime eşleştirmesi yaparak condition_medica
   cp .env.example .env   # Supabase anahtarlarını doldur
   python kub_endikasyon_cikarici.py
 
-İsteğe bağlı hata ayıklama: .env veya ortamda KUB_DEBUG=1
-  - 4.1 bulunamazsa PDF metninin ilk 500 karakteri yazdırılır.
-  - 4.1 bulunur ama hastalık eşleşmezse endikasyon metni yazdırılır.
+İsteğe bağlı bayraklar (.env veya ortam):
+  KUB_DEBUG=1       — bölüm bulunamazsa PDF önizleme, eşleşme yoksa metin yazdırılır
+  REPROCESS_ALL=1   — daha önce işlenmiş ilaçları da yeniden işle (KT ekleme için)
+  MAX_MEDICATIONS=N — test koşusu için ilaç sayısını sınırla
 
 Gerekli: Supabase service_role (RLS bypass).
 """
@@ -47,21 +50,31 @@ BATCH_SIZE = 10  # İleride paralel iş için ayrıldı; şu an sıralı işleni
 SLEEP_BETWEEN = 1.0
 _max_raw = _env("MAX_MEDICATIONS")
 MAX_MEDICATIONS: int | None = int(_max_raw) if _max_raw.isdigit() else None
-_MEDICATIONS_PAGE = 500  # PostgREST URL sınırı; NOT IN yerine sayfalama + filtre
+_MEDICATIONS_PAGE = 500  # PostgREST URL sınırı; sayfalama + filtre
 # ───────────────────────────────────────────────────────────────────────────
 
 _PLACEHOLDER_SERVICE = "your_service_role_key_here"
 _DEBUG_PREVIEW_LEN = 500
 
-# 4.1 başlığı: 4 / 4. / 4 . 1 / 4.1. vb. + "terapötik" (büyük/küçük harf, çoklu boşluk)
+# KÜB: 4 / 4. / 4 . 1 / 4.1. vb. + "terapötik" (büyük/küçük harf, çoklu boşluk)
 _SECTION_41_HEADER = re.compile(r"4[\.\s]*1[\s\.]+" + "terapötik", re.IGNORECASE)
 
-# PDF başında geçerse KÜB değil, hasta broşürü (Kullanma Talimatı)
+# KT: "Ne için kullanılır" veya "Neyin için kullanılır" (her türlü boşluk, büyük/küçük)
+_KT_SECTION_HEADER = re.compile(
+    r"ne(?:yin)?\s+için\s+kullan[ıi]l[ıi]r",
+    re.IGNORECASE,
+)
+
+# PDF başında bu kalıp varsa hasta broşürü (KT) — başlık tespiti için
 _BROSUR_HEAD_CHARS = 4000
 
 
 def _debug_kub() -> bool:
     return _env("KUB_DEBUG").lower() in ("1", "true", "yes", "on")
+
+
+def _reprocess_all() -> bool:
+    return _env("REPROCESS_ALL").lower() in ("1", "true", "yes", "on")
 
 
 def text_for_match(s: str) -> str:
@@ -175,7 +188,6 @@ def _strip_turkish_suffix_chain(word: str, max_steps: int = 6) -> frozenset[str]
 
 
 # Katalog `name` normalize edilmiş halinde bu alt dizgilerden biri geçerse ek arama terimleri.
-# (endikasyon metninde case-insensitive alt dize aranır.)
 # Önce daha uzun / spesifik anahtarlar (hepatit b / c ayrımı vb.).
 _CATALOG_SUBSTRING_TO_EXTRAS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("hepatit b", ("hepatit b", "hbv", "kronik hepatit b", "anti-hbv", "anti hbv", "hbsag", "hepatit")),
@@ -280,7 +292,6 @@ def keywords_for_condition(catalog_name: str) -> set[str]:
         if sub in n:
             terms.update(extras)
 
-    # Ham ve normalize edilmiş tüm anlamlı alt dizgiler
     return {t for t in terms if isinstance(t, str) and len(text_for_match(t)) >= 2}
 
 
@@ -354,7 +365,7 @@ def fetch_processed_medication_id_set() -> set[str]:
 
 
 def fetch_medications(processed_ids: set[str] | None = None) -> list:
-    """kub_url dolu ve henüz condition_medications'ta olmayan ilaçları çek.
+    """kub_url VEYA kt_url dolu olan ilaçları çek; işlenmiş olanları atla.
 
     Çok sayıda işlenmiş id için PostgREST `not.in` URL sınırına takılmaması adına
     ilaçlar id sırasıyla sayfalanır, işlenmiş olanlar yerelde elenir.
@@ -367,8 +378,8 @@ def fetch_medications(processed_ids: set[str] | None = None) -> list:
     while True:
         q = (
             supabase.table("medications")
-            .select("id, ilac_adi, kub_url")
-            .not_.is_("kub_url", "null")
+            .select("id, ilac_adi, kub_url, kt_url")
+            .or_("kub_url.not.is.null,kt_url.not.is.null")
             .order("id")
             .range(offset, offset + _MEDICATIONS_PAGE - 1)
         )
@@ -400,7 +411,6 @@ def download_pdf(url: str) -> str | None:
         resp = requests.get(url, headers=headers, timeout=60)
         if resp.status_code != 200:
             return None
-
         tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
         tmp.write(resp.content)
         tmp.close()
@@ -411,12 +421,9 @@ def download_pdf(url: str) -> str | None:
 
 
 def looks_like_hasta_brosuru(full_text: str) -> bool:
-    """Metnin başında 'Kullanma Talimatı' varsa hasta broşürü sayılır (KÜB değil)."""
-    head = full_text.lstrip()[:_BROSUR_HEAD_CHARS]
-    if not head:
-        return False
-    h = text_for_match(head)
-    return "kullanma talimatı" in h or "kullanma talimati" in h
+    """Metnin başında 'Kullanma Talimatı' varsa hasta broşürü (KT) sayılır."""
+    head = text_for_match(full_text.lstrip()[:_BROSUR_HEAD_CHARS])
+    return bool(head) and ("kullanma talimatı" in head or "kullanma talimati" in head)
 
 
 def read_pdf_text(pdf_path: str) -> str | None:
@@ -433,7 +440,7 @@ def read_pdf_text(pdf_path: str) -> str | None:
 
 
 def extract_section_41_from_text(full_text: str) -> str | None:
-    """Çıkarılmış PDF metninden 4.1 Terapötik … bölümünü kes (başlık regex ile)."""
+    """KÜB metninden 4.1 Terapötik Endikasyonlar bölümünü kes."""
     markers_end = [
         "4.2 Pozoloji",
         "4.2. Pozoloji",
@@ -456,7 +463,35 @@ def extract_section_41_from_text(full_text: str) -> str | None:
     return section[:2000] if section else None
 
 
-def save_condition_medications(medication_id: str, condition_ids: list[str]) -> int:
+def extract_kt_section_from_text(full_text: str) -> str | None:
+    """KT metninden 'Ne için kullanılır' / 'Neyin için kullanılır' bölümünü kes."""
+    # KT belgesinde bu başlıktan sonraki bölüm bir sonraki ana başlığa kadar alınır
+    markers_end = [
+        "kullanmadan önce",
+        "nasıl kullanılır",
+        "nasil kullanilir",
+        "olası yan etkiler",
+        "olasi yan etkiler",
+        "dikkat edilmesi gereken",
+    ]
+
+    m = _KT_SECTION_HEADER.search(full_text)
+    if not m:
+        return None
+    start_idx = m.end()
+
+    ft_lower = full_text.lower()
+    end_idx = len(full_text)
+    for marker in markers_end:
+        idx = ft_lower.find(marker, start_idx)
+        if idx != -1 and idx < end_idx:
+            end_idx = idx
+
+    section = full_text[start_idx:end_idx].strip()
+    return section[:2000] if section else None
+
+
+def save_condition_medications(medication_id: str, condition_ids: list[str], source: str) -> int:
     """condition_medications tablosuna kaydet (duplicate'leri atla)."""
     if not condition_ids:
         return 0
@@ -465,7 +500,7 @@ def save_condition_medications(medication_id: str, condition_ids: list[str]) -> 
         {
             "medication_id": medication_id,
             "condition_id": cid,
-            "notes": "KÜB anahtar kelime eşleştirme",
+            "notes": f"{source} anahtar kelime eşleştirme",
         }
         for cid in condition_ids
     ]
@@ -483,97 +518,145 @@ def save_condition_medications(medication_id: str, condition_ids: list[str]) -> 
 
 def main() -> None:
     _ = BATCH_SIZE  # gelecekte batch/paralel iş için
-    print("BiTanı KÜB Endikasyon Çıkarıcı başlıyor...")
-    if _debug_kub():
-        print("KUB_DEBUG=1 — 4.1 yoksa PDF önizleme, eşleşme yoksa endikasyon metni yazdırılır.\n")
-    else:
-        print()
+    print("BiTanı KÜB+KT Endikasyon Çıkarıcı başlıyor...")
 
-    processed_ids = fetch_processed_medication_id_set()
+    reprocess = _reprocess_all()
+    if reprocess:
+        print("REPROCESS_ALL=1 — daha önce işlenmiş ilaçlar da yeniden işlenecek.")
+    if _debug_kub():
+        print("KUB_DEBUG=1 — bölüm yoksa PDF önizleme, eşleşme yoksa endikasyon metni yazdırılır.")
+    print()
+
+    processed_ids = set() if reprocess else fetch_processed_medication_id_set()
     medications = fetch_medications(processed_ids)
     conditions = fetch_conditions()
 
     print(f"Zaten eşlemesi olan (atlanan): {len(processed_ids)} ilaç")
-    print(f"Bu koşuda işlenecek ilaç: {len(medications)}")
-    print(f"Hastalık sayısı: {len(conditions)}\n")
+    print(f"Bu koşuda işlenecek ilaç     : {len(medications)}")
+    print(f"Hastalık sayısı              : {len(conditions)}\n")
 
     stats = {
         "toplam": len(medications),
-        "pdf_indirildi": 0,
-        "bolum_bulundu": 0,
+        "kub_pdf_indirildi": 0,
+        "kub_bolum_bulundu": 0,
+        "kt_pdf_indirildi": 0,
+        "kt_bolum_bulundu": 0,
         "eslestirme_yapildi": 0,
         "kayit_eklendi": 0,
         "hata": 0,
-        "brosur_atlandi": 0,
     }
 
     for i, med in enumerate(medications):
         name = (med.get("ilac_adi") or "")[:50]
         print(f"[{i + 1}/{len(medications)}] {name}...")
 
-        pdf_path = download_pdf(med["kub_url"])
-        if not pdf_path:
-            print("  ✗ PDF indirilemedi")
-            stats["hata"] += 1
-            continue
-        stats["pdf_indirildi"] += 1
+        all_condition_ids: set[str] = set()
+        sources_used: list[str] = []
 
-        try:
-            full_text = read_pdf_text(pdf_path)
-            if full_text is None:
-                print("  ✗ PDF metni okunamadı")
+        # ── KÜB PDF ──────────────────────────────────────────────────────────
+        kub_url = med.get("kub_url")
+        if kub_url:
+            pdf_path = download_pdf(kub_url)
+            if not pdf_path:
+                print("  KÜB ✗ PDF indirilemedi")
                 stats["hata"] += 1
-                continue
-
-            if looks_like_hasta_brosuru(full_text):
-                print("  KÜB değil, hasta broşürü")
-                stats["brosur_atlandi"] += 1
-                continue
-
-            section = extract_section_41_from_text(full_text)
-            if not section:
-                print("  ✗ 4.1 bölümü bulunamadı")
-                if _debug_kub():
-                    preview = full_text[:_DEBUG_PREVIEW_LEN]
-                    print(f"  [DEBUG] PDF metninin ilk {len(preview)} karakteri (başlık formatı):")
-                    print(preview)
-                    print("  [DEBUG] — önizleme sonu —")
-                stats["hata"] += 1
-                continue
-            stats["bolum_bulundu"] += 1
-            print(f"  ✓ Endikasyon bulundu ({len(section)} karakter)")
-
-            matched_ids = match_conditions_by_keywords(section, conditions)
-
-            if matched_ids:
-                stats["eslestirme_yapildi"] += 1
-                count = save_condition_medications(med["id"], matched_ids)
-                stats["kayit_eklendi"] += count
-                print(f"  ✓ {len(matched_ids)} hastalık eşleşti, {count} kayıt eklendi")
             else:
-                print("  - Eşleşen hastalık bulunamadı")
-                if _debug_kub():
-                    print("  [DEBUG] Endikasyon metni:")
-                    print(section)
-                    print("  [DEBUG] — endikasyon sonu —")
+                stats["kub_pdf_indirildi"] += 1
+                try:
+                    full_text = read_pdf_text(pdf_path)
+                    if not full_text:
+                        print("  KÜB ✗ PDF metni okunamadı")
+                        stats["hata"] += 1
+                    elif looks_like_hasta_brosuru(full_text):
+                        # kub_url aslında KT belgesi — KT olarak işle
+                        print("  KÜB URL'si KT belgesi içeriyor, KT olarak işleniyor")
+                        section = extract_kt_section_from_text(full_text)
+                        if section:
+                            stats["kt_bolum_bulundu"] += 1
+                            matched = match_conditions_by_keywords(section, conditions)
+                            all_condition_ids.update(matched)
+                            sources_used.append("KT(kub_url)")
+                            print(f"  KT(kub_url) ✓ Bölüm bulundu ({len(section)} karakter, {len(matched)} eşleşme)")
+                        else:
+                            print("  KT(kub_url) ✗ 'Ne için kullanılır' bölümü bulunamadı")
+                            if _debug_kub():
+                                print(f"  [DEBUG] KT(kub_url) ilk {_DEBUG_PREVIEW_LEN} karakter:")
+                                print(full_text[:_DEBUG_PREVIEW_LEN])
+                    else:
+                        section = extract_section_41_from_text(full_text)
+                        if section:
+                            stats["kub_bolum_bulundu"] += 1
+                            matched = match_conditions_by_keywords(section, conditions)
+                            all_condition_ids.update(matched)
+                            sources_used.append("KÜB")
+                            print(f"  KÜB ✓ Bölüm bulundu ({len(section)} karakter, {len(matched)} eşleşme)")
+                        else:
+                            print("  KÜB ✗ 4.1 bölümü bulunamadı")
+                            if _debug_kub():
+                                print(f"  [DEBUG] KÜB PDF ilk {_DEBUG_PREVIEW_LEN} karakter:")
+                                print(full_text[:_DEBUG_PREVIEW_LEN])
+                                print("  [DEBUG] — önizleme sonu —")
+                            stats["hata"] += 1
+                finally:
+                    try:
+                        os.unlink(pdf_path)
+                    except OSError:
+                        pass
 
-        finally:
-            try:
-                os.unlink(pdf_path)
-            except OSError:
-                pass
+        # ── KT PDF ───────────────────────────────────────────────────────────
+        kt_url = med.get("kt_url")
+        if kt_url:
+            pdf_path = download_pdf(kt_url)
+            if not pdf_path:
+                print("  KT ✗ PDF indirilemedi")
+            else:
+                stats["kt_pdf_indirildi"] += 1
+                try:
+                    full_text = read_pdf_text(pdf_path)
+                    if not full_text:
+                        print("  KT ✗ PDF metni okunamadı")
+                    else:
+                        section = extract_kt_section_from_text(full_text)
+                        if section:
+                            stats["kt_bolum_bulundu"] += 1
+                            matched = match_conditions_by_keywords(section, conditions)
+                            all_condition_ids.update(matched)
+                            sources_used.append("KT")
+                            print(f"  KT ✓ Bölüm bulundu ({len(section)} karakter, {len(matched)} eşleşme)")
+                        else:
+                            print("  KT ✗ 'Ne için kullanılır' bölümü bulunamadı")
+                            if _debug_kub():
+                                print(f"  [DEBUG] KT PDF ilk {_DEBUG_PREVIEW_LEN} karakter:")
+                                print(full_text[:_DEBUG_PREVIEW_LEN])
+                                print("  [DEBUG] — önizleme sonu —")
+                finally:
+                    try:
+                        os.unlink(pdf_path)
+                    except OSError:
+                        pass
+
+        # ── Kaydet ───────────────────────────────────────────────────────────
+        if all_condition_ids:
+            source_label = "+".join(sources_used)
+            stats["eslestirme_yapildi"] += 1
+            count = save_condition_medications(med["id"], list(all_condition_ids), source=source_label)
+            stats["kayit_eklendi"] += count
+            print(f"  ✓ {len(all_condition_ids)} hastalık eşleşti, {count} kayıt eklendi [{source_label}]")
+        else:
+            print("  - Eşleşen hastalık bulunamadı")
 
         time.sleep(SLEEP_BETWEEN)
 
-    print("\n── Özet ──────────────────────────────")
-    print(f"Toplam ilaç       : {stats['toplam']}")
-    print(f"PDF indirildi     : {stats['pdf_indirildi']}")
-    print(f"Bölüm bulundu     : {stats['bolum_bulundu']}")
-    print(f"Eşleştirme yapıldı: {stats['eslestirme_yapildi']}")
-    print(f"Kayıt eklendi     : {stats['kayit_eklendi']}")
-    print(f"Hata              : {stats['hata']}")
-    print(f"Hasta broşürü atla: {stats['brosur_atlandi']}")
-    print("──────────────────────────────────────")
+    print("\n── Özet ──────────────────────────────────")
+    print(f"Toplam ilaç            : {stats['toplam']}")
+    print(f"KÜB PDF indirildi      : {stats['kub_pdf_indirildi']}")
+    print(f"KÜB bölüm bulundu      : {stats['kub_bolum_bulundu']}")
+    print(f"KT PDF indirildi       : {stats['kt_pdf_indirildi']}")
+    print(f"KT bölüm bulundu       : {stats['kt_bolum_bulundu']}")
+    print(f"Eşleştirme yapıldı     : {stats['eslestirme_yapildi']}")
+    print(f"Kayıt eklendi          : {stats['kayit_eklendi']}")
+    print(f"Hata                   : {stats['hata']}")
+    print("──────────────────────────────────────────")
 
 
 if __name__ == "__main__":
