@@ -31,113 +31,14 @@ type ApiMessage = {
   content: string;
 };
 
-type ProfileData = {
-  full_name: string | null;
-  birth_date: string | null;
-  gender: string | null;
-  height_cm: number | null;
-  weight_kg: number | null;
-};
-
-type AnthropicContent = { type: string; text: string };
-type AnthropicSuccessBody = { content: AnthropicContent[] };
-type AnthropicErrorBody = { error: { message: string } };
-
 function containsAcilKeyword(text: string): boolean {
   const lower = text.toLocaleLowerCase('tr');
   return ACIL_KELIMELER.some((k) => lower.includes(k));
 }
 
-function getDummyReply(): string {
-  return 'Anlıyorum, şikayetinizi not aldım. Belirtileriniz devam ederse bir doktora başvurmanızı öneririm.';
-}
-
-function computeAge(birthDate: string | null): string {
-  if (!birthDate) return 'belirtilmemiş';
-  const birth = new Date(birthDate);
-  if (isNaN(birth.getTime())) return 'belirtilmemiş';
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const m = today.getMonth() - birth.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-  return `${age} yaşında`;
-}
-
-function genderTr(gender: string | null): string {
-  if (gender === 'male') return 'erkek';
-  if (gender === 'female') return 'kadın';
-  return 'belirtilmemiş';
-}
-
-function buildSystemPrompt(
-  profile: ProfileData | null,
-  conditions: string[],
-  medications: string[],
-): string {
-  const name = profile?.full_name ?? 'Kullanıcı';
-  const age = computeAge(profile?.birth_date ?? null);
-  const gender = genderTr(profile?.gender ?? null);
-  const height = profile?.height_cm != null ? `${profile.height_cm} cm` : 'belirtilmemiş';
-  const weight = profile?.weight_kg != null ? `${profile.weight_kg} kg` : 'belirtilmemiş';
-  const conditionsList = conditions.length > 0 ? conditions.join(', ') : 'yok';
-  const medicationsList = medications.length > 0 ? medications.join(', ') : 'yok';
-
-  return `Sen BiTanı uygulamasının Türkçe sağlık asistanısın. Kullanıcıyla samimi, sıcak ve anlayışlı bir dille konuşursun. Sağlık konularında genel bilgi ve rehberlik sağlarsın.
-
-ÖNEMLİ KISITLAMALAR:
-- Kesinlikle doktor değilsin; tıbbi tanı koymaz, ilaç reçete etmez veya mevcut tedaviyi değiştirmeni önermezsin.
-- Acil durumlarda her zaman 112'yi veya en yakın sağlık kuruluşunu yönlendirirsin.
-- Gerektiğinde mutlaka bir doktora başvurmasını hatırlatırsın.
-- Yanıtlarını kısa, anlaşılır ve Türkçe tut.
-
-Kullanıcı Profili:
-- Ad: ${name}
-- Yaş: ${age}
-- Cinsiyet: ${gender}
-- Boy: ${height}
-- Kilo: ${weight}
-- Kronik hastalıklar: ${conditionsList}
-- Düzenli kullandığı ilaçlar: ${medicationsList}
-
-Bu profil bilgilerini dikkate alarak kişiselleştirilmiş ve güvenli sağlık rehberliği sun.`;
-}
-
-// Gerçek API için korunuyor — dummy moddan çıkınca buraya dön
-async function callAnthropic(messages: ApiMessage[], systemPrompt: string): Promise<string> {
-  const apiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('API anahtarı yapılandırılmamış.');
-
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages,
-    }),
-  });
-
-  const data = (await res.json()) as AnthropicSuccessBody | AnthropicErrorBody;
-  if (!res.ok) {
-    const err = data as AnthropicErrorBody;
-    throw new Error(err.error?.message ?? `API hatası: ${res.status}`);
-  }
-  const success = data as AnthropicSuccessBody;
-  const block = success.content.find((c) => c.type === 'text');
-  if (!block?.text) throw new Error('Yanıt alınamadı.');
-  return block.text;
-}
-
-void callAnthropic; // kullanılmayan uyarısını bastır
-
 export default function ChatScreen() {
   const [loadingProfile, setLoadingProfile] = useState(true);
-  const [systemPrompt, setSystemPrompt] = useState('');
+  const [userId, setUserId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [apiMessages, setApiMessages] = useState<ApiMessage[]>([]);
   const [input, setInput] = useState('');
@@ -146,7 +47,6 @@ export default function ChatScreen() {
   const [showEmergency, setShowEmergency] = useState(false);
   const [locating, setLocating] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
-  const userMsgCountRef = useRef(0);
 
   const loadProfile = useCallback(async () => {
     setLoadingProfile(true);
@@ -156,50 +56,26 @@ export default function ChatScreen() {
     } = await supabase.auth.getUser();
 
     if (!user?.id) {
-      setSystemPrompt(buildSystemPrompt(null, [], []));
+      setMessages([
+        {
+          id: 'welcome',
+          role: 'assistant',
+          content: 'Merhaba! Ben BiTanı sağlık asistanınım. Sağlıkla ilgili sorularını yanıtlamaya hazırım.',
+        },
+      ]);
       setLoadingProfile(false);
       return;
     }
 
-    const [profileRes, condRes, medRes] = await Promise.all([
-      supabase
-        .from('profiles')
-        .select('full_name, birth_date, gender, height_cm, weight_kg')
-        .eq('id', user.id)
-        .maybeSingle(),
-      supabase
-        .from('user_conditions')
-        .select('conditions_catalog(name)')
-        .eq('user_id', user.id),
-      supabase
-        .from('user_medications')
-        .select('dosage, medications(ilac_adi)')
-        .eq('user_id', user.id),
-    ]);
+    setUserId(user.id);
 
-    const profile = profileRes.data as ProfileData | null;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .maybeSingle();
 
-    type CondRow = { conditions_catalog: { name: string } | null };
-    const conditions = condRes.data
-      ? (condRes.data as unknown as CondRow[])
-          .map((r) => r.conditions_catalog?.name)
-          .filter((n): n is string => !!n)
-      : [];
-
-    type MedRow = { dosage: string | null; medications: { ilac_adi: string } | null };
-    const medications = medRes.data
-      ? (medRes.data as unknown as MedRow[])
-          .map((r) => {
-            const name = r.medications?.ilac_adi;
-            if (!name) return null;
-            return r.dosage ? `${name} (${r.dosage})` : name;
-          })
-          .filter((n): n is string => !!n)
-      : [];
-
-    setSystemPrompt(buildSystemPrompt(profile, conditions, medications));
-
-    const firstName = profile?.full_name?.split(' ')[0] ?? '';
+    const firstName = (profile?.full_name as string | null)?.split(' ')[0] ?? '';
     const greeting = firstName
       ? `Merhaba ${firstName}! Ben BiTanı sağlık asistanınım. Sağlıkla ilgili sorularını yanıtlamaya hazırım.`
       : 'Merhaba! Ben BiTanı sağlık asistanınım. Sağlıkla ilgili sorularını yanıtlamaya hazırım.';
@@ -251,26 +127,27 @@ export default function ChatScreen() {
     setSendError(null);
 
     const msgId = Date.now().toString();
-    const userMsg: Message = { id: msgId, role: 'user', content: text };
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((prev) => [...prev, { id: msgId, role: 'user', content: text }]);
 
     const nextApiMessages: ApiMessage[] = [...apiMessages, { role: 'user', content: text }];
 
-    userMsgCountRef.current += 1;
-
     setSending(true);
     try {
-      // Dummy mod — gerçek API için getDummyReply yerine callAnthropic kullan
-      const reply = getDummyReply();
-      const assistantMsg: Message = { id: `${msgId}-a`, role: 'assistant', content: reply };
-      setMessages((prev) => [...prev, assistantMsg]);
+      const { data, error } = await supabase.functions.invoke('chat', {
+        body: { messages: nextApiMessages, userId },
+      });
+
+      if (error) throw new Error(error.message);
+
+      const reply = (data as { reply: string }).reply;
+      if (!reply) throw new Error('Yanıt alınamadı.');
+
+      setMessages((prev) => [...prev, { id: `${msgId}-a`, role: 'assistant', content: reply }]);
       setApiMessages([...nextApiMessages, { role: 'assistant', content: reply }]);
 
-      const acilTetiklendi =
-        containsAcilKeyword(text) ||
-        containsAcilKeyword(reply) ||
-        userMsgCountRef.current % 3 === 0;
-      if (acilTetiklendi) setShowEmergency(true);
+      if (containsAcilKeyword(text) || containsAcilKeyword(reply)) {
+        setShowEmergency(true);
+      }
     } catch (e) {
       setSendError(e instanceof Error ? e.message : 'Bir hata oluştu.');
       setMessages((prev) => prev.filter((m) => m.id !== msgId));
@@ -278,7 +155,7 @@ export default function ChatScreen() {
     } finally {
       setSending(false);
     }
-  }, [input, sending, loadingProfile, apiMessages]);
+  }, [input, sending, loadingProfile, apiMessages, userId]);
 
   if (loadingProfile) {
     return (
