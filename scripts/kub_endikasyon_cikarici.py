@@ -49,7 +49,24 @@ from supabase import create_client
 # ── .env yükle ───────────────────────────────────────────────────────────────
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
-PIPELINE_VERSION = "v3.1.0"
+PIPELINE_VERSION = "v3.2.0"
+
+# Düzeltme 1: Kontrendikasyon için minimum confidence eşiği
+KONTRA_MIN_CONFIDENCE: float = 0.15
+
+# Düzeltme 2: OCR kalite eşiği (Türkçe karakter oranı)
+OCR_MIN_QUALITY: float = 0.40
+
+# Düzeltme 3: 4.3 bölümü — sadece genel aşırı duyarlılık içeren cümleler
+# Bu kalıplar tek başına bir hastalık eşleşmesi sayılmaz
+_GENERIC_HYPERSENSITIVITY = re.compile(
+    r"(bileşen(?:ler)?(?:in)?[ea]?\s+karşı\s+(?:bilinen\s+)?(?:aşırı\s+duyarlı|hipersensitiv)"
+    r"|(?:madde(?:ler)?|içerik(?:ler)?)\s+(?:karşı\s+)?(?:bilinen\s+)?(?:aşırı\s+duyarlı|hipersensitiv)"
+    r"|(?:ilac[aı]|preparata)\s+karşı\s+(?:bilinen\s+)?(?:aşırı\s+duyarlı|hipersensitiv)"
+    r"|bu\s+(?:tıbbi\s+)?ürün(?:ün)?\s+(?:herhangi\s+bir?\s+)?bileşen"
+    r"|(?:herhangi\s+bir?\s+)?bileşen(?:ine|lerine)\s+(?:karşı\s+)?(?:aşırı\s+duyarlı|alerjis))",
+    re.I,
+)
 
 
 # ── Ortam değişkenleri ───────────────────────────────────────────────────────
@@ -451,11 +468,20 @@ async def process_medication(
     }
     parsed = await asyncio.gather(*parse_tasks.values(), return_exceptions=True)
     for key, result in zip(parse_tasks.keys(), parsed):
-        if isinstance(result, str) and result.strip():
-            texts[key] = result
+        if not isinstance(result, str) or not result.strip():
+            continue
+        # ── Düzeltme 2: OCR kalite kontrolü ─────────────────────────────────
+        tr_chars = len(re.findall(r"[a-zA-ZğüşıöçĞÜŞİÖÇ]", result))
+        ocr_quality = tr_chars / max(len(result), 1)
+        if ocr_quality < OCR_MIN_QUALITY:
+            print(f"    🔍 {key.upper()} PDF atlandı — OCR kalitesi düşük "
+                  f"({ocr_quality:.2f} < {OCR_MIN_QUALITY})")
+            st.errors += 1
+            continue
+        texts[key] = result
 
     if not texts:
-        print(f"  ⚠️  {name}: PDF okunamadı")
+        print(f"  ⚠️  {name}: PDF okunamadı veya OCR kalitesi yetersiz")
         st.errors += 1
         return st
 
@@ -501,15 +527,35 @@ async def process_medication(
     kontra_map: dict[str, dict] = {} # condition_id → match
 
     for source, (section_text, is_contra) in sections_to_process.items():
+
+        # ── Düzeltme 3: 4.3 genel aşırı duyarlılık filtresi ─────────────────
+        # Bölüm yalnızca "bileşenlerine karşı aşırı duyarlılık" içeriyorsa
+        # ve başka hastalık referansı yoksa eşleşme yapma.
+        if is_contra:
+            section_lower = section_text.lower()
+            has_generic_only = bool(_GENERIC_HYPERSENSITIVITY.search(section_text))
+            # "Gerçek" hastalık referansı var mı? Bölüm yeterince uzunsa veya
+            # hastalık adı geçiyorsa genel filtre devreye girmesin.
+            # Kısa bölüm (< 300 karakter) + sadece genel ifade = atla
+            if has_generic_only and len(section_text.strip()) < 300:
+                if DEBUG:
+                    print(f"    🔍 4.3 atlandı — yalnızca genel aşırı duyarlılık cümlesi")
+                continue
+
         matches = match_keywords(section_text, conditions)
         for m in matches:
-            cid = m["condition_id"]
+            cid  = m["condition_id"]
+            conf = m["confidence_score"]
+
             if is_contra:
+                # ── Düzeltme 1: Kontrendikasyon confidence eşiği ─────────────
+                if conf < KONTRA_MIN_CONFIDENCE:
+                    continue  # yanlış pozitif — atla
                 kontra_map[cid] = m
                 endi_map.pop(cid, None)   # endikasyon listesinden çıkar
             else:
                 if cid not in kontra_map:  # kontrendike değilse ekle
-                    if cid not in endi_map or m["confidence_score"] > endi_map[cid]["confidence_score"]:
+                    if cid not in endi_map or conf > endi_map[cid]["confidence_score"]:
                         endi_map[cid] = m
 
     # 5. Kaydet
