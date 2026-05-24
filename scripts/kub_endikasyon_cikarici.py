@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BiTanı — KÜB + KT Endikasyon Çıkarıcı  (v3.3.0)
+BiTanı — KÜB + KT Endikasyon Çıkarıcı  (v3.4.0)
 ═══════════════════════════════════════════════════
 
 Pipeline:
@@ -49,7 +49,7 @@ from supabase import create_client
 # ── .env yükle ───────────────────────────────────────────────────────────────
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
-PIPELINE_VERSION = "v3.3.0"
+PIPELINE_VERSION = "v3.4.0"
 
 # Kontrendikasyon için minimum confidence eşiği
 KONTRA_MIN_CONFIDENCE: float = 0.15
@@ -78,6 +78,52 @@ _SENT_BREAK = re.compile(
     r"|(?:\n{2,})",           # çift satır sonu (paragraf)
     re.M,
 )
+
+# ── Stopword listesi (v3.4.0) ─────────────────────────────────────────────────
+# Bu stemler/kelimeler tek başına hastalık adı değil; genel Türkçe tıp dili.
+# "hastalığı" → "Alzheimer Hastalığı", "Gut Hastalığı", "Parkinson Hastalığı"
+# gibi condition token'ı olarak ekleniyor ama metin içinde çok genel geçiyor
+# ("karaciğer hastalığı", "böbrek hastalığı" vb.) → yanlış eşleşme.
+_STOPWORDS: frozenset[str] = frozenset({
+    # "hastal*" ailesi — Türkçe'de "patient/illness" anlamına gelen genel kelimeler
+    "hastalarda", "hastalara", "hastalar", "hastalık",
+    "hastalığı", "hastalığa", "hastalığ",   # suffix-stripped formlar
+    "hastalıkta", "hastalıktan", "hastalıklar",
+    # "hasta" 5 karakter — minimum stem sınırında; çok genel olduğu için hariç
+    "hasta",
+})
+
+# ── Hastalığa özgü negatif cümle filtreleri (v3.4.0) ─────────────────────────
+# Belirli bir condition için: eşleşme bulunan CÜMLEde bu kalıp varsa atla.
+# Anahtar: text_for_match(condition_name)  →  list[re.Pattern]
+#
+# Mesane Aşırı Aktivitesi:
+#   "mesane boynu obstrüksiyonu", "mesane çıkışı" gibi anatomik ifadeler
+#   Mesane Aşırı Aktivitesi DEĞİL; üretral/boyun obstrüksiyonu anlamına gelir.
+#
+# Gut Hastalığı / Parkinson / Alzheimer:
+#   Stopword fix ("hastalığı") ana sorunu çözer; ek olarak
+#   "hastalıklarda", "hastalıklı" gibi genel "morbid" kelimeler de dışlanır.
+_CONDITION_EXCLUDES: dict[str, list[re.Pattern]] = {
+    "mesane aşırı aktivitesi": [
+        re.compile(
+            r"mesane\s+boynu|mesane\s+çıkı[sş]ı?|mesane\s+boyun"
+            r"|mesane\s+boyno|boyun\s+obstr|çıkım\s+obstr",
+            re.I,
+        ),
+    ],
+    # Gut, Parkinson, Alzheimer — "hastalığı olan hastalarda" kalıbı:
+    # "karaciğer hastalığı olan hastalarda" → "hastalığı" stopword + bu exclude
+    "gut hastalığı": [
+        re.compile(r"(?:karaciğer|böbrek|akciğer|kalp|tiroid)\s+hastalığı", re.I),
+    ],
+    "parkinson hastalığı": [
+        re.compile(r"(?:karaciğer|böbrek|akciğer|kalp|tiroid)\s+hastalığı", re.I),
+    ],
+    "alzheimer hastalığı": [
+        re.compile(r"(?:karaciğer|böbrek|akciğer|kalp|tiroid)\s+hastalığı", re.I),
+    ],
+}
 
 
 # ── Ortam değişkenleri ───────────────────────────────────────────────────────
@@ -161,12 +207,16 @@ _SUFFIXES_LONGEST_FIRST: tuple[str, ...] = (
 
 
 def _strip_suffix(word: str, max_steps: int = 6) -> frozenset[str]:
+    """
+    Türkçe suffix stripping.  Minimum kök uzunluğu 5 karakter (v3.4.0'da 4'ten artırıldı).
+    4-karakterli stemler gürültü üretti: "hastalığı" → "hast" → tüm metinlerde çakışıyordu.
+    """
     out: set[str] = {word}
     cur = word
     for _ in range(max_steps):
         nxt = cur
         for suf in _SUFFIXES_LONGEST_FIRST:
-            if cur.endswith(suf) and len(cur) - len(suf) >= 4:
+            if cur.endswith(suf) and len(cur) - len(suf) >= 5:
                 nxt = cur[: -len(suf)]
                 break
         if nxt == cur:
@@ -258,13 +308,20 @@ def match_keywords(
     """
     Keyword matching → [{condition_id, confidence_score, evidence_snippet}]
 
-    is_contraindication=True ise (4.3 bölümü):
-      Her eşleşme için eşleşmenin geçtiği cümle çıkarılır.
-      Cümle _GENERIC_HYPERSENSITIVITY regex'ine uyuyorsa bu eşleşme
-      sayılmaz — diğer keyword'ler normal devam eder.
-      Böylece "bileşenlerine karşı aşırı duyarlılık" gibi jenerik
-      cümleler filtrelenirken "kalp yetmezliğinde kontrendikedir"
-      gibi gerçek cümleler korunur.
+    Filtre katmanları (v3.4.0):
+
+    1. Stopword filtresi (_STOPWORDS):
+       "hastalarda", "hastalığı" gibi genel Türkçe tıp kelimeleri variant
+       olarak üretilse bile sayılmaz.  Tüm bölümlerde aktif.
+
+    2. Generic aşırı duyarlılık filtresi (_GENERIC_HYPERSENSITIVITY):
+       is_contraindication=True olduğunda, eşleşmenin cümlesi jenerik bir
+       "bileşenlerine karşı aşırı duyarlılık" kalıbı içeriyorsa bu keyword
+       atlanır; gerçek kontra cümleleri (ör. "kalp yetmezliğinde") korunur.
+
+    3. Hastalığa özgü negatif cümle filtresi (_CONDITION_EXCLUDES):
+       Örn. "Mesane Aşırı Aktivitesi" için "mesane boynu obstrüksiyonu"
+       içeren cümleler atlanır.  Tüm bölümlerde aktif.
     """
     hay = text_for_match(section_text)
     section_len = max(len(section_text), 1)
@@ -276,24 +333,35 @@ def match_keywords(
         if not cid or not name:
             continue
 
-        hit_count = 0
+        hit_count     = 0
         first_snippet = ""
+        cname_key     = text_for_match(name)
+        cond_excludes = _CONDITION_EXCLUDES.get(cname_key, ())
 
         for kw in _keywords_for_condition(name):
             for variant in _strip_suffix(text_for_match(kw)):
-                if len(variant) < 3 or variant not in hay:
+                # ── 1. Uzunluk + stopword kontrolü ────────────────────────────
+                if len(variant) < 3 or variant in _STOPWORDS:
+                    continue  # bu variant'ı atla; başka variant dene
+                if variant not in hay:
                     continue
 
                 idx = hay.find(variant)
 
-                # ── Cümle bazlı generic aşırı duyarlılık filtresi ──────────────
-                # Sadece kontrendikasyon bölümlerinde aktif.
-                # Eşleşmenin geçtiği cümle jenerik ise bu keyword'ü say ma;
-                # ancak döngü devam eder — başka keyword gerçek cümleden gelebilir.
-                if is_contraindication:
+                # Cümle bir kez hesaplanır, her iki filtre tarafından paylaşılır
+                sentence: str | None = None
+                if is_contraindication or cond_excludes:
                     sentence = _sentence_around(section_text, idx)
-                    if _GENERIC_HYPERSENSITIVITY.search(sentence):
-                        break  # bu kw tüm variantları generic — sonraki kw'ye geç
+
+                # ── 2. Generic aşırı duyarlılık filtresi (sadece 4.3) ──────────
+                if is_contraindication and sentence and \
+                        _GENERIC_HYPERSENSITIVITY.search(sentence):
+                    break  # bu kw tamamen generic — sonraki kw'ye geç
+
+                # ── 3. Hastalığa özgü negatif filtre ──────────────────────────
+                if cond_excludes and sentence and \
+                        any(pat.search(sentence) for pat in cond_excludes):
+                    break  # bu cümle bu condition için geçersiz — sonraki kw
 
                 hit_count += 1
                 if not first_snippet:
@@ -453,7 +521,7 @@ async def _download(
     sem: asyncio.Semaphore,
     url: str,
 ) -> bytes | None:
-    headers = {"User-Agent": "Mozilla/5.0 BiTani/3.3"}
+    headers = {"User-Agent": "Mozilla/5.0 BiTani/3.4"}
     for attempt in range(1, 4):
         async with sem:
             try:
