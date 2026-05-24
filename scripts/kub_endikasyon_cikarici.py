@@ -3,8 +3,12 @@
 BiTanı - KÜB + KT Endikasyon Çıkarıcı
 TİTCK KÜB ve KT PDF'lerinden endikasyonları çıkarır:
   - KÜB: "4.1 Terapötik Endikasyonlar" bölümü
+  - KÜB: "4.3 Kontrendikasyonlar" bölümü  → is_contraindication = True
   - KT : "Ne için kullanılır" / "Neyin için kullanılır" bölümü
+
 Her iki kaynaktan gelen eşleşmeler condition_medications tablosuna yazılır.
+Yeni kolonlar: confidence_score, is_contraindication, extraction_method,
+               evidence_snippet, source, annotation_version
 
 Çalıştırma:
   cd scripts && python -m venv .venv && source .venv/bin/activate
@@ -14,7 +18,7 @@ Her iki kaynaktan gelen eşleşmeler condition_medications tablosuna yazılır.
 
 İsteğe bağlı bayraklar (.env veya ortam):
   KUB_DEBUG=1       — bölüm bulunamazsa PDF önizleme, eşleşme yoksa metin yazdırılır
-  REPROCESS_ALL=1   — daha önce işlenmiş ilaçları da yeniden işle (KT ekleme için)
+  REPROCESS_ALL=1   — daha önce işlenmiş ilaçları da yeniden işle
   MAX_MEDICATIONS=N — test koşusu için ilaç sayısını sınırla
 
 Gerekli: Supabase service_role (RLS bypass).
@@ -51,6 +55,7 @@ SLEEP_BETWEEN = 1.0
 _max_raw = _env("MAX_MEDICATIONS")
 MAX_MEDICATIONS: int | None = int(_max_raw) if _max_raw.isdigit() else None
 _MEDICATIONS_PAGE = 500  # PostgREST URL sınırı; sayfalama + filtre
+PIPELINE_VERSION = "v2.0.0"  # confidence_score + is_contraindication + evidence_snippet
 # ───────────────────────────────────────────────────────────────────────────
 
 _PLACEHOLDER_SERVICE = "your_service_role_key_here"
@@ -58,6 +63,12 @@ _DEBUG_PREVIEW_LEN = 500
 
 # KÜB: 4 / 4. / 4 . 1 / 4.1. vb. + "terapötik" (büyük/küçük harf, çoklu boşluk)
 _SECTION_41_HEADER = re.compile(r"4[\.\s]*1[\s\.]+" + "terapötik", re.IGNORECASE)
+
+# KÜB: 4.3 Kontrendikasyonlar bölümü
+_SECTION_43_HEADER = re.compile(
+    r"4[\.\s]*3[\s\.]+(kontr(?:a)?endikasyon|kontrendike)",
+    re.IGNORECASE,
+)
 
 # KT: "Ne için kullanılır" veya "Neyin için kullanılır" (her türlü boşluk, büyük/küçük)
 _KT_SECTION_HEADER = re.compile(
@@ -309,19 +320,51 @@ def _keyword_matches_haystack(hay: str, nkw: str) -> bool:
     return False
 
 
-def match_conditions_by_keywords(endikasyon_text: str, conditions: list) -> list[str]:
-    """Endikasyon metninde katalog anahtar kelimelerini ara; eşleşen condition id'lerini döndür."""
+def match_conditions_by_keywords(
+    endikasyon_text: str,
+    conditions: list,
+) -> list[dict]:
+    """Endikasyon metninde katalog anahtar kelimelerini ara.
+
+    Döndürür: [{"condition_id": str, "confidence_score": float, "evidence_snippet": str}]
+    confidence_score = eşleşen_keyword_sayısı / sqrt(section_uzunluğu / 100)
+    0.0–1.0 aralığına normalize edilir.
+    """
     hay = text_for_match(endikasyon_text)
-    matched: list[str] = []
+    section_len = max(len(endikasyon_text), 1)
+    matched: list[dict] = []
+
     for c in conditions:
         cid = c.get("id")
         name = c.get("name") or ""
         if not cid or not name:
             continue
+
+        hit_count = 0
+        first_snippet = ""
         for nkw in normalized_keywords_for_condition(name):
-            if _keyword_matches_haystack(hay, nkw):
-                matched.append(cid)
-                break
+            for variant in _strip_turkish_suffix_chain(nkw):
+                if len(variant) >= 2 and variant in hay:
+                    hit_count += 1
+                    if not first_snippet:
+                        # Eşleşen yerin çevresinden 120 karakter al
+                        idx = hay.find(variant)
+                        start = max(0, idx - 40)
+                        end = min(len(endikasyon_text), idx + 80)
+                        first_snippet = endikasyon_text[start:end].strip()
+                    break  # Bu keyword için ilk eşleşme yeterli
+
+        if hit_count > 0:
+            # Kısa metinde 1 hit = daha güvenilir; uzun metinde normalize et
+            import math
+            raw_score = hit_count / (1 + math.log(section_len / 100 + 1))
+            confidence = min(round(raw_score, 3), 1.0)
+            matched.append({
+                "condition_id": cid,
+                "confidence_score": confidence,
+                "evidence_snippet": first_snippet[:200],
+            })
+
     return matched
 
 
@@ -463,6 +506,37 @@ def extract_section_41_from_text(full_text: str) -> str | None:
     return section[:2000] if section else None
 
 
+def extract_section_43_from_text(full_text: str) -> str | None:
+    """KÜB metninden 4.3 Kontrendikasyonlar bölümünü kes.
+
+    Bu bölümden gelen eşleşmeler is_contraindication=True olarak işaretlenir.
+    """
+    markers_end = [
+        "4.4 Özel",
+        "4.4. Özel",
+        "4.4 ÖZEL",
+        "4.4 ozel",
+        "4.5 Diğer",
+        "4.5. Diğer",
+    ]
+
+    m = _SECTION_43_HEADER.search(full_text)
+    if not m:
+        return None
+    start_idx = m.end()
+
+    end_idx = len(full_text)
+    for marker in markers_end:
+        idx = full_text.find(marker, start_idx)
+        if idx == -1:
+            idx = full_text.lower().find(marker.lower(), start_idx)
+        if idx != -1 and idx < end_idx:
+            end_idx = idx
+
+    section = full_text[start_idx:end_idx].strip()
+    return section[:2000] if section else None
+
+
 def extract_kt_section_from_text(full_text: str) -> str | None:
     """KT metninden 'Ne için kullanılır' / 'Neyin için kullanılır' bölümünü kes."""
     # KT belgesinde bu başlıktan sonraki bölüm bir sonraki ana başlığa kadar alınır
@@ -491,18 +565,32 @@ def extract_kt_section_from_text(full_text: str) -> str | None:
     return section[:2000] if section else None
 
 
-def save_condition_medications(medication_id: str, condition_ids: list[str], source: str) -> int:
-    """condition_medications tablosuna kaydet (duplicate'leri atla)."""
-    if not condition_ids:
+def save_condition_medications(
+    medication_id: str,
+    matches: list[dict],
+    source: str,
+    is_contraindication: bool = False,
+) -> int:
+    """condition_medications tablosuna kaydet.
+
+    matches: [{"condition_id": str, "confidence_score": float, "evidence_snippet": str}]
+    Kontrendikasyon eşleşmeleri is_contraindication=True ile ayrı kaydedilir.
+    """
+    if not matches:
         return 0
 
     rows = [
         {
             "medication_id": medication_id,
-            "condition_id": cid,
-            "notes": f"{source} anahtar kelime eşleştirme",
+            "condition_id": m["condition_id"],
+            "confidence_score": m.get("confidence_score"),
+            "evidence_snippet": m.get("evidence_snippet", "")[:200],
+            "extraction_method": "keyword",
+            "source": source,
+            "is_contraindication": is_contraindication,
+            "annotation_version": PIPELINE_VERSION,
         }
-        for cid in condition_ids
+        for m in matches
     ]
 
     try:
@@ -538,11 +626,13 @@ def main() -> None:
     stats = {
         "toplam": len(medications),
         "kub_pdf_indirildi": 0,
-        "kub_bolum_bulundu": 0,
+        "kub_bolum_41_bulundu": 0,
+        "kub_bolum_43_bulundu": 0,
         "kt_pdf_indirildi": 0,
         "kt_bolum_bulundu": 0,
         "eslestirme_yapildi": 0,
         "kayit_eklendi": 0,
+        "kontrendikasyon_eklendi": 0,
         "hata": 0,
     }
 
@@ -550,7 +640,9 @@ def main() -> None:
         name = (med.get("ilac_adi") or "")[:50]
         print(f"[{i + 1}/{len(medications)}] {name}...")
 
-        all_condition_ids: set[str] = set()
+        # {condition_id: {"confidence_score": float, "evidence_snippet": str}}
+        endikasyon_matches: dict[str, dict] = {}
+        kontra_matches: dict[str, dict] = {}
         sources_used: list[str] = []
 
         # ── KÜB PDF ──────────────────────────────────────────────────────────
@@ -573,30 +665,51 @@ def main() -> None:
                         section = extract_kt_section_from_text(full_text)
                         if section:
                             stats["kt_bolum_bulundu"] += 1
-                            matched = match_conditions_by_keywords(section, conditions)
-                            all_condition_ids.update(matched)
-                            sources_used.append("KT(kub_url)")
-                            print(f"  KT(kub_url) ✓ Bölüm bulundu ({len(section)} karakter, {len(matched)} eşleşme)")
+                            for m in match_conditions_by_keywords(section, conditions):
+                                cid = m["condition_id"]
+                                if cid not in endikasyon_matches or \
+                                   m["confidence_score"] > endikasyon_matches[cid]["confidence_score"]:
+                                    endikasyon_matches[cid] = m
+                            sources_used.append("KT")
+                            print(f"  KT(kub_url) ✓ {len(section)} karakter, {len(endikasyon_matches)} eşleşme")
                         else:
                             print("  KT(kub_url) ✗ 'Ne için kullanılır' bölümü bulunamadı")
                             if _debug_kub():
-                                print(f"  [DEBUG] KT(kub_url) ilk {_DEBUG_PREVIEW_LEN} karakter:")
+                                print(f"  [DEBUG] ilk {_DEBUG_PREVIEW_LEN} karakter:")
                                 print(full_text[:_DEBUG_PREVIEW_LEN])
                     else:
-                        section = extract_section_41_from_text(full_text)
-                        if section:
-                            stats["kub_bolum_bulundu"] += 1
-                            matched = match_conditions_by_keywords(section, conditions)
-                            all_condition_ids.update(matched)
-                            sources_used.append("KÜB")
-                            print(f"  KÜB ✓ Bölüm bulundu ({len(section)} karakter, {len(matched)} eşleşme)")
+                        # ── 4.1 Endikasyonlar ────────────────────────────────
+                        section_41 = extract_section_41_from_text(full_text)
+                        if section_41:
+                            stats["kub_bolum_41_bulundu"] += 1
+                            for m in match_conditions_by_keywords(section_41, conditions):
+                                cid = m["condition_id"]
+                                if cid not in endikasyon_matches or \
+                                   m["confidence_score"] > endikasyon_matches[cid]["confidence_score"]:
+                                    endikasyon_matches[cid] = m
+                            sources_used.append("KUB_4_1")
+                            print(f"  KÜB 4.1 ✓ {len(section_41)} karakter, {len(endikasyon_matches)} eşleşme")
                         else:
                             print("  KÜB ✗ 4.1 bölümü bulunamadı")
                             if _debug_kub():
-                                print(f"  [DEBUG] KÜB PDF ilk {_DEBUG_PREVIEW_LEN} karakter:")
+                                print(f"  [DEBUG] KÜB ilk {_DEBUG_PREVIEW_LEN} karakter:")
                                 print(full_text[:_DEBUG_PREVIEW_LEN])
                                 print("  [DEBUG] — önizleme sonu —")
                             stats["hata"] += 1
+
+                        # ── 4.3 Kontrendikasyonlar ───────────────────────────
+                        section_43 = extract_section_43_from_text(full_text)
+                        if section_43:
+                            stats["kub_bolum_43_bulundu"] += 1
+                            contra = match_conditions_by_keywords(section_43, conditions)
+                            for m in contra:
+                                cid = m["condition_id"]
+                                # Kontrendikasyon endikasyon listesinden çıkarılır
+                                endikasyon_matches.pop(cid, None)
+                                if cid not in kontra_matches or \
+                                   m["confidence_score"] > kontra_matches[cid]["confidence_score"]:
+                                    kontra_matches[cid] = m
+                            print(f"  KÜB 4.3 ✓ {len(section_43)} karakter, {len(kontra_matches)} kontrendikasyon")
                 finally:
                     try:
                         os.unlink(pdf_path)
@@ -619,14 +732,20 @@ def main() -> None:
                         section = extract_kt_section_from_text(full_text)
                         if section:
                             stats["kt_bolum_bulundu"] += 1
-                            matched = match_conditions_by_keywords(section, conditions)
-                            all_condition_ids.update(matched)
+                            for m in match_conditions_by_keywords(section, conditions):
+                                cid = m["condition_id"]
+                                # Kontrendikasyon olarak işaretlenmişse KT'den ekle ama kontrendike bayrakla
+                                if cid in kontra_matches:
+                                    continue
+                                if cid not in endikasyon_matches or \
+                                   m["confidence_score"] > endikasyon_matches[cid]["confidence_score"]:
+                                    endikasyon_matches[cid] = m
                             sources_used.append("KT")
-                            print(f"  KT ✓ Bölüm bulundu ({len(section)} karakter, {len(matched)} eşleşme)")
+                            print(f"  KT ✓ {len(section)} karakter, {len(endikasyon_matches)} toplam eşleşme")
                         else:
                             print("  KT ✗ 'Ne için kullanılır' bölümü bulunamadı")
                             if _debug_kub():
-                                print(f"  [DEBUG] KT PDF ilk {_DEBUG_PREVIEW_LEN} karakter:")
+                                print(f"  [DEBUG] KT ilk {_DEBUG_PREVIEW_LEN} karakter:")
                                 print(full_text[:_DEBUG_PREVIEW_LEN])
                                 print("  [DEBUG] — önizleme sonu —")
                 finally:
@@ -635,28 +754,53 @@ def main() -> None:
                     except OSError:
                         pass
 
-        # ── Kaydet ───────────────────────────────────────────────────────────
-        if all_condition_ids:
-            source_label = "+".join(sources_used)
+        # ── Kaydet: Endikasyonlar ────────────────────────────────────────────
+        source_label = "+".join(sources_used) if sources_used else "keyword"
+        total_saved = 0
+
+        if endikasyon_matches:
             stats["eslestirme_yapildi"] += 1
-            count = save_condition_medications(med["id"], list(all_condition_ids), source=source_label)
+            count = save_condition_medications(
+                med["id"],
+                list(endikasyon_matches.values()),
+                source=source_label,
+                is_contraindication=False,
+            )
             stats["kayit_eklendi"] += count
-            print(f"  ✓ {len(all_condition_ids)} hastalık eşleşti, {count} kayıt eklendi [{source_label}]")
+            total_saved += count
+
+        # ── Kaydet: Kontrendikasyonlar ───────────────────────────────────────
+        if kontra_matches:
+            count = save_condition_medications(
+                med["id"],
+                list(kontra_matches.values()),
+                source="KUB_4_3",
+                is_contraindication=True,
+            )
+            stats["kontrendikasyon_eklendi"] += count
+            total_saved += count
+
+        if total_saved > 0:
+            print(f"  ✓ {len(endikasyon_matches)} endikasyon + {len(kontra_matches)} kontrendikasyon "
+                  f"→ {total_saved} kayıt [{source_label}]")
         else:
             print("  - Eşleşen hastalık bulunamadı")
 
         time.sleep(SLEEP_BETWEEN)
 
-    print("\n── Özet ──────────────────────────────────")
+    print("\n── Özet ──────────────────────────────────────")
+    print(f"Pipeline versiyonu     : {PIPELINE_VERSION}")
     print(f"Toplam ilaç            : {stats['toplam']}")
     print(f"KÜB PDF indirildi      : {stats['kub_pdf_indirildi']}")
-    print(f"KÜB bölüm bulundu      : {stats['kub_bolum_bulundu']}")
+    print(f"KÜB 4.1 bölüm bulundu  : {stats['kub_bolum_41_bulundu']}")
+    print(f"KÜB 4.3 bölüm bulundu  : {stats['kub_bolum_43_bulundu']}")
     print(f"KT PDF indirildi       : {stats['kt_pdf_indirildi']}")
     print(f"KT bölüm bulundu       : {stats['kt_bolum_bulundu']}")
     print(f"Eşleştirme yapıldı     : {stats['eslestirme_yapildi']}")
-    print(f"Kayıt eklendi          : {stats['kayit_eklendi']}")
+    print(f"Endikasyon kaydı       : {stats['kayit_eklendi']}")
+    print(f"Kontrendikasyon kaydı  : {stats['kontrendikasyon_eklendi']}")
     print(f"Hata                   : {stats['hata']}")
-    print("──────────────────────────────────────────")
+    print("──────────────────────────────────────────────")
 
 
 if __name__ == "__main__":
