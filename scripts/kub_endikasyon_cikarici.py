@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BiTanı — KÜB + KT Endikasyon Çıkarıcı  (v3.1.0)
+BiTanı — KÜB + KT Endikasyon Çıkarıcı  (v3.3.0)
 ═══════════════════════════════════════════════════
 
 Pipeline:
@@ -49,23 +49,34 @@ from supabase import create_client
 # ── .env yükle ───────────────────────────────────────────────────────────────
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
-PIPELINE_VERSION = "v3.2.0"
+PIPELINE_VERSION = "v3.3.0"
 
-# Düzeltme 1: Kontrendikasyon için minimum confidence eşiği
+# Kontrendikasyon için minimum confidence eşiği
 KONTRA_MIN_CONFIDENCE: float = 0.15
 
-# Düzeltme 2: OCR kalite eşiği (Türkçe karakter oranı)
+# OCR kalite eşiği (Türkçe karakter oranı)
 OCR_MIN_QUALITY: float = 0.40
 
-# Düzeltme 3: 4.3 bölümü — sadece genel aşırı duyarlılık içeren cümleler
-# Bu kalıplar tek başına bir hastalık eşleşmesi sayılmaz
+# Cümle bazlı generic aşırı duyarlılık filtresi (v3.3.0)
+# 4.3 bölümünde bu kalıbı içeren CÜMLELERdeki eşleşmeler sayılmaz.
+# Gerçek kontrendikasyon cümleleri (ör. "kalp yetmezliğinde") etkilenmez.
 _GENERIC_HYPERSENSITIVITY = re.compile(
-    r"(bileşen(?:ler)?(?:in)?[ea]?\s+karşı\s+(?:bilinen\s+)?(?:aşırı\s+duyarlı|hipersensitiv)"
-    r"|(?:madde(?:ler)?|içerik(?:ler)?)\s+(?:karşı\s+)?(?:bilinen\s+)?(?:aşırı\s+duyarlı|hipersensitiv)"
-    r"|(?:ilac[aı]|preparata)\s+karşı\s+(?:bilinen\s+)?(?:aşırı\s+duyarlı|hipersensitiv)"
+    r"(bileşen(?:ler)?(?:in)?[ea]?\s+karşı\s+(?:bilinen\s+)?(?:aşırı\s+duyarlı|hipersensitiv|aşırı\s+hassasiyet)"
+    r"|(?:madde(?:ler)?|içerik(?:ler)?)\s+(?:karşı\s+)?(?:bilinen\s+)?(?:aşırı\s+duyarlı|hipersensitiv|aşırı\s+hassasiyet)"
+    r"|(?:ilac[aı]|preparata)\s+karşı\s+(?:bilinen\s+)?(?:aşırı\s+duyarlı|hipersensitiv|aşırı\s+hassasiyet)"
     r"|bu\s+(?:tıbbi\s+)?ürün(?:ün)?\s+(?:herhangi\s+bir?\s+)?bileşen"
-    r"|(?:herhangi\s+bir?\s+)?bileşen(?:ine|lerine)\s+(?:karşı\s+)?(?:aşırı\s+duyarlı|alerjis))",
+    r"|(?:herhangi\s+bir(?:isi)?(?:ne|ye|nde|e)?)\s+(?:karşı\s+)?(?:aşırı\s+duyarlı|aşırı\s+hassasiyet|alerjis)"
+    r"|(?:herhangi\s+bir?\s+)?bileşen(?:ine|lerine)\s+(?:karşı\s+)?(?:aşırı\s+duyarlı|alerjis)"
+    r"|çapraz\s+duyarlılık|çapraz\s+reaksiyon)",
     re.I,
+)
+
+# Cümle sınırı ayıraçları — _sentence_around() için
+_SENT_BREAK = re.compile(
+    r"(?<=[.;!?])\s+"        # noktalama + boşluk
+    r"|(?:\n[ \t]*[•\-–])"  # satır başı madde işareti
+    r"|(?:\n{2,})",           # çift satır sonu (paragraf)
+    re.M,
 )
 
 
@@ -197,6 +208,30 @@ _CATALOG_EXTRAS: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 
 
+def _sentence_around(text: str, pos: int, radius: int = 300) -> str:
+    """
+    `pos` karakteri etrafındaki cümleyi döndürür.
+
+    Cümle sınırı: noktalama işareti + boşluk, madde işareti satırı veya
+    çift satır sonu.  Hem sol hem sağ `radius` karakter taranır.
+    """
+    lo = max(0, pos - radius)
+    hi = min(len(text), pos + radius)
+    chunk = text[lo:hi]
+    local = pos - lo  # chunk içindeki yerel offset
+
+    # Sol sınır: chunk[:local] içinde son kırılma noktasının sonu
+    start = 0
+    for m in _SENT_BREAK.finditer(chunk[:local]):
+        start = m.end()
+
+    # Sağ sınır: local'den itibaren ilk kırılma noktasının başı
+    rm = _SENT_BREAK.search(chunk, local)
+    end = (rm.start() + 1) if rm else len(chunk)
+
+    return chunk[start:end].strip()
+
+
 def _keywords_for_condition(name: str) -> frozenset[str]:
     n = text_for_match(name.strip())
     terms: set[str] = {n}
@@ -214,8 +249,23 @@ def _keywords_for_condition(name: str) -> frozenset[str]:
     return frozenset(t for t in terms if len(text_for_match(t)) >= 3)
 
 
-def match_keywords(section_text: str, conditions: list[dict]) -> list[dict]:
-    """Keyword matching → [{condition_id, confidence_score, evidence_snippet}]"""
+def match_keywords(
+    section_text: str,
+    conditions: list[dict],
+    *,
+    is_contraindication: bool = False,
+) -> list[dict]:
+    """
+    Keyword matching → [{condition_id, confidence_score, evidence_snippet}]
+
+    is_contraindication=True ise (4.3 bölümü):
+      Her eşleşme için eşleşmenin geçtiği cümle çıkarılır.
+      Cümle _GENERIC_HYPERSENSITIVITY regex'ine uyuyorsa bu eşleşme
+      sayılmaz — diğer keyword'ler normal devam eder.
+      Böylece "bileşenlerine karşı aşırı duyarlılık" gibi jenerik
+      cümleler filtrelenirken "kalp yetmezliğinde kontrendikedir"
+      gibi gerçek cümleler korunur.
+    """
     hay = text_for_match(section_text)
     section_len = max(len(section_text), 1)
     results: list[dict] = []
@@ -231,20 +281,32 @@ def match_keywords(section_text: str, conditions: list[dict]) -> list[dict]:
 
         for kw in _keywords_for_condition(name):
             for variant in _strip_suffix(text_for_match(kw)):
-                if len(variant) >= 3 and variant in hay:
-                    hit_count += 1
-                    if not first_snippet:
-                        idx   = hay.find(variant)
-                        start = max(0, idx - 40)
-                        end   = min(len(section_text), idx + 80)
-                        first_snippet = section_text[start:end].strip()
-                    break  # bu kw için yeter
+                if len(variant) < 3 or variant not in hay:
+                    continue
+
+                idx = hay.find(variant)
+
+                # ── Cümle bazlı generic aşırı duyarlılık filtresi ──────────────
+                # Sadece kontrendikasyon bölümlerinde aktif.
+                # Eşleşmenin geçtiği cümle jenerik ise bu keyword'ü say ma;
+                # ancak döngü devam eder — başka keyword gerçek cümleden gelebilir.
+                if is_contraindication:
+                    sentence = _sentence_around(section_text, idx)
+                    if _GENERIC_HYPERSENSITIVITY.search(sentence):
+                        break  # bu kw tüm variantları generic — sonraki kw'ye geç
+
+                hit_count += 1
+                if not first_snippet:
+                    start = max(0, idx - 40)
+                    end   = min(len(section_text), idx + 80)
+                    first_snippet = section_text[start:end].strip()
+                break  # bu kw için yeter
 
         if hit_count > 0:
             raw_score  = hit_count / (1 + math.log(section_len / 100 + 1))
             confidence = min(round(raw_score, 3), 1.0)
             results.append({
-                "condition_id":    cid,
+                "condition_id":     cid,
                 "confidence_score": confidence,
                 "evidence_snippet": first_snippet[:200],
             })
@@ -391,7 +453,7 @@ async def _download(
     sem: asyncio.Semaphore,
     url: str,
 ) -> bytes | None:
-    headers = {"User-Agent": "Mozilla/5.0 BiTani/3.1"}
+    headers = {"User-Agent": "Mozilla/5.0 BiTani/3.3"}
     for attempt in range(1, 4):
         async with sem:
             try:
@@ -528,21 +590,10 @@ async def process_medication(
 
     for source, (section_text, is_contra) in sections_to_process.items():
 
-        # ── Düzeltme 3: 4.3 genel aşırı duyarlılık filtresi ─────────────────
-        # Bölüm yalnızca "bileşenlerine karşı aşırı duyarlılık" içeriyorsa
-        # ve başka hastalık referansı yoksa eşleşme yapma.
-        if is_contra:
-            section_lower = section_text.lower()
-            has_generic_only = bool(_GENERIC_HYPERSENSITIVITY.search(section_text))
-            # "Gerçek" hastalık referansı var mı? Bölüm yeterince uzunsa veya
-            # hastalık adı geçiyorsa genel filtre devreye girmesin.
-            # Kısa bölüm (< 300 karakter) + sadece genel ifade = atla
-            if has_generic_only and len(section_text.strip()) < 300:
-                if DEBUG:
-                    print(f"    🔍 4.3 atlandı — yalnızca genel aşırı duyarlılık cümlesi")
-                continue
-
-        matches = match_keywords(section_text, conditions)
+        # match_keywords: is_contraindication=True olduğunda her eşleşmenin
+        # geçtiği cümleyi kontrol eder; jenerik aşırı duyarlılık cümleleri atlanır.
+        matches = match_keywords(section_text, conditions,
+                                 is_contraindication=is_contra)
         for m in matches:
             cid  = m["condition_id"]
             conf = m["confidence_score"]
