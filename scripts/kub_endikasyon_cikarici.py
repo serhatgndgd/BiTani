@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BiTanı — KÜB + KT Endikasyon Çıkarıcı  (v3.4.0)
+BiTanı — KÜB + KT Endikasyon Çıkarıcı  (v3.5.0)
 ═══════════════════════════════════════════════════
 
 Pipeline:
@@ -24,6 +24,9 @@ Ortam değişkenleri (.env):
   SUPABASE_URL              — zorunlu
   SUPABASE_SERVICE_ROLE_KEY — zorunlu
   MAX_MEDICATIONS=N         — test için ilaç sınırı (varsayılan: tümü)
+  MEDICATION_OFFSET=N       — DB'deki başlangıç pozisyonu (varsayılan: 0)
+  MEDICATION_LIMIT=N        — bu çalıştırmada işlenecek maksimum ilaç
+                              (paralel çalıştırma için — OFFSET ile birlikte kullan)
   REPROCESS_ALL=1           — daha önce işlenenleri de yeniden işle
   KUB_DEBUG=1               — bölüm bulunamazsa PDF önizleme yazdır
   CONCURRENT_DOWNLOADS=10   — eş zamanlı PDF indirme sayısı
@@ -49,7 +52,7 @@ from supabase import create_client
 # ── .env yükle ───────────────────────────────────────────────────────────────
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
-PIPELINE_VERSION = "v3.4.0"
+PIPELINE_VERSION = "v3.5.0"
 
 # Kontrendikasyon için minimum confidence eşiği
 KONTRA_MIN_CONFIDENCE: float = 0.15
@@ -138,6 +141,17 @@ SUPABASE_KEY = _env("SUPABASE_SERVICE_ROLE_KEY")
 
 _max_raw = _env("MAX_MEDICATIONS")
 MAX_MEDICATIONS: int | None = int(_max_raw) if _max_raw.isdigit() else None
+
+# Paralel çalıştırma için sayfalama
+# Örnek — 3 terminal:
+#   MEDICATION_OFFSET=0     MEDICATION_LIMIT=5000 python kub_endikasyon_cikarici.py
+#   MEDICATION_OFFSET=5000  MEDICATION_LIMIT=5000 python kub_endikasyon_cikarici.py
+#   MEDICATION_OFFSET=10000 MEDICATION_LIMIT=5000 python kub_endikasyon_cikarici.py
+_off_raw = _env("MEDICATION_OFFSET")
+_lim_raw = _env("MEDICATION_LIMIT")
+MEDICATION_OFFSET: int       = int(_off_raw) if _off_raw.isdigit() else 0
+MEDICATION_LIMIT:  int | None = int(_lim_raw) if _lim_raw.isdigit() else None
+
 CONCURRENT_DOWNLOADS: int = int(_env("CONCURRENT_DOWNLOADS", "10"))
 REPROCESS_ALL: bool = _env("REPROCESS_ALL", "0").lower() in ("1", "true", "yes")
 DEBUG: bool = _env("KUB_DEBUG", "0").lower() in ("1", "true", "yes")
@@ -449,26 +463,44 @@ def fetch_processed_ids() -> set[str]:
 
 
 def fetch_medications(skip_ids: set[str]) -> list[dict]:
+    """
+    URL'si olan ilaçları DB'den çeker.
+
+    Sayfalama:
+      MEDICATION_OFFSET — DB sıralamasındaki başlangıç pozisyonu (varsayılan 0).
+      MEDICATION_LIMIT  — bu çalıştırmada işlenecek maksimum ilaç sayısı.
+      MAX_MEDICATIONS   — test kısıtı; her ikisi de setliyse küçük olan geçerli.
+
+    Paralel kullanım örneği (3 terminal, 15k ilacı 3'e böl):
+      MEDICATION_OFFSET=0     MEDICATION_LIMIT=5000 python kub_endikasyon_cikarici.py
+      MEDICATION_OFFSET=5000  MEDICATION_LIMIT=5000 python kub_endikasyon_cikarici.py
+      MEDICATION_OFFSET=10000 MEDICATION_LIMIT=6000 python kub_endikasyon_cikarici.py
+    """
     out: list[dict] = []
-    offset = 0
+    db_offset = MEDICATION_OFFSET          # DB'deki başlangıç satırı
+
+    # Etkin üst sınır: MEDICATION_LIMIT ve MAX_MEDICATIONS'dan küçük olanı
+    limits = [l for l in (MEDICATION_LIMIT, MAX_MEDICATIONS) if l]
+    effective_limit: int | None = min(limits) if limits else None
+
     while True:
         rows = (
             supabase.table("medications")
             .select("id, ilac_adi, kub_url, kt_url")
             .or_("kub_url.not.is.null,kt_url.not.is.null")
             .order("id")
-            .range(offset, offset + MEDICATIONS_PAGE - 1)
+            .range(db_offset, db_offset + MEDICATIONS_PAGE - 1)
             .execute()
             .data or []
         )
         for med in rows:
             if med.get("id") not in skip_ids:
                 out.append(med)
-                if MAX_MEDICATIONS and len(out) >= MAX_MEDICATIONS:
+                if effective_limit and len(out) >= effective_limit:
                     return out
         if len(rows) < MEDICATIONS_PAGE:
             break
-        offset += MEDICATIONS_PAGE
+        db_offset += MEDICATIONS_PAGE
     return out
 
 
@@ -708,6 +740,10 @@ async def main_async() -> None:
     print(f"  Paralel İndirme: {CONCURRENT_DOWNLOADS}")
     if REPROCESS_ALL:
         print("  ⚠️  REPROCESS_ALL=1 — tüm ilaçlar yeniden işlenecek")
+    if MEDICATION_OFFSET:
+        print(f"  ↪  MEDICATION_OFFSET={MEDICATION_OFFSET}")
+    if MEDICATION_LIMIT:
+        print(f"  ↩  MEDICATION_LIMIT={MEDICATION_LIMIT}")
     if MAX_MEDICATIONS:
         print(f"  ⚙️  MAX_MEDICATIONS={MAX_MEDICATIONS} (test modu)")
     print("═" * 58)
