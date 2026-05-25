@@ -12,6 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '../components/EmptyState';
+import { HospitalIcon } from '../components/HospitalIcon';
+import { PharmacyIcon } from '../components/PharmacyIcon';
 import { SkeletonBox } from '../components/SkeletonBox';
 import { C } from '../theme';
 
@@ -300,8 +302,8 @@ function EczaneCard({ item, userCoords }: EczaneCardProps) {
 
   return (
     <View style={styles.card}>
-      <View style={[styles.cardIcon, styles.cardIconPharmacy]}>
-        <Ionicons name="medkit" size={18} color={C.pharmacy} />
+      <View style={styles.iconWrap}>
+        <PharmacyIcon size={40} />
       </View>
 
       <View style={styles.cardBody}>
@@ -356,12 +358,8 @@ function PlaceCard({ item, userCoords, isPharmacy = false }: PlaceCardProps) {
       style={({ pressed }) => [styles.card, pressed && { opacity: 0.72 }]}
       onPress={() => openMapsRoute(userCoords, item.lat, item.lng)}
     >
-      <View style={[styles.cardIcon, isPharmacy ? styles.cardIconPharmacy : styles.cardIconHospital]}>
-        <Ionicons
-          name={isPharmacy ? 'medkit' : 'business'}
-          size={18}
-          color={isPharmacy ? C.pharmacy : C.primary}
-        />
+      <View style={styles.iconWrap}>
+        {isPharmacy ? <PharmacyIcon size={40} /> : <HospitalIcon size={40} />}
       </View>
 
       <View style={styles.cardBody}>
@@ -763,16 +761,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
   },
-  cardIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 11,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 1,
-  },
-  cardIconPharmacy: { backgroundColor: C.pharmacyDim },
-  cardIconHospital: { backgroundColor: C.primaryDim },
+  /* İkon sarmalayıcı (PharmacyIcon / HospitalIcon kendi şeklini çiziyor) */
+  iconWrap: { marginTop: 1, flexShrink: 0 },
 
   cardBody:  { flex: 1, gap: 5 },
   cardName:  { color: C.text1, fontSize: 14, fontWeight: '600', lineHeight: 20 },
