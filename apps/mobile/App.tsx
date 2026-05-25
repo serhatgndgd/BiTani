@@ -6,6 +6,7 @@ import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -14,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import ChatScreen from './screens/ChatScreen';
 import HomeScreen from './screens/HomeScreen';
 import LoginScreen from './screens/LoginScreen';
+import NearbyScreen from './screens/NearbyScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import WelcomeScreen from './screens/WelcomeScreen';
 import OtpScreen from './screens/OtpScreen';
@@ -124,6 +126,17 @@ function MainNavigator() {
         }}
       />
       <MainTabs.Screen
+        name="Nearby"
+        component={NearbyScreen}
+        options={{
+          title: 'Yakın Yerler',
+          tabBarLabel: 'Yakın',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="location-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <MainTabs.Screen
         name="Chat"
         component={ChatScreen}
         options={{
@@ -150,23 +163,56 @@ function MainNavigator() {
   );
 }
 
+// ─── Biyometrik kilit ekranı ──────────────────────────────────────────────────
+
+interface BiometricGateProps {
+  onRetry: () => void;
+}
+
+function BiometricGate({ onRetry }: BiometricGateProps) {
+  return (
+    <View style={styles.biometricGate}>
+      <View style={styles.biometricIcon}>
+        <Ionicons name="finger-print-outline" size={58} color="#1a6ef5" />
+      </View>
+      <Text style={styles.biometricTitle}>BiTanı</Text>
+      <Text style={styles.biometricSub}>
+        Sağlık verilerinizi korumak için{'\n'}kimliğinizi doğrulayın.
+      </Text>
+      <Pressable
+        style={({ pressed }) => [styles.biometricBtn, pressed && { opacity: 0.8 }]}
+        onPress={onRetry}
+      >
+        <Ionicons name="finger-print-outline" size={18} color="#fff" />
+        <Text style={styles.biometricBtnText}>Tekrar Dene</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── Ana uygulama ─────────────────────────────────────────────────────────────
+
 /**
- * Supabase expo-user-management örneğiyle aynı çekirdek:
- * - İlk açılışta getSession()
- * - onAuthStateChange ile oturum güncellemeleri
- * - Oturum netleşene kadar yükleme ekranı
- *
- * BiTanı akışı:
+ * Auth akışı:
  * - Oturum yok → Welcome (Auth stack)
  * - Oturum var + onboarding_completed false → Onboarding
- * - Oturum var + onboarding_completed true → MainTabs
+ * - Oturum var + onboarding_completed true → Biometric gate → MainTabs
+ *
+ * Biometric akışı:
+ * - Donanım/kayıt yok → doğrudan geç
+ * - Face ID / Touch ID başarılı → MainTabs
+ * - İptal/başarısız → BiometricGate (tekrar dene)
  */
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
-  /** İlk getSession() tamamlandı mı (oturum null da olsa “belli”) */
   const [sessionReady, setSessionReady] = useState(false);
-  /** null: profil sorgusu sürüyor; true: onboarding gerekli; false: tamamlandı */
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
+
+  // Biyometrik durum: null=henüz kontrol edilmedi, checking=doğrulanıyor
+  const [biometricPassed, setBiometricPassed] = useState(false);
+  const [biometricChecking, setBiometricChecking] = useState(false);
+
+  // ─── Profil kapı kontrolü ────────────────────────────────────────────────
 
   const refreshProfileGate = useCallback(async (userId: string) => {
     setNeedsOnboarding(null);
@@ -188,6 +234,8 @@ export default function App() {
     if (error || !user?.id) return;
     await refreshProfileGate(user.id);
   }, [refreshProfileGate]);
+
+  // ─── Session ─────────────────────────────────────────────────────────────
 
   useEffect(() => {
     let cancelled = false;
@@ -220,12 +268,52 @@ export default function App() {
     void refreshProfileGate(uid);
   }, [session, refreshProfileGate]);
 
+  // ─── Biyometrik auth ─────────────────────────────────────────────────────
+
+  const promptBiometric = useCallback(async () => {
+    setBiometricChecking(true);
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+
+      if (!hasHardware || !enrolled) {
+        // Desteklenmiyor veya kayıtlı değil → doğrudan geç
+        setBiometricPassed(true);
+        return;
+      }
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'BiTanı sağlık verilerinizi korur',
+        cancelLabel: 'İptal',
+        disableDeviceFallback: false,
+      });
+      setBiometricPassed(result.success);
+    } catch {
+      // Hata durumunda da geç (güvenlik > kullanılabilirlik için false yapılabilir)
+      setBiometricPassed(true);
+    } finally {
+      setBiometricChecking(false);
+    }
+  }, []);
+
+  // showMain her true olduğunda biyometriği tetikle, oturum kapanınca sıfırla
   const signedIn = !!session;
   const profileLoading = signedIn && needsOnboarding === null;
   const showOnboarding = signedIn && needsOnboarding === true;
   const showMain = signedIn && needsOnboarding === false;
 
-  const showSplash = !sessionReady || profileLoading;
+  useEffect(() => {
+    if (!showMain) {
+      setBiometricPassed(false);
+      setBiometricChecking(false);
+      return;
+    }
+    void promptBiometric();
+  }, [showMain, promptBiometric]);
+
+  // ─── Yükleniyor ───────────────────────────────────────────────────────────
+
+  const showSplash = !sessionReady || profileLoading || (showMain && biometricChecking);
 
   if (showSplash) {
     return (
@@ -239,6 +327,20 @@ export default function App() {
       </GestureHandlerRootView>
     );
   }
+
+  // Biyometrik kapı (sadece showMain + geçilmedi + kontrol bitti)
+  if (showMain && !biometricPassed) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <BiometricGate onRetry={() => void promptBiometric()} />
+          <StatusBar style="light" />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    );
+  }
+
+  // ─── Ana render ───────────────────────────────────────────────────────────
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -269,5 +371,54 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0a0a',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  /* Biyometrik kapı */
+  biometricGate: {
+    flex: 1,
+    backgroundColor: '#0a0a0a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+    gap: 14,
+  },
+  biometricIcon: {
+    width: 88,
+    height: 88,
+    borderRadius: 24,
+    backgroundColor: 'rgba(26,110,245,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(26,110,245,0.2)',
+  },
+  biometricTitle: {
+    color: '#fff',
+    fontSize: 26,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  biometricSub: {
+    color: '#555',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 8,
+  },
+  biometricBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#1a6ef5',
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginTop: 8,
+  },
+  biometricBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

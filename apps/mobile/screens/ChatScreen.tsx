@@ -18,7 +18,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { supabase } from '../lib/supabase';
 
-const ACIL_KELIMELER = ['acil', 'hastane', '112', 'ambulans', 'bayıl', 'ambulan'];
+const ACIL_KELIMELER = [
+  // Orijinal
+  'acil', 'hastane', '112', 'ambulans', 'bayıl', 'ambulan',
+  // Kardiyovasküler / nörolojik
+  'göğüs ağrısı', 'kalp krizi', 'çarpıntı',
+  'felç', 'inme', 'uyuşma', 'konuşamıyorum', 'görme kaybı',
+  // Solunum
+  'nefes alamıyorum', 'nefes darlığı', 'boğuluyorum',
+  // Metabolik
+  'şeker düştü', 'hipoglisemi', 'insülin şoku',
+  // Alerjik reaksiyon
+  'alerji şoku', 'anafilaksi',
+  // Ruh sağlığı acil
+  'kendime zarar', 'intihar', 'yaşamak istemiyorum',
+  // Travma / bilinç
+  'kan kaybı', 'kaza', 'bilinç kaybı', 'bayılıyorum',
+];
 
 type Message = {
   id: string;

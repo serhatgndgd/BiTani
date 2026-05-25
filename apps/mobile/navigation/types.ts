@@ -8,6 +8,7 @@ export type AuthStackParamList = {
 export type MainTabParamList = {
   Home: undefined;
   Search: undefined;
+  Nearby: undefined;
   Chat: undefined;
   Profile: undefined;
 };

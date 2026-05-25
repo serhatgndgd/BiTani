@@ -239,6 +239,21 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {/* ── Yakın Hastane / Eczane CTA ── */}
+        <Pressable
+          style={({ pressed }) => [styles.cta, styles.ctaNearby, pressed && styles.ctaPressed]}
+          onPress={() => navigation.navigate('Nearby')}
+        >
+          <View style={[styles.ctaIcon, styles.ctaNearbyIcon]}>
+            <Ionicons name="location" size={22} color="#ef4444" />
+          </View>
+          <View style={styles.ctaText}>
+            <Text style={styles.ctaTitle}>Yakın Hastane / Eczane</Text>
+            <Text style={styles.ctaSub}>GPS ile yakınındaki sağlık noktaları</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.35)" />
+        </Pressable>
+
         {/* ── Asistan CTA ── */}
         <Pressable
           style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
@@ -333,4 +348,7 @@ const styles = StyleSheet.create({
   ctaText:    { flex: 1 },
   ctaTitle:   { color: '#fff', fontSize: 15, fontWeight: '700' },
   ctaSub:     { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 2 },
+
+  ctaNearby:     { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#2a2a2a' },
+  ctaNearbyIcon: { backgroundColor: 'rgba(239,68,68,0.15)' },
 });

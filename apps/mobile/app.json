@@ -12,15 +12,28 @@
       "resizeMode": "contain",
       "backgroundColor": "#0a0a0a"
     },
+    "plugins": [
+      "expo-local-authentication"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "BiTanı, sağlık verilerinizi korumak için Face ID kullanır.",
+        "NSLocationWhenInUseUsageDescription": "Yakındaki hastane ve eczaneleri bulmak için konumunuz kullanılır."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1a6ef5"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
