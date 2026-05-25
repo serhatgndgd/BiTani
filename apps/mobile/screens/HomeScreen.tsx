@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { supabase } from '../lib/supabase';
 import type { MainTabParamList } from '../navigation/types';
+import { C } from '../theme';
 
 // ─── Tipler ──────────────────────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ type MedItem = { name: string; dosage: string | null };
 
 // ─── Yardımcı fonksiyonlar ────────────────────────────────────────────────────
 
-const TR_DAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+const TR_DAYS   = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
 const TR_MONTHS = [
   'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
   'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
@@ -54,13 +55,13 @@ function computeBmi(h: number | null, w: number | null): number | null {
   return w / ((h / 100) ** 2);
 }
 
-type BmiInfo = { label: string; color: string };
+type BmiInfo = { label: string; color: string; dimColor: string };
 
 function getBmiInfo(bmi: number): BmiInfo {
-  if (bmi < 18.5) return { label: 'Zayıf', color: '#f59e0b' };
-  if (bmi < 25)   return { label: 'Normal', color: '#34c759' };
-  if (bmi < 30)   return { label: 'Fazla Kilolu', color: '#f59e0b' };
-  return { label: 'Obez', color: '#ff4444' };
+  if (bmi < 18.5) return { label: 'Zayıf',         color: C.warning, dimColor: C.warningDim };
+  if (bmi < 25)   return { label: 'Normal',         color: C.success, dimColor: C.successDim };
+  if (bmi < 30)   return { label: 'Fazla Kilolu',   color: C.warning, dimColor: C.warningDim };
+  return           { label: 'Obez',                 color: C.error,   dimColor: C.errorDim   };
 }
 
 // ─── Ana bileşen ──────────────────────────────────────────────────────────────
@@ -68,11 +69,11 @@ function getBmiInfo(bmi: number): BmiInfo {
 export default function HomeScreen() {
   const navigation = useNavigation<HomeNavProp>();
 
-  const [loading, setLoading]           = useState(true);
-  const [profile, setProfile]           = useState<ProfileData | null>(null);
-  const [firstName, setFirstName]       = useState('');
-  const [conditions, setConditions]     = useState<string[]>([]);
-  const [medications, setMedications]   = useState<MedItem[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [profile, setProfile]         = useState<ProfileData | null>(null);
+  const [firstName, setFirstName]     = useState('');
+  const [conditions, setConditions]   = useState<string[]>([]);
+  const [medications, setMedications] = useState<MedItem[]>([]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -125,7 +126,7 @@ export default function HomeScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1a6ef5" />
+        <ActivityIndicator size="large" color={C.primary} />
       </View>
     );
   }
@@ -153,7 +154,7 @@ export default function HomeScreen() {
         {profile?.height_cm != null && profile?.weight_kg != null && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Ionicons name="body-outline" size={17} color="#666" />
+              <Ionicons name="body-outline" size={17} color={C.text3} />
               <Text style={styles.cardTitle}>Vücut Kitle İndeksi</Text>
             </View>
             <View style={styles.bmiRow}>
@@ -170,12 +171,19 @@ export default function HomeScreen() {
               </View>
               <View style={styles.bmiDivider} />
               <View style={styles.bmiStat}>
-                <Text style={[styles.bmiScore, { color: bInfo?.color ?? '#fff' }]}>
+                {/* BMI sayısı: değere göre renkli */}
+                <Text style={[styles.bmiScore, { color: bInfo?.color ?? C.text1 }]}>
                   {bmi?.toFixed(1)}
                 </Text>
-                <Text style={[styles.bmiLabel, { color: bInfo?.color ?? '#888', marginTop: 2 }]}>
-                  {bInfo?.label ?? '—'}
-                </Text>
+                {/* BMI durumu etiketi: aynı renk + arka plan dim */}
+                <View style={[
+                  styles.bmiStatusBadge,
+                  { backgroundColor: bInfo?.dimColor ?? 'transparent' },
+                ]}>
+                  <Text style={[styles.bmiStatusText, { color: bInfo?.color ?? C.text2 }]}>
+                    {bInfo?.label ?? '—'}
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
@@ -185,7 +193,7 @@ export default function HomeScreen() {
         {conditions.length > 0 && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Ionicons name="medical-outline" size={17} color="#666" />
+              <Ionicons name="medical-outline" size={17} color={C.text3} />
               <Text style={styles.cardTitle}>Kronik Hastalıklarınız</Text>
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{conditions.length}</Text>
@@ -205,7 +213,7 @@ export default function HomeScreen() {
         {medications.length > 0 && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Ionicons name="medkit-outline" size={17} color="#666" />
+              <Ionicons name="medkit-outline" size={17} color={C.text3} />
               <Text style={styles.cardTitle}>Kullandığınız İlaçlar</Text>
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{medications.length}</Text>
@@ -228,10 +236,10 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* ── Boş Durum (henüz veri yok) ── */}
+        {/* ── Boş Durum ── */}
         {conditions.length === 0 && medications.length === 0 && (
           <View style={styles.emptyCard}>
-            <Ionicons name="clipboard-outline" size={36} color="#333" />
+            <Ionicons name="clipboard-outline" size={36} color={C.border} />
             <Text style={styles.emptyTitle}>Profiliniz hazırlanıyor</Text>
             <Text style={styles.emptySub}>
               Hastalık ve ilaç bilgileriniz Profil ekranından güncellenebilir.
@@ -245,13 +253,13 @@ export default function HomeScreen() {
           onPress={() => navigation.navigate('Nearby')}
         >
           <View style={[styles.ctaIcon, styles.ctaNearbyIcon]}>
-            <Ionicons name="location" size={22} color="#ef4444" />
+            <Ionicons name="location" size={22} color={C.error} />
           </View>
           <View style={styles.ctaText}>
             <Text style={styles.ctaTitle}>Yakın Hastane / Eczane</Text>
             <Text style={styles.ctaSub}>GPS ile yakınındaki sağlık noktaları</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.35)" />
+          <Ionicons name="chevron-forward" size={18} color={C.text3} />
         </Pressable>
 
         {/* ── Asistan CTA ── */}
@@ -260,7 +268,7 @@ export default function HomeScreen() {
           onPress={() => navigation.navigate('Chat')}
         >
           <View style={styles.ctaIcon}>
-            <Ionicons name="chatbubble-ellipses" size={22} color="#fff" />
+            <Ionicons name="chatbubble-ellipses" size={22} color={C.text1} />
           </View>
           <View style={styles.ctaText}>
             <Text style={styles.ctaTitle}>Asistana Sor</Text>
@@ -277,23 +285,23 @@ export default function HomeScreen() {
 // ─── Stiller ─────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  safe:          { flex: 1, backgroundColor: '#0a0a0a' },
-  center:        { flex: 1, backgroundColor: '#0a0a0a', justifyContent: 'center', alignItems: 'center' },
+  safe:          { flex: 1, backgroundColor: C.bg },
+  center:        { flex: 1, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center' },
   scroll:        { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 36, gap: 12 },
 
   /* Karşılama */
   greeting:  { marginBottom: 6 },
-  greetDate: { color: '#444', fontSize: 13, fontWeight: '500', marginBottom: 5 },
-  greetName: { color: '#fff', fontSize: 26, fontWeight: '700', letterSpacing: -0.3 },
+  greetDate: { color: C.text3, fontSize: 13, fontWeight: '500', marginBottom: 5 },
+  greetName: { color: C.text1, fontSize: 26, fontWeight: '700', letterSpacing: -0.3 },
 
   /* Kart */
   card: {
-    backgroundColor: '#141414',
+    backgroundColor: C.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#222',
+    borderColor: C.border,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -301,41 +309,75 @@ const styles = StyleSheet.create({
     gap: 7,
     marginBottom: 14,
   },
-  cardTitle: { color: '#888', fontSize: 12, fontWeight: '700', letterSpacing: 0.5, flex: 1, textTransform: 'uppercase' },
+  cardTitle: {
+    color: C.text3,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    flex: 1,
+    textTransform: 'uppercase',
+  },
 
-  badge:     { backgroundColor: '#222', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
-  badgeText: { color: '#666', fontSize: 12, fontWeight: '600' },
+  badge:     { backgroundColor: C.surfaceAlt, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  badgeText: { color: C.text3, fontSize: 12, fontWeight: '600' },
 
   /* BMI */
   bmiRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
   bmiStat:   { alignItems: 'center', flex: 1 },
-  bmiValue:  { color: '#fff', fontSize: 22, fontWeight: '700' },
+  bmiValue:  { color: C.text1, fontSize: 22, fontWeight: '700' },
   bmiScore:  { fontSize: 26, fontWeight: '800' },
-  bmiUnit:   { color: '#555', fontSize: 11, marginTop: 1 },
-  bmiLabel:  { color: '#555', fontSize: 11, marginTop: 3 },
-  bmiDivider:{ width: 1, height: 40, backgroundColor: '#242424' },
+  bmiUnit:   { color: C.text3, fontSize: 11, marginTop: 1 },
+  bmiLabel:  { color: C.text3, fontSize: 11, marginTop: 3 },
+  bmiDivider:{ width: 1, height: 40, backgroundColor: C.border },
+
+  /* BMI durum badge'i */
+  bmiStatusBadge: {
+    marginTop: 6,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  bmiStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
 
   /* Hastalıklar */
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip:     { backgroundColor: '#1e1e1e', borderRadius: 20, paddingHorizontal: 13, paddingVertical: 7, borderWidth: 1, borderColor: '#2a2a2a' },
-  chipText: { color: '#ccc', fontSize: 13 },
+  chip:     {
+    backgroundColor: C.surfaceAlt,
+    borderRadius: 20,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  chipText: { color: C.text2, fontSize: 13 },
 
   /* İlaçlar */
   medRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, gap: 12 },
-  medRowBorder: { borderBottomWidth: 1, borderBottomColor: '#1e1e1e' },
-  medDot:       { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#1a6ef5' },
+  medRowBorder: { borderBottomWidth: 1, borderBottomColor: C.border },
+  medDot:       { width: 7, height: 7, borderRadius: 3.5, backgroundColor: C.primary },
   medInfo:      { flex: 1 },
-  medName:      { color: '#e8e8e8', fontSize: 14, fontWeight: '500' },
-  medDosage:    { color: '#555', fontSize: 12, marginTop: 2 },
+  medName:      { color: C.text1, fontSize: 14, fontWeight: '500' },
+  medDosage:    { color: C.text3, fontSize: 12, marginTop: 2 },
 
   /* Boş durum */
-  emptyCard:  { backgroundColor: '#141414', borderRadius: 16, padding: 28, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#222' },
-  emptyTitle: { color: '#555', fontSize: 15, fontWeight: '600' },
-  emptySub:   { color: '#3a3a3a', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  emptyCard:  {
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    padding: 28,
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  emptyTitle: { color: C.text3, fontSize: 15, fontWeight: '600' },
+  emptySub:   { color: C.text3, fontSize: 13, textAlign: 'center', lineHeight: 20, opacity: 0.6 },
 
   /* CTA */
   cta: {
-    backgroundColor: '#1a6ef5',
+    backgroundColor: C.primary,
     borderRadius: 16,
     padding: 16,
     flexDirection: 'row',
@@ -343,12 +385,19 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 4,
   },
-  ctaPressed: { opacity: 0.82 },
-  ctaIcon:    { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
-  ctaText:    { flex: 1 },
-  ctaTitle:   { color: '#fff', fontSize: 15, fontWeight: '700' },
-  ctaSub:     { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 2 },
+  ctaPressed:    { opacity: 0.82 },
+  ctaIcon:       {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ctaText:       { flex: 1 },
+  ctaTitle:      { color: C.text1, fontSize: 15, fontWeight: '700' },
+  ctaSub:        { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 2 },
 
-  ctaNearby:     { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#2a2a2a' },
-  ctaNearbyIcon: { backgroundColor: 'rgba(239,68,68,0.15)' },
+  ctaNearby:     { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border },
+  ctaNearbyIcon: { backgroundColor: C.errorDim },
 });
