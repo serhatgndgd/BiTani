@@ -42,12 +42,14 @@ profiles
 ├── weight_kg numeric
 └── onboarding_completed boolean (default false)
 
-conditions_catalog (74 hastalık, sabit katalog)
+conditions_catalog (71 hastalık, sabit katalog)
 ├── id uuid
 ├── name text
 └── category text
+— Çıkarılanlar (v3.5.0 kalite filtresi): Mesane Aşırı Aktivitesi (K/E 36.8x),
+  Hipertiroidi (K/E 15.3x), Hipotiroidi (K/E 15.3x)
 
-medications (25.572 ilaç - TİTCK verisi)
+medications (15.573 ilaç - TİTCK verisi)
 ├── id uuid
 ├── ilac_adi text
 ├── etkin_madde_adi text
@@ -55,12 +57,16 @@ medications (25.572 ilaç - TİTCK verisi)
 ├── kub_url text
 └── kt_url text
 
-condition_medications (57.000+ eşleşme)
+condition_medications (100.193 eşleşme — v3.5.0)
 ├── condition_id → conditions_catalog
 ├── medication_id → medications
-└── medication_id → medications
-├── dosage text (opsiyonel)
-└── is_active boolean (false = bıraktı)
+├── confidence_score numeric
+├── is_contraindication boolean
+├── extraction_method text
+├── evidence_snippet text
+├── source text
+└── annotation_version text
+— Endikasyon: 47.813 | Kontrendikasyon: 52.380 | K/E: 1.10
 
 ## Auth Akışı
 Session yok → WelcomeScreen
