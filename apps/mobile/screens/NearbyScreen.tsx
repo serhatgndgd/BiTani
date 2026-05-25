@@ -12,10 +12,52 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+// ─── Env sabitleri ────────────────────────────────────────────────────────────
+
+const NOBETECZA_KEY = (process.env.EXPO_PUBLIC_NOBETECZA_API_KEY ?? '') as string;
+const GOOGLE_MAPS_KEY = (process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY ?? '') as string;
+const HOSPITAL_RADIUS = 5000; // 5 km
+
 // ─── Tipler ───────────────────────────────────────────────────────────────────
 
-type PlaceType = 'hospital' | 'pharmacy';
+type Tab = 'pharmacy' | 'hospital';
 
+interface Coords {
+  latitude: number;
+  longitude: number;
+}
+
+// Nöbetçi eczane — API yanıtında farklı alan adları olabilir
+interface EczaneRaw {
+  adi?: string;
+  ad?: string;
+  name?: string;
+  adres?: string;
+  adres1?: string;
+  adres2?: string;
+  address?: string;
+  telefon?: string;
+  tel?: string;
+  phone?: string;
+  lat?: number | string;
+  lng?: number | string;
+  lon?: number | string;
+  mesafe?: number | string;
+  uzaklik?: number | string;
+  distance?: number | string;
+}
+
+interface EczaneItem {
+  key: string;
+  adi: string;
+  adres: string;
+  telefon: string;
+  lat: number | null;
+  lng: number | null;
+  mesafeKm: number | null;
+}
+
+// Google Places
 interface PlaceResult {
   place_id: string;
   name: string;
@@ -24,7 +66,6 @@ interface PlaceResult {
     location: { lat: number; lng: number };
   };
   opening_hours?: { open_now: boolean };
-  rating?: number;
 }
 
 interface PlacesApiResponse {
@@ -32,19 +73,16 @@ interface PlacesApiResponse {
   status: string;
 }
 
-interface Coords {
-  latitude: number;
-  longitude: number;
-}
-
-// ─── Sabitler ─────────────────────────────────────────────────────────────────
-
-const RADIUS = 3000; // 3 km
-const GOOGLE_API_KEY = (process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY ?? '') as string;
+// nobetecza API — farklı sarmalama biçimlerini destekler
+type NobetczaResponse =
+  | EczaneRaw[]
+  | { data?: EczaneRaw[] | { eczaneler?: EczaneRaw[]; nobetci_eczaneler?: EczaneRaw[] } }
+  | { eczaneler?: EczaneRaw[] }
+  | { result?: EczaneRaw[] }
+  | { success?: boolean; eczaneler?: EczaneRaw[] };
 
 // ─── Yardımcı fonksiyonlar ────────────────────────────────────────────────────
 
-/** Haversine formülü ile iki nokta arası mesafe (km) */
 function haversineKm(a: Coords, b: { lat: number; lng: number }): number {
   const R = 6371;
   const dLat = ((b.lat - a.latitude) * Math.PI) / 180;
@@ -61,91 +99,199 @@ function distLabel(km: number): string {
   return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
 }
 
-async function fetchNearby(coords: Coords, type: PlaceType): Promise<PlaceResult[]> {
-  const url =
-    `https://maps.googleapis.com/maps/api/place/nearbysearch/json` +
-    `?location=${coords.latitude},${coords.longitude}` +
-    `&radius=${RADIUS}` +
-    `&type=${type}` +
-    `&language=tr` +
-    `&key=${GOOGLE_API_KEY}`;
+/** NobetczaResponse içinden EczaneRaw[] çıkar */
+function extractEczaneler(raw: NobetczaResponse): EczaneRaw[] {
+  if (Array.isArray(raw)) return raw;
 
-  const res = await fetch(url);
-  const json = (await res.json()) as PlacesApiResponse;
+  const obj = raw as Record<string, unknown>;
 
-  if (json.status !== 'OK' && json.status !== 'ZERO_RESULTS') {
-    throw new Error(`Places API hatası: ${json.status}`);
+  if (Array.isArray(obj['eczaneler'])) return obj['eczaneler'] as EczaneRaw[];
+  if (Array.isArray(obj['result']))    return obj['result']    as EczaneRaw[];
+
+  const data = obj['data'];
+  if (Array.isArray(data)) return data;
+
+  if (data && typeof data === 'object') {
+    const d = data as Record<string, unknown>;
+    if (Array.isArray(d['eczaneler']))          return d['eczaneler']          as EczaneRaw[];
+    if (Array.isArray(d['nobetci_eczaneler']))  return d['nobetci_eczaneler']  as EczaneRaw[];
   }
-  return json.results ?? [];
+
+  return [];
 }
 
-function openInMaps(place: PlaceResult, user: Coords): void {
-  const { lat, lng } = place.geometry.location;
-  const url =
+/** EczaneRaw → EczaneItem (alan adı normalizasyonu) */
+function normalizeEczane(raw: EczaneRaw, idx: number, userCoords: Coords): EczaneItem {
+  const adi = raw.adi ?? raw.ad ?? raw.name ?? `Eczane ${idx + 1}`;
+  const adres = raw.adres ?? raw.adres1 ?? raw.adres2 ?? raw.address ?? '';
+  const telefon = raw.telefon ?? raw.tel ?? raw.phone ?? '';
+
+  const latNum = raw.lat !== undefined ? Number(raw.lat) : null;
+  const lngNum = (raw.lng ?? raw.lon) !== undefined ? Number(raw.lng ?? raw.lon) : null;
+
+  let mesafeKm: number | null = null;
+  const rawMesafe = raw.mesafe ?? raw.uzaklik ?? raw.distance;
+  if (rawMesafe !== undefined) {
+    const n = Number(rawMesafe);
+    // API genellikle metre veya km cinsinden döner; <10 ise km, >=10 ise metre
+    mesafeKm = !isNaN(n) ? (n >= 10 ? n / 1000 : n) : null;
+  } else if (latNum !== null && lngNum !== null) {
+    mesafeKm = haversineKm(userCoords, { lat: latNum, lng: lngNum });
+  }
+
+  return {
+    key: `eczane-${idx}-${adi}`,
+    adi,
+    adres,
+    telefon,
+    lat: latNum,
+    lng: lngNum,
+    mesafeKm,
+  };
+}
+
+function callPhone(tel: string): void {
+  const cleaned = tel.replace(/\s+/g, '').replace(/-/g, '');
+  void Linking.openURL(`tel:${cleaned}`);
+}
+
+function openMapsCoords(lat: number, lng: number, label: string): void {
+  const encoded = encodeURIComponent(label);
+  void Linking.openURL(
+    `https://www.google.com/maps/search/?api=1&query=${lat},${lng}&query_place_id=${encoded}`,
+  );
+}
+
+function openMapsAddress(adres: string): void {
+  void Linking.openURL(
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(adres)}`,
+  );
+}
+
+function openMapsRoute(userCoords: Coords, destLat: number, destLng: number): void {
+  void Linking.openURL(
     `https://www.google.com/maps/dir/?api=1` +
-    `&origin=${user.latitude},${user.longitude}` +
-    `&destination=${lat},${lng}` +
-    `&travelmode=driving`;
-  void Linking.openURL(url);
+    `&origin=${userCoords.latitude},${userCoords.longitude}` +
+    `&destination=${destLat},${destLng}` +
+    `&travelmode=driving`,
+  );
 }
 
 // ─── Alt bileşenler ───────────────────────────────────────────────────────────
 
-interface PlaceCardProps {
-  item: PlaceResult;
-  type: PlaceType;
+interface EczaneCardProps {
+  item: EczaneItem;
   userCoords: Coords;
 }
 
-function PlaceCard({ item, type, userCoords }: PlaceCardProps) {
+function EczaneCard({ item, userCoords }: EczaneCardProps) {
+  const hasPhone = item.telefon.trim().length > 0;
+  const hasCoords = item.lat !== null && item.lng !== null;
+
+  return (
+    <View style={styles.card}>
+      {/* İkon + İçerik */}
+      <View style={[styles.cardIcon, styles.cardIconPharmacy]}>
+        <Ionicons name="medkit" size={18} color="#10b981" />
+      </View>
+
+      <View style={styles.cardBody}>
+        <Text style={styles.cardName} numberOfLines={2}>
+          {item.adi}
+        </Text>
+
+        {/* Mesafe badge */}
+        {item.mesafeKm !== null && (
+          <View style={styles.distRow}>
+            <Ionicons name="navigate-outline" size={11} color="#666" />
+            <Text style={styles.distText}>{distLabel(item.mesafeKm)}</Text>
+          </View>
+        )}
+
+        {/* Adres — tıklanabilir */}
+        {item.adres.length > 0 && (
+          <Pressable
+            style={({ pressed }) => [styles.infoRow, pressed && { opacity: 0.6 }]}
+            onPress={() =>
+              hasCoords
+                ? openMapsRoute(userCoords, item.lat!, item.lng!)
+                : openMapsAddress(item.adres)
+            }
+          >
+            <Ionicons name="location-outline" size={13} color="#1a6ef5" />
+            <Text style={[styles.infoText, styles.infoLink]} numberOfLines={2}>
+              {item.adres}
+            </Text>
+          </Pressable>
+        )}
+
+        {/* Telefon — tıklanabilir */}
+        {hasPhone && (
+          <Pressable
+            style={({ pressed }) => [styles.infoRow, pressed && { opacity: 0.6 }]}
+            onPress={() => callPhone(item.telefon)}
+          >
+            <Ionicons name="call-outline" size={13} color="#10b981" />
+            <Text style={[styles.infoText, styles.infoCall]}>{item.telefon}</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+}
+
+interface HastaneCardProps {
+  item: PlaceResult;
+  userCoords: Coords;
+}
+
+function HastaneCard({ item, userCoords }: HastaneCardProps) {
   const km = haversineKm(userCoords, item.geometry.location);
   const isOpen = item.opening_hours?.open_now;
+  const { lat, lng } = item.geometry.location;
 
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && { opacity: 0.72 }]}
-      onPress={() => openInMaps(item, userCoords)}
+      onPress={() => openMapsRoute(userCoords, lat, lng)}
     >
-      <View style={styles.cardIcon}>
-        <Ionicons
-          name={type === 'hospital' ? 'medkit' : 'fitness'}
-          size={20}
-          color="#1a6ef5"
-        />
+      <View style={[styles.cardIcon, styles.cardIconHospital]}>
+        <Ionicons name="business" size={18} color="#1a6ef5" />
       </View>
 
       <View style={styles.cardBody}>
         <Text style={styles.cardName} numberOfLines={1}>
           {item.name}
         </Text>
-        <Text style={styles.cardAddr} numberOfLines={1}>
-          {item.vicinity}
-        </Text>
 
-        <View style={styles.cardMeta}>
-          <View style={styles.distRow}>
-            <Ionicons name="navigate-outline" size={11} color="#666" />
-            <Text style={styles.distText}>{distLabel(km)}</Text>
-          </View>
+        <View style={styles.distRow}>
+          <Ionicons name="navigate-outline" size={11} color="#666" />
+          <Text style={styles.distText}>{distLabel(km)}</Text>
+        </View>
 
-          {item.opening_hours != null && (
-            <View
-              style={[
-                styles.openBadge,
-                { backgroundColor: isOpen ? '#14532d' : '#3f0000' },
-              ]}
-            >
-              <Text
-                style={[styles.openText, { color: isOpen ? '#4ade80' : '#f87171' }]}
-              >
-                {isOpen ? 'Açık' : 'Kapalı'}
-              </Text>
-            </View>
-          )}
+        <View style={styles.infoRow}>
+          <Ionicons name="location-outline" size={13} color="#555" />
+          <Text style={styles.infoText} numberOfLines={1}>
+            {item.vicinity}
+          </Text>
         </View>
       </View>
 
-      <Ionicons name="chevron-forward" size={16} color="#2a2a2a" />
+      <View style={styles.cardRight}>
+        {item.opening_hours != null && (
+          <View
+            style={[
+              styles.openBadge,
+              { backgroundColor: isOpen ? '#14532d' : '#3f0000' },
+            ]}
+          >
+            <Text style={[styles.openText, { color: isOpen ? '#4ade80' : '#f87171' }]}>
+              {isOpen ? 'Açık' : 'Kapalı'}
+            </Text>
+          </View>
+        )}
+        <Ionicons name="chevron-forward" size={15} color="#2a2a2a" />
+      </View>
     </Pressable>
   );
 }
@@ -153,17 +299,22 @@ function PlaceCard({ item, type, userCoords }: PlaceCardProps) {
 // ─── Ana bileşen ──────────────────────────────────────────────────────────────
 
 export default function NearbyScreen() {
-  const [tab, setTab] = useState<PlaceType>('hospital');
+  const [tab, setTab] = useState<Tab>('pharmacy');
   const [coords, setCoords] = useState<Coords | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [loadingLocation, setLoadingLocation] = useState(true);
-  const [hospitals, setHospitals] = useState<PlaceResult[]>([]);
-  const [pharmacies, setPharmacies] = useState<PlaceResult[]>([]);
-  const [loadingPlaces, setLoadingPlaces] = useState(false);
-  const [placesError, setPlacesError] = useState<string | null>(null);
+
+  const [eczaneler, setEczaneler] = useState<EczaneItem[]>([]);
+  const [loadingEczane, setLoadingEczane] = useState(false);
+  const [eczaneError, setEczaneError] = useState<string | null>(null);
+
+  const [hastaneler, setHastaneler] = useState<PlaceResult[]>([]);
+  const [loadingHastane, setLoadingHastane] = useState(false);
+  const [hastaneError, setHastaneError] = useState<string | null>(null);
+
   const fetchedRef = useRef(false);
 
-  // ─── Konum al ─────────────────────────────────────────────────────────────
+  // ─── Konum ──────────────────────────────────────────────────────────────────
 
   const getLocation = useCallback(async () => {
     setLoadingLocation(true);
@@ -172,48 +323,101 @@ export default function NearbyScreen() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setLocationError('Konum iznine ihtiyaç var.\nAyarlardan izin verin.');
+        setLocationError('Konum iznine ihtiyaç var.\nAyarlar → Gizlilik → Konum');
         return;
       }
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-      setCoords({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-      });
+      setCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
     } catch {
-      setLocationError('Konum alınamadı. Lütfen tekrar deneyin.');
+      setLocationError('Konum alınamadı. Tekrar deneyin.');
     } finally {
       setLoadingLocation(false);
     }
   }, []);
 
-  // ─── Places API ───────────────────────────────────────────────────────────
+  // ─── Nöbetçi Eczane API ──────────────────────────────────────────────────────
 
-  const fetchPlaces = useCallback(async (c: Coords) => {
-    if (!GOOGLE_API_KEY) {
-      setPlacesError(
-        'Google Maps API anahtarı eksik.\n' +
-        'EXPO_PUBLIC_GOOGLE_MAPS_KEY değişkenini .env dosyasına ekleyin.',
+  const fetchEczaneler = useCallback(async (c: Coords) => {
+    if (!NOBETECZA_KEY) {
+      setEczaneError(
+        'Eczane API anahtarı eksik.\n' +
+        '.env.local dosyasına EXPO_PUBLIC_NOBETECZA_API_KEY ekleyin.',
       );
       return;
     }
-    setLoadingPlaces(true);
-    setPlacesError(null);
+
+    setLoadingEczane(true);
+    setEczaneError(null);
     try {
-      const [h, p] = await Promise.all([
-        fetchNearby(c, 'hospital'),
-        fetchNearby(c, 'pharmacy'),
-      ]);
-      setHospitals(h);
-      setPharmacies(p);
+      const url =
+        `https://api.nobetecza.com/v1/yakin` +
+        `?lat=${c.latitude}&lng=${c.longitude}`;
+
+      const res = await fetch(url, {
+        headers: { 'X-API-Key': NOBETECZA_KEY },
+      });
+
+      if (!res.ok) {
+        throw new Error(`Eczane API hatası: ${res.status}`);
+      }
+
+      const json = (await res.json()) as NobetczaResponse;
+      const rawList = extractEczaneler(json);
+
+      const items = rawList.map((r, i) => normalizeEczane(r, i, c));
+      // Mesafeye göre sırala
+      items.sort((a, b) => (a.mesafeKm ?? 999) - (b.mesafeKm ?? 999));
+      setEczaneler(items);
     } catch (e) {
-      setPlacesError(e instanceof Error ? e.message : 'Yerler yüklenemedi.');
+      setEczaneError(e instanceof Error ? e.message : 'Eczaneler yüklenemedi.');
     } finally {
-      setLoadingPlaces(false);
+      setLoadingEczane(false);
     }
   }, []);
+
+  // ─── Google Maps Places API (Hastane) ────────────────────────────────────────
+
+  const fetchHastaneler = useCallback(async (c: Coords) => {
+    if (!GOOGLE_MAPS_KEY || GOOGLE_MAPS_KEY === 'buraya_google_maps_key') {
+      setHastaneError(
+        'Google Maps API anahtarı eksik.\n' +
+        '.env.local dosyasına EXPO_PUBLIC_GOOGLE_MAPS_KEY ekleyin.',
+      );
+      return;
+    }
+
+    setLoadingHastane(true);
+    setHastaneError(null);
+    try {
+      const url =
+        `https://maps.googleapis.com/maps/api/place/nearbysearch/json` +
+        `?location=${c.latitude},${c.longitude}` +
+        `&radius=${HOSPITAL_RADIUS}` +
+        `&type=hospital` +
+        `&language=tr` +
+        `&key=${GOOGLE_MAPS_KEY}`;
+
+      const res = await fetch(url);
+      const json = (await res.json()) as PlacesApiResponse;
+
+      if (json.status !== 'OK' && json.status !== 'ZERO_RESULTS') {
+        throw new Error(`Places API hatası: ${json.status}`);
+      }
+
+      const sorted = (json.results ?? []).sort((a, b) =>
+        haversineKm(c, a.geometry.location) - haversineKm(c, b.geometry.location),
+      );
+      setHastaneler(sorted);
+    } catch (e) {
+      setHastaneError(e instanceof Error ? e.message : 'Hastaneler yüklenemedi.');
+    } finally {
+      setLoadingHastane(false);
+    }
+  }, []);
+
+  // ─── Effects ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     void getLocation();
@@ -222,11 +426,24 @@ export default function NearbyScreen() {
   useEffect(() => {
     if (coords && !fetchedRef.current) {
       fetchedRef.current = true;
-      void fetchPlaces(coords);
+      void fetchEczaneler(coords);
+      void fetchHastaneler(coords);
     }
-  }, [coords, fetchPlaces]);
+  }, [coords, fetchEczaneler, fetchHastaneler]);
 
-  // ─── Render durumları ─────────────────────────────────────────────────────
+  // ─── Render yardımcıları ─────────────────────────────────────────────────────
+
+  const isPharmacy = tab === 'pharmacy';
+  const loading = isPharmacy ? loadingEczane : loadingHastane;
+  const error   = isPharmacy ? eczaneError   : hastaneError;
+
+  function retryFetch() {
+    if (!coords) { void getLocation(); return; }
+    if (isPharmacy) void fetchEczaneler(coords);
+    else            void fetchHastaneler(coords);
+  }
+
+  // ─── Loading / Error durumları ───────────────────────────────────────────────
 
   if (loadingLocation) {
     return (
@@ -249,49 +466,52 @@ export default function NearbyScreen() {
     );
   }
 
-  const places = tab === 'hospital' ? hospitals : pharmacies;
+  // ─── Ana render ───────────────────────────────────────────────────────────────
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
+
       {/* ── Sekme seçici ── */}
       <View style={styles.tabBar}>
+        {/* Nöbetçi Eczane */}
         <Pressable
-          style={[styles.tabBtn, tab === 'hospital' && styles.tabBtnActive]}
-          onPress={() => setTab('hospital')}
+          style={[styles.tabBtn, isPharmacy && styles.tabBtnActive]}
+          onPress={() => setTab('pharmacy')}
         >
           <Ionicons
             name="medkit-outline"
-            size={15}
-            color={tab === 'hospital' ? '#fff' : '#555'}
+            size={14}
+            color={isPharmacy ? '#fff' : '#555'}
           />
-          <Text style={[styles.tabText, tab === 'hospital' && styles.tabTextActive]}>
-            Hastaneler
+          <Text style={[styles.tabText, isPharmacy && styles.tabTextActive]}>
+            Nöbetçi Eczane
           </Text>
-          {hospitals.length > 0 && (
-            <View style={[styles.count, tab === 'hospital' && styles.countActive]}>
-              <Text style={[styles.countText, tab === 'hospital' && styles.countTextActive]}>
-                {hospitals.length}
+          {eczaneler.length > 0 && (
+            <View style={[styles.countBadge, isPharmacy && styles.countBadgeActive]}>
+              <Text style={[styles.countText, isPharmacy && styles.countTextActive]}>
+                {eczaneler.length}
               </Text>
             </View>
           )}
         </Pressable>
 
+        {/* Yakın Hastane */}
         <Pressable
-          style={[styles.tabBtn, tab === 'pharmacy' && styles.tabBtnActive]}
-          onPress={() => setTab('pharmacy')}
+          style={[styles.tabBtn, !isPharmacy && styles.tabBtnActive]}
+          onPress={() => setTab('hospital')}
         >
           <Ionicons
-            name="fitness-outline"
-            size={15}
-            color={tab === 'pharmacy' ? '#fff' : '#555'}
+            name="business-outline"
+            size={14}
+            color={!isPharmacy ? '#fff' : '#555'}
           />
-          <Text style={[styles.tabText, tab === 'pharmacy' && styles.tabTextActive]}>
-            Eczaneler
+          <Text style={[styles.tabText, !isPharmacy && styles.tabTextActive]}>
+            Yakın Hastane
           </Text>
-          {pharmacies.length > 0 && (
-            <View style={[styles.count, tab === 'pharmacy' && styles.countActive]}>
-              <Text style={[styles.countText, tab === 'pharmacy' && styles.countTextActive]}>
-                {pharmacies.length}
+          {hastaneler.length > 0 && (
+            <View style={[styles.countBadge, !isPharmacy && styles.countBadgeActive]}>
+              <Text style={[styles.countText, !isPharmacy && styles.countTextActive]}>
+                {hastaneler.length}
               </Text>
             </View>
           )}
@@ -299,46 +519,57 @@ export default function NearbyScreen() {
       </View>
 
       {/* ── İçerik ── */}
-      {loadingPlaces ? (
+      {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#1a6ef5" />
           <Text style={styles.centerText}>
-            {tab === 'hospital' ? 'Hastaneler' : 'Eczaneler'} aranıyor…
+            {isPharmacy ? 'Nöbetçi eczaneler' : 'Hastaneler'} aranıyor…
           </Text>
         </View>
-      ) : placesError ? (
+      ) : error ? (
         <View style={styles.center}>
-          <Ionicons name="warning-outline" size={52} color="#2a2a2a" />
-          <Text style={styles.centerText}>{placesError}</Text>
-          <Pressable
-            style={styles.retryBtn}
-            onPress={() => coords && void fetchPlaces(coords)}
-          >
+          <Ionicons name="warning-outline" size={48} color="#2a2a2a" />
+          <Text style={styles.centerText}>{error}</Text>
+          <Pressable style={styles.retryBtn} onPress={retryFetch}>
             <Text style={styles.retryText}>Tekrar Dene</Text>
           </Pressable>
         </View>
-      ) : places.length === 0 ? (
-        <View style={styles.center}>
-          <Ionicons name="map-outline" size={52} color="#2a2a2a" />
-          <Text style={styles.centerText}>
-            {tab === 'hospital'
-              ? '3 km içinde hastane bulunamadı.'
-              : '3 km içinde eczane bulunamadı.'}
-          </Text>
-        </View>
+      ) : isPharmacy ? (
+        eczaneler.length === 0 ? (
+          <View style={styles.center}>
+            <Ionicons name="medkit-outline" size={48} color="#2a2a2a" />
+            <Text style={styles.centerText}>Yakında nöbetçi eczane bulunamadı.</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={eczaneler}
+            keyExtractor={(item) => item.key}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) =>
+              coords ? <EczaneCard item={item} userCoords={coords} /> : null
+            }
+          />
+        )
       ) : (
-        <FlatList
-          data={places}
-          keyExtractor={(item) => item.place_id}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) =>
-            coords ? (
-              <PlaceCard item={item} type={tab} userCoords={coords} />
-            ) : null
-          }
-        />
+        hastaneler.length === 0 ? (
+          <View style={styles.center}>
+            <Ionicons name="business-outline" size={48} color="#2a2a2a" />
+            <Text style={styles.centerText}>{HOSPITAL_RADIUS / 1000} km içinde hastane bulunamadı.</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={hastaneler}
+            keyExtractor={(item) => item.place_id}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) =>
+              coords ? <HastaneCard item={item} userCoords={coords} /> : null
+            }
+          />
+        )
       )}
+
     </SafeAreaView>
   );
 }
@@ -378,20 +609,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 5,
     paddingVertical: 10,
     borderRadius: 9,
   },
-  tabBtnActive: { backgroundColor: '#1a6ef5' },
-  tabText:      { color: '#555', fontSize: 13, fontWeight: '600' },
-  tabTextActive:{ color: '#fff' },
-  count:        { backgroundColor: '#2a2a2a', borderRadius: 9, paddingHorizontal: 6, paddingVertical: 1 },
-  countActive:  { backgroundColor: 'rgba(255,255,255,0.2)' },
-  countText:    { color: '#666', fontSize: 11, fontWeight: '700' },
-  countTextActive:{ color: '#fff' },
+  tabBtnActive:  { backgroundColor: '#1a6ef5' },
+  tabText:       { color: '#555', fontSize: 13, fontWeight: '600' },
+  tabTextActive: { color: '#fff' },
+  countBadge:        { backgroundColor: '#2a2a2a', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 },
+  countBadgeActive:  { backgroundColor: 'rgba(255,255,255,0.22)' },
+  countText:         { color: '#666', fontSize: 11, fontWeight: '700' },
+  countTextActive:   { color: '#fff' },
 
   /* Liste */
-  list: { paddingHorizontal: 14, paddingBottom: 24, gap: 10 },
+  list: { paddingHorizontal: 14, paddingBottom: 28, gap: 10 },
 
   /* Kart */
   card: {
@@ -399,25 +630,35 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
     borderWidth: 1,
     borderColor: '#1e1e1e',
   },
   cardIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: 'rgba(26,110,245,0.1)',
+    width: 40,
+    height: 40,
+    borderRadius: 11,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 1,
   },
-  cardBody:    { flex: 1, gap: 3 },
-  cardName:    { color: '#e8e8e8', fontSize: 14, fontWeight: '600' },
-  cardAddr:    { color: '#555', fontSize: 12 },
-  cardMeta:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
-  distRow:     { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  distText:    { color: '#666', fontSize: 11 },
-  openBadge:   { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
-  openText:    { fontSize: 11, fontWeight: '600' },
+  cardIconPharmacy: { backgroundColor: 'rgba(16,185,129,0.12)' },
+  cardIconHospital: { backgroundColor: 'rgba(26,110,245,0.12)' },
+
+  cardBody:  { flex: 1, gap: 5 },
+  cardName:  { color: '#e8e8e8', fontSize: 14, fontWeight: '600', lineHeight: 20 },
+
+  cardRight: { alignItems: 'flex-end', gap: 6, justifyContent: 'center' },
+
+  distRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  distText: { color: '#666', fontSize: 11 },
+
+  infoRow:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  infoText: { color: '#555', fontSize: 12, flex: 1 },
+  infoLink: { color: '#1a6ef5' },
+  infoCall: { color: '#10b981', fontWeight: '500' },
+
+  openBadge: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  openText:  { fontSize: 11, fontWeight: '600' },
 });

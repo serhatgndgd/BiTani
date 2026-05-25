@@ -1,11 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
-  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -17,6 +16,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { supabase } from '../lib/supabase';
+import type { MainTabParamList } from '../navigation/types';
+
+// ─── Acil anahtar kelimeler ───────────────────────────────────────────────────
 
 const ACIL_KELIMELER = [
   // Orijinal
@@ -36,6 +38,8 @@ const ACIL_KELIMELER = [
   'kan kaybı', 'kaza', 'bilinç kaybı', 'bayılıyorum',
 ];
 
+// ─── Tipler ───────────────────────────────────────────────────────────────────
+
 type Message = {
   id: string;
   role: 'user' | 'assistant';
@@ -47,12 +51,20 @@ type ApiMessage = {
   content: string;
 };
 
+type ChatNavProp = BottomTabNavigationProp<MainTabParamList, 'Chat'>;
+
+// ─── Yardımcı ─────────────────────────────────────────────────────────────────
+
 function containsAcilKeyword(text: string): boolean {
   const lower = text.toLocaleLowerCase('tr');
   return ACIL_KELIMELER.some((k) => lower.includes(k));
 }
 
+// ─── Ana bileşen ──────────────────────────────────────────────────────────────
+
 export default function ChatScreen() {
+  const navigation = useNavigation<ChatNavProp>();
+
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -61,24 +73,21 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [showEmergency, setShowEmergency] = useState(false);
-  const [locating, setLocating] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+
+  // ─── Profil yükle ───────────────────────────────────────────────────────────
 
   const loadProfile = useCallback(async () => {
     setLoadingProfile(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
 
     if (!user?.id) {
-      setMessages([
-        {
-          id: 'welcome',
-          role: 'assistant',
-          content: 'Merhaba! Ben BiTanı sağlık asistanınım. Sağlıkla ilgili sorularını yanıtlamaya hazırım.',
-        },
-      ]);
+      setMessages([{
+        id: 'welcome',
+        role: 'assistant',
+        content: 'Merhaba! Ben BiTanı sağlık asistanınım. Sağlıkla ilgili sorularını yanıtlamaya hazırım.',
+      }]);
       setLoadingProfile(false);
       return;
     }
@@ -100,40 +109,16 @@ export default function ChatScreen() {
     setLoadingProfile(false);
   }, []);
 
-  useEffect(() => {
-    void loadProfile();
-  }, [loadProfile]);
+  useEffect(() => { void loadProfile(); }, [loadProfile]);
 
+  // Otomatik scroll
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
     }
   }, [messages, sending]);
 
-  const openNearbyHospital = useCallback(async () => {
-    setLocating(true);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Konum İzni Gerekli',
-          'En yakın hastaneyi bulmak için lütfen konum iznine izin verin.',
-          [{ text: 'Tamam' }],
-        );
-        return;
-      }
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      const { latitude, longitude } = loc.coords;
-      const url = `https://www.google.com/maps/search/hastane/@${latitude},${longitude},14z`;
-      await Linking.openURL(url);
-    } catch {
-      Alert.alert('Hata', 'Konum alınamadı. Lütfen tekrar deneyin.', [{ text: 'Tamam' }]);
-    } finally {
-      setLocating(false);
-    }
-  }, []);
+  // ─── Mesaj gönder ───────────────────────────────────────────────────────────
 
   const send = useCallback(async () => {
     const text = input.trim();
@@ -173,6 +158,8 @@ export default function ChatScreen() {
     }
   }, [input, sending, loadingProfile, apiMessages, userId]);
 
+  // ─── Yükleniyor ─────────────────────────────────────────────────────────────
+
   if (loadingProfile) {
     return (
       <View style={styles.center}>
@@ -181,6 +168,8 @@ export default function ChatScreen() {
     );
   }
 
+  // ─── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <KeyboardAvoidingView
@@ -188,6 +177,7 @@ export default function ChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={90}
       >
+        {/* Mesaj listesi */}
         <ScrollView
           ref={scrollRef}
           style={styles.list}
@@ -201,24 +191,21 @@ export default function ChatScreen() {
           {sendError ? <Text style={styles.errorText}>{sendError}</Text> : null}
         </ScrollView>
 
+        {/* Acil butonu → NearbyScreen'e yönlendir */}
         {showEmergency && (
           <Pressable
-            style={[styles.emergencyBtn, locating && styles.emergencyBtnDisabled]}
-            onPress={() => void openNearbyHospital()}
-            disabled={locating}
+            style={({ pressed }) => [styles.emergencyBtn, pressed && { opacity: 0.82 }]}
+            onPress={() => navigation.navigate('Nearby')}
           >
-            {locating ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Text style={styles.emergencyBtnIcon}>🚨</Text>
-                <Text style={styles.emergencyBtnText}>En Yakın Hastaneyi Bul</Text>
-                <Ionicons name="chevron-forward" size={18} color="#fff" />
-              </>
-            )}
+            <Text style={styles.emergencyBtnIcon}>🚨</Text>
+            <Text style={styles.emergencyBtnText}>
+              Nöbetçi Eczane / Hastane Bul
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color="#fff" />
           </Pressable>
         )}
 
+        {/* Mesaj girişi */}
         <View style={styles.inputRow}>
           <TextInput
             style={styles.textInput}
@@ -244,6 +231,8 @@ export default function ChatScreen() {
   );
 }
 
+// ─── Alt bileşenler ───────────────────────────────────────────────────────────
+
 function MessageBubble({ message }: { message: Message }) {
   const isUser = message.role === 'user';
   return (
@@ -267,19 +256,17 @@ function TypingIndicator() {
   );
 }
 
+// ─── Stiller ─────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0a0a0a' },
-  flex: { flex: 1 },
+  safe:   { flex: 1, backgroundColor: '#0a0a0a' },
+  flex:   { flex: 1 },
   center: { flex: 1, backgroundColor: '#0a0a0a', justifyContent: 'center', alignItems: 'center' },
 
-  list: { flex: 1 },
+  list:        { flex: 1 },
   listContent: { padding: 12, paddingBottom: 8 },
 
-  bubbleRow: {
-    flexDirection: 'row',
-    marginBottom: 10,
-    justifyContent: 'flex-start',
-  },
+  bubbleRow:     { flexDirection: 'row', marginBottom: 10, justifyContent: 'flex-start' },
   bubbleRowUser: { justifyContent: 'flex-end' },
 
   bubble: {
@@ -288,25 +275,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
   },
-  bubbleAssistant: {
-    backgroundColor: '#1a1a1a',
-    borderBottomLeftRadius: 4,
-  },
-  bubbleUser: {
-    backgroundColor: '#2a4fff',
-    borderBottomRightRadius: 4,
-  },
-  bubbleText: {
-    color: '#e0e0e0',
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  bubbleTextUser: { color: '#fff' },
-
-  typingBubble: {
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-  },
+  bubbleAssistant:  { backgroundColor: '#1a1a1a', borderBottomLeftRadius: 4 },
+  bubbleUser:       { backgroundColor: '#2a4fff', borderBottomRightRadius: 4 },
+  bubbleText:       { color: '#e0e0e0', fontSize: 15, lineHeight: 22 },
+  bubbleTextUser:   { color: '#fff' },
+  typingBubble:     { paddingVertical: 12, paddingHorizontal: 18 },
 
   errorText: {
     color: '#ff6b6b',
@@ -327,7 +300,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: '#b91c1c',
   },
-  emergencyBtnDisabled: { opacity: 0.6 },
   emergencyBtnIcon: { fontSize: 18 },
   emergencyBtnText: {
     color: '#fff',
@@ -360,13 +332,6 @@ const styles = StyleSheet.create({
     minHeight: 46,
     maxHeight: 120,
   },
-  sendBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  sendBtn:         { width: 46, height: 46, borderRadius: 23, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
   sendBtnDisabled: { opacity: 0.35 },
 });
