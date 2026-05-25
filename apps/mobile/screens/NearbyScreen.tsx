@@ -32,25 +32,29 @@ interface Coords {
   longitude: number;
 }
 
-// ── Nöbetçi eczane (nobetecza API) ───────────────────────────────────────────
+// ── Nöbetçi eczane (nobetecza.com API) ───────────────────────────────────────
+// Döküman: https://nobetecza.com/docs
+// Endpoint: GET /v1/konum?lat=&lng=&radius=
 
-interface EczaneRaw {
-  adi?: string;
-  ad?: string;
-  name?: string;
-  adres?: string;
-  adres1?: string;
-  adres2?: string;
-  address?: string;
-  telefon?: string;
-  tel?: string;
-  phone?: string;
-  lat?: number | string;
-  lng?: number | string;
-  lon?: number | string;
-  mesafe?: number | string;
-  uzaklik?: number | string;
-  distance?: number | string;
+interface NobeteczaPharmacy {
+  id: number;
+  ad: string;
+  adres: string;
+  telefon: string;
+  il: string;
+  il_slug: string;
+  ilce: string;
+  ilce_slug: string;
+  tarif?: string;
+  konum: { lat: number; lng: number };
+  mesafe: number; // metre cinsinden
+}
+
+interface NobeteczaApiResponse {
+  success: boolean;
+  data: NobeteczaPharmacy[];
+  adet: number;
+  tarih: string;
 }
 
 interface EczaneItem {
@@ -62,13 +66,6 @@ interface EczaneItem {
   lng: number | null;
   mesafeKm: number | null;
 }
-
-type NobetczaResponse =
-  | EczaneRaw[]
-  | { data?: EczaneRaw[] | { eczaneler?: EczaneRaw[]; nobetci_eczaneler?: EczaneRaw[] } }
-  | { eczaneler?: EczaneRaw[] }
-  | { result?: EczaneRaw[] }
-  | { success?: boolean; eczaneler?: EczaneRaw[] };
 
 // ── Overpass API ──────────────────────────────────────────────────────────────
 
@@ -157,51 +154,15 @@ function osmToPlaceItem(el: OverpassElement, idx: number, userCoords: Coords): P
   };
 }
 
-function extractEczaneler(raw: NobetczaResponse): EczaneRaw[] {
-  if (Array.isArray(raw)) return raw;
-
-  const obj = raw as Record<string, unknown>;
-
-  if (Array.isArray(obj['eczaneler'])) return obj['eczaneler'] as EczaneRaw[];
-  if (Array.isArray(obj['result']))    return obj['result']    as EczaneRaw[];
-
-  const data = obj['data'];
-  if (Array.isArray(data)) return data;
-
-  if (data && typeof data === 'object') {
-    const d = data as Record<string, unknown>;
-    if (Array.isArray(d['eczaneler']))          return d['eczaneler']          as EczaneRaw[];
-    if (Array.isArray(d['nobetci_eczaneler']))  return d['nobetci_eczaneler']  as EczaneRaw[];
-  }
-
-  return [];
-}
-
-function normalizeEczane(raw: EczaneRaw, idx: number, userCoords: Coords): EczaneItem {
-  const adi     = raw.adi ?? raw.ad ?? raw.name ?? `Eczane ${idx + 1}`;
-  const adres   = raw.adres ?? raw.adres1 ?? raw.adres2 ?? raw.address ?? '';
-  const telefon = raw.telefon ?? raw.tel ?? raw.phone ?? '';
-
-  const latNum = raw.lat !== undefined ? Number(raw.lat) : null;
-  const lngNum = (raw.lng ?? raw.lon) !== undefined ? Number(raw.lng ?? raw.lon) : null;
-
-  let mesafeKm: number | null = null;
-  const rawMesafe = raw.mesafe ?? raw.uzaklik ?? raw.distance;
-  if (rawMesafe !== undefined) {
-    const n = Number(rawMesafe);
-    mesafeKm = !isNaN(n) ? (n >= 10 ? n / 1000 : n) : null;
-  } else if (latNum !== null && lngNum !== null) {
-    mesafeKm = haversineKm(userCoords, { lat: latNum, lng: lngNum });
-  }
-
+function normalizeEczane(raw: NobeteczaPharmacy): EczaneItem {
   return {
-    key: `eczane-${idx}-${adi}`,
-    adi,
-    adres,
-    telefon,
-    lat: latNum,
-    lng: lngNum,
-    mesafeKm,
+    key:      `eczane-${raw.id}`,
+    adi:      raw.ad,
+    adres:    raw.adres,
+    telefon:  raw.telefon,
+    lat:      raw.konum?.lat  ?? null,
+    lng:      raw.konum?.lng  ?? null,
+    mesafeKm: typeof raw.mesafe === 'number' ? raw.mesafe / 1000 : null,
   };
 }
 
@@ -436,15 +397,19 @@ export default function NearbyScreen() {
     setLoadingEczane(true);
     setEczaneError(null);
     try {
-      const url = `https://api.nobetecza.com/v1/yakin?lat=${c.latitude}&lng=${c.longitude}`;
+      // GET /v1/konum — mesafe metre cinsinden döner, radius varsayılan 3 km
+      const url =
+        `https://api.nobetecza.com/v1/konum` +
+        `?lat=${c.latitude}&lng=${c.longitude}&radius=${PHARMACY_RADIUS}`;
       const res = await fetch(url, { headers: { 'X-API-Key': NOBETECZA_KEY } });
 
       if (!res.ok) throw new Error(`Eczane API hatası: ${res.status}`);
 
-      const json = (await res.json()) as NobetczaResponse;
-      const rawList = extractEczaneler(json);
-      const items = rawList
-        .map((r, i) => normalizeEczane(r, i, c))
+      const json = (await res.json()) as NobeteczaApiResponse;
+      if (!json.success) throw new Error('Nöbetçi eczane verisi alınamadı.');
+
+      const items = (json.data ?? [])
+        .map((r) => normalizeEczane(r))
         .sort((a, b) => (a.mesafeKm ?? 999) - (b.mesafeKm ?? 999));
       setEczaneler(items);
     } catch (e) {
