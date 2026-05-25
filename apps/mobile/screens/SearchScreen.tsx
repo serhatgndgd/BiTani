@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Linking,
   Modal,
@@ -13,7 +12,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EmptyState } from '../components/EmptyState';
+import { SkeletonBox } from '../components/SkeletonBox';
 import { supabase } from '../lib/supabase';
+import { C } from '../theme';
 
 // ─── Tipler ──────────────────────────────────────────────────────────────────
 
@@ -31,6 +33,31 @@ type MedResult = {
 const PAGE_SIZE    = 30;
 const DEBOUNCE_MS  = 300;
 const MIN_QUERY    = 2;
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+function SearchSkeletonList() {
+  return (
+    <View>
+      {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+        <View
+          key={i}
+          style={{
+            paddingVertical: 14,
+            paddingHorizontal: 16,
+            borderBottomWidth: 1,
+            borderBottomColor: C.border,
+            gap: 8,
+          }}
+        >
+          <SkeletonBox width="68%" height={14} />
+          <SkeletonBox width="44%" height={12} />
+          <SkeletonBox width="28%" height={11} />
+        </View>
+      ))}
+    </View>
+  );
+}
 
 // ─── Ana bileşen ──────────────────────────────────────────────────────────────
 
@@ -72,7 +99,6 @@ export default function SearchScreen() {
       return;
     }
 
-    // Yarış durumunu önle: eski istekler yeni sonucu ezmemeli
     const requestQuery = q;
     if (offset === 0) setSearching(true);
     else setLoadingMore(true);
@@ -85,7 +111,6 @@ export default function SearchScreen() {
         .order('ilac_adi')
         .range(offset, offset + PAGE_SIZE - 1);
 
-      // Sorgu değiştiyse eski sonucu gösterme
       if (requestQuery !== activeQuery.current) return;
       if (error) throw error;
 
@@ -93,7 +118,7 @@ export default function SearchScreen() {
       setHasMore(rows.length === PAGE_SIZE);
       setResults((prev) => append ? [...prev, ...rows] : rows);
     } catch {
-      // Hata sessizce geçilir; kullanıcı boş liste görür
+      // Hata sessizce geçilir
     } finally {
       if (requestQuery === activeQuery.current) {
         setSearching(false);
@@ -157,7 +182,7 @@ export default function SearchScreen() {
             <Text style={styles.itemFirma} numberOfLines={1}>{item.firma_adi}</Text>
           )}
         </View>
-        <Ionicons name="chevron-forward" size={15} color="#333" />
+        <Ionicons name="chevron-forward" size={15} color={C.border} />
       </Pressable>
     );
   }, [userMedIds]);
@@ -173,22 +198,19 @@ export default function SearchScreen() {
 
       {/* Arama çubuğu */}
       <View style={styles.searchBar}>
-        <Ionicons name="search-outline" size={17} color="#555" />
+        <Ionicons name="search-outline" size={17} color={C.text3} />
         <TextInput
           style={styles.searchInput}
           value={query}
           onChangeText={onChangeText}
           placeholder="İlaç adı veya etken madde..."
-          placeholderTextColor="#444"
+          placeholderTextColor={C.text3}
           returnKeyType="search"
           clearButtonMode="while-editing"
           autoCorrect={false}
           autoCapitalize="none"
           spellCheck={false}
         />
-        {searching && (
-          <ActivityIndicator size="small" color="#1a6ef5" style={styles.searchSpinner} />
-        )}
       </View>
 
       {/* Yardım metni */}
@@ -206,6 +228,9 @@ export default function SearchScreen() {
         </View>
       )}
 
+      {/* Skeleton: arama sırasında */}
+      {query.length >= MIN_QUERY && searching && <SearchSkeletonList />}
+
       {/* Sonuç listesi */}
       {query.length >= MIN_QUERY && !searching && (
         <FlatList
@@ -219,29 +244,22 @@ export default function SearchScreen() {
           keyboardDismissMode="on-drag"
           ListEmptyComponent={
             isEmpty ? (
-              <View style={styles.empty}>
-                <Ionicons name="search-outline" size={38} color="#2a2a2a" />
-                <Text style={styles.emptyTitle}>Sonuç bulunamadı</Text>
-                <Text style={styles.emptySub}>"{query}" için eşleşen ilaç yok</Text>
-              </View>
+              <EmptyState
+                icon="search-outline"
+                title="Sonuç bulunamadı"
+                subtitle={`"${query}" için eşleşen ilaç yok`}
+              />
             ) : null
           }
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.footer}>
-                <ActivityIndicator size="small" color="#1a6ef5" />
+                <SkeletonBox width={120} height={12} borderRadius={6} />
               </View>
             ) : null
           }
           contentContainerStyle={results.length === 0 ? styles.listEmpty : undefined}
         />
-      )}
-
-      {/* Arama sırasında skeleton */}
-      {query.length >= MIN_QUERY && searching && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#1a6ef5" />
-        </View>
       )}
 
       {/* İlaç Detay Modal */}
@@ -252,12 +270,7 @@ export default function SearchScreen() {
         onRequestClose={() => setSelected(null)}
       >
         <View style={styles.modalWrap}>
-          {/* Backdrop */}
-          <Pressable
-            style={styles.backdrop}
-            onPress={() => setSelected(null)}
-          />
-          {/* Bottom Sheet */}
+          <Pressable style={styles.backdrop} onPress={() => setSelected(null)} />
           <View style={styles.sheet}>
             {selected !== null && (
               <DrugDetail drug={selected} onClose={() => setSelected(null)} />
@@ -298,7 +311,7 @@ function DrugDetail({ drug, onClose }: DrugDetailProps) {
           onPress={onClose}
           hitSlop={8}
         >
-          <Ionicons name="close" size={20} color="#666" />
+          <Ionicons name="close" size={20} color={C.text3} />
         </Pressable>
       </View>
 
@@ -317,9 +330,9 @@ function DrugDetail({ drug, onClose }: DrugDetailProps) {
             style={({ pressed }) => [styles.linkBtn, pressed && styles.linkBtnPressed]}
             onPress={() => openUrl(drug.kub_url!)}
           >
-            <Ionicons name="document-text-outline" size={18} color="#1a6ef5" />
+            <Ionicons name="document-text-outline" size={18} color={C.primary} />
             <Text style={styles.linkBtnText}>Kısa Ürün Bilgisi (KÜB)</Text>
-            <Ionicons name="open-outline" size={14} color="#1a6ef5" style={{ marginLeft: 'auto' }} />
+            <Ionicons name="open-outline" size={14} color={C.primary} style={{ marginLeft: 'auto' }} />
           </Pressable>
         )}
         {drug.kt_url != null && (
@@ -327,14 +340,14 @@ function DrugDetail({ drug, onClose }: DrugDetailProps) {
             style={({ pressed }) => [styles.linkBtn, pressed && styles.linkBtnPressed]}
             onPress={() => openUrl(drug.kt_url!)}
           >
-            <Ionicons name="reader-outline" size={18} color="#1a6ef5" />
+            <Ionicons name="reader-outline" size={18} color={C.primary} />
             <Text style={styles.linkBtnText}>Kullanma Talimatı</Text>
-            <Ionicons name="open-outline" size={14} color="#1a6ef5" style={{ marginLeft: 'auto' }} />
+            <Ionicons name="open-outline" size={14} color={C.primary} style={{ marginLeft: 'auto' }} />
           </Pressable>
         )}
         {drug.kub_url == null && drug.kt_url == null && (
           <View style={styles.noLink}>
-            <Ionicons name="document-outline" size={16} color="#333" />
+            <Ionicons name="document-outline" size={16} color={C.border} />
             <Text style={styles.noLinkText}>PDF belgesi henüz mevcut değil</Text>
           </View>
         )}
@@ -346,13 +359,13 @@ function DrugDetail({ drug, onClose }: DrugDetailProps) {
 // ─── Stiller ─────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: '#0a0a0a' },
+  safe: { flex: 1, backgroundColor: C.bg },
 
   /* Arama */
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#141414',
+    backgroundColor: C.surface,
     marginHorizontal: 12,
     marginTop: 10,
     marginBottom: 8,
@@ -361,22 +374,21 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 10,
     borderWidth: 1,
-    borderColor: '#222',
+    borderColor: C.border,
   },
   searchInput: {
     flex: 1,
-    color: '#fff',
+    color: C.text1,
     fontSize: 15,
     padding: 0,
   },
-  searchSpinner: { marginLeft: 4 },
 
   /* Yardım metni */
-  hint: { paddingHorizontal: 20, paddingTop: 28, alignItems: 'center' },
-  hintText: { color: '#3a3a3a', fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  hint:     { paddingHorizontal: 20, paddingTop: 28, alignItems: 'center' },
+  hintText: { color: C.border, fontSize: 14, textAlign: 'center', lineHeight: 22 },
 
   /* Liste */
-  sep:       { height: 1, backgroundColor: '#181818', marginLeft: 16 },
+  sep:       { height: 1, backgroundColor: C.surface, marginLeft: 16 },
   listEmpty: { flex: 1 },
 
   item: {
@@ -386,89 +398,78 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 10,
   },
-  itemPressed: { backgroundColor: '#111' },
+  itemPressed: { backgroundColor: C.surface },
   itemInfo:    { flex: 1 },
 
   itemTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
-  itemName:     { color: '#e8e8e8', fontSize: 14, fontWeight: '500', flex: 1 },
+  itemName:     { color: C.text1, fontSize: 14, fontWeight: '500', flex: 1 },
 
-  mineBadge:     { backgroundColor: '#1a3a7a', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
-  mineBadgeText: { color: '#5b9cf6', fontSize: 11, fontWeight: '700' },
+  mineBadge:     { backgroundColor: C.primaryDim, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
+  mineBadgeText: { color: C.primary, fontSize: 11, fontWeight: '700' },
 
-  itemSub:   { color: '#555', fontSize: 12, marginTop: 1 },
-  itemFirma: { color: '#3a3a3a', fontSize: 11, marginTop: 2 },
-
-  /* Boş durum */
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 60,
-    gap: 10,
-  },
-  emptyTitle: { color: '#444', fontSize: 15, fontWeight: '600' },
-  emptySub:   { color: '#333', fontSize: 13 },
+  itemSub:   { color: C.text3, fontSize: 12, marginTop: 1 },
+  itemFirma: { color: C.border, fontSize: 11, marginTop: 2 },
 
   /* Footer */
-  footer:         { paddingVertical: 18, alignItems: 'center' },
-  loadingOverlay: { flex: 1, alignItems: 'center', paddingTop: 60 },
+  footer: { paddingVertical: 18, alignItems: 'center' },
 
   /* Modal */
   modalWrap: { flex: 1, justifyContent: 'flex-end' },
-  backdrop:  { ...{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, backgroundColor: 'rgba(0,0,0,0.65)' },
+  backdrop:  {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+  },
   sheet: {
-    backgroundColor: '#141414',
+    backgroundColor: C.surface,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     paddingHorizontal: 20,
     paddingBottom: 36,
     borderTopWidth: 1,
-    borderColor: '#222',
+    borderColor: C.border,
   },
 
   /* Detay */
   handle: {
-    width: 38,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#2a2a2a',
+    width: 38, height: 4, borderRadius: 2,
+    backgroundColor: C.border,
     alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 16,
+    marginTop: 12, marginBottom: 16,
   },
   detailHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16 },
-  detailName:   { color: '#fff', fontSize: 17, fontWeight: '700', lineHeight: 24 },
-  detailFirma:  { color: '#555', fontSize: 13, marginTop: 3 },
+  detailName:   { color: C.text1, fontSize: 17, fontWeight: '700', lineHeight: 24 },
+  detailFirma:  { color: C.text3, fontSize: 13, marginTop: 3 },
   closeBtn: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: '#1e1e1e',
+    backgroundColor: C.surfaceAlt,
     justifyContent: 'center', alignItems: 'center',
   },
 
   detailRow: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: C.surfaceAlt,
     borderRadius: 12,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#242424',
+    borderColor: C.border,
   },
-  detailLabel: { color: '#555', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', marginBottom: 5 },
-  detailValue: { color: '#ddd', fontSize: 14, lineHeight: 20 },
+  detailLabel: { color: C.text3, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', marginBottom: 5 },
+  detailValue: { color: C.text2, fontSize: 14, lineHeight: 20 },
 
   linkGroup: { gap: 8, marginTop: 4 },
   linkBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#0d1f3c',
+    backgroundColor: C.primaryDim,
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#1a3a6a',
+    borderColor: 'rgba(37,99,235,0.25)',
   },
   linkBtnPressed: { opacity: 0.75 },
-  linkBtnText: { color: '#5b9cf6', fontSize: 14, fontWeight: '500', flex: 1 },
+  linkBtnText: { color: C.primary, fontSize: 14, fontWeight: '500', flex: 1 },
 
   noLink: {
     flexDirection: 'row',
@@ -476,5 +477,5 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 12,
   },
-  noLinkText: { color: '#333', fontSize: 13 },
+  noLinkText: { color: C.text3, fontSize: 13 },
 });
