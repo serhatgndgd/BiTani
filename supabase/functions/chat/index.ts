@@ -18,6 +18,11 @@ interface ApiMessage {
   content: string
 }
 
+interface ChatHistoryRow {
+  role: string
+  content: string
+}
+
 function computeAge(birthDate: string | null): string {
   if (!birthDate) return 'belirtilmemiş'
   const birth = new Date(birthDate)
@@ -76,12 +81,12 @@ Deno.serve(async (req) => {
   try {
     const { messages, userId } = (await req.json()) as {
       messages: ApiMessage[]
-      userId: string
+      userId: string | null | undefined
     }
 
-    if (!Array.isArray(messages) || !userId) {
+    if (!Array.isArray(messages) || messages.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'messages ve userId gerekli' }),
+        JSON.stringify({ error: 'messages gerekli' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
@@ -91,37 +96,79 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
 
-    const [profileRes, condRes, medRes] = await Promise.all([
-      supabaseAdmin
-        .from('profiles')
-        .select('full_name, birth_date, gender, height_cm, weight_kg')
-        .eq('id', userId)
-        .maybeSingle(),
-      supabaseAdmin
-        .from('user_conditions')
-        .select('conditions_catalog(name)')
-        .eq('user_id', userId),
-      supabaseAdmin
-        .from('user_medications')
-        .select('dosage, medications(ilac_adi)')
-        .eq('user_id', userId),
-    ])
+    // ── Kullanıcı profili, hastalıklar, ilaçlar ──────────────────────────────
+    let profile: Profile | null = null
+    let conditions: string[] = []
+    let medications: string[] = []
 
-    const profile = profileRes.data as Profile | null
+    if (userId) {
+      const [profileRes, condRes, medRes] = await Promise.all([
+        supabaseAdmin
+          .from('profiles')
+          .select('full_name, birth_date, gender, height_cm, weight_kg')
+          .eq('id', userId)
+          .maybeSingle(),
+        supabaseAdmin
+          .from('user_conditions')
+          .select('conditions_catalog(name)')
+          .eq('user_id', userId),
+        supabaseAdmin
+          .from('user_medications')
+          .select('dosage, medications(ilac_adi)')
+          .eq('user_id', userId),
+      ])
 
-    type CondRow = { conditions_catalog: { name: string } | null }
-    const conditions = ((condRes.data ?? []) as CondRow[])
-      .map((r) => r.conditions_catalog?.name)
-      .filter((n): n is string => !!n)
+      profile = profileRes.data as Profile | null
 
-    type MedRow = { dosage: string | null; medications: { ilac_adi: string } | null }
-    const medications = ((medRes.data ?? []) as MedRow[])
-      .map((r) => {
-        const name = r.medications?.ilac_adi
-        if (!name) return null
-        return r.dosage ? `${name} (${r.dosage})` : name
-      })
-      .filter((n): n is string => !!n)
+      type CondRow = { conditions_catalog: { name: string } | null }
+      conditions = ((condRes.data ?? []) as CondRow[])
+        .map((r) => r.conditions_catalog?.name)
+        .filter((n): n is string => !!n)
+
+      type MedRow = { dosage: string | null; medications: { ilac_adi: string } | null }
+      medications = ((medRes.data ?? []) as MedRow[])
+        .map((r) => {
+          const medName = r.medications?.ilac_adi
+          if (!medName) return null
+          return r.dosage ? `${medName} (${r.dosage})` : medName
+        })
+        .filter((n): n is string => !!n)
+    }
+
+    // ── chat_history: son 20 mesajı çek ──────────────────────────────────────
+    // Strateji: DB geçmişi (önceki oturumlar) + client'ın son mesajı (bu oturum).
+    // Client tüm oturum geçmişini gönderir; sadece son elemanı alarak
+    // DB geçmişiyle birleştiririz — böylece duplikasyon olmaz.
+    let historyMessages: ApiMessage[] = []
+
+    if (userId) {
+      try {
+        const { data: historyRows } = await supabaseAdmin
+          .from('chat_history')
+          .select('role, content')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(20)
+
+        if (historyRows && historyRows.length > 0) {
+          // DESC'ten ASC'ye çevir (en eski önce → Groq için doğru sıra)
+          historyMessages = (historyRows as ChatHistoryRow[])
+            .reverse()
+            .map((r) => ({
+              role: r.role as 'user' | 'assistant',
+              content: r.content,
+            }))
+        }
+      } catch {
+        // Geçmiş çekilemezse boş array ile devam et
+        historyMessages = []
+      }
+    }
+
+    // ── Groq'a gönderilecek mesaj dizisi ──────────────────────────────────────
+    // DB geçmişi + bu oturumun son (yeni) kullanıcı mesajı
+    const currentMessage = messages[messages.length - 1]
+    const groqMessages: ApiMessage[] = [...historyMessages, currentMessage]
 
     const groqKey = Deno.env.get('GROQ_API_KEY')
     if (!groqKey) {
@@ -142,7 +189,7 @@ Deno.serve(async (req) => {
         max_tokens: 1024,
         messages: [
           { role: 'system', content: buildSystemPrompt(profile, conditions, medications) },
-          ...messages,
+          ...groqMessages,
         ],
       }),
     })
@@ -163,6 +210,18 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Groq boş yanıt döndürdü' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
+    }
+
+    // ── chat_history'e kaydet (user + assistant) ──────────────────────────────
+    if (userId) {
+      try {
+        await supabaseAdmin.from('chat_history').insert([
+          { user_id: userId, role: 'user', content: currentMessage.content },
+          { user_id: userId, role: 'assistant', content: reply },
+        ])
+      } catch {
+        // Kayıt başarısız olursa asıl cevabı yine de döndür
+      }
     }
 
     return new Response(
