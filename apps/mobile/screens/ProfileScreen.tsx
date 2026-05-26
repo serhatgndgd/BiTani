@@ -17,6 +17,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { supabase } from '../lib/supabase';
 import type { ConditionCatalogRow } from '../navigation/types';
+import { C } from '../theme';
 
 type Gender = 'male' | 'female' | 'unspecified';
 
@@ -689,7 +690,7 @@ export default function ProfileScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#fff" />
+        <ActivityIndicator size="large" color={C.text1} />
       </View>
     );
   }
@@ -807,7 +808,7 @@ export default function ProfileScreen() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Kronik Hastalıklar</Text>
             <Pressable onPress={() => void openConditionsModal()} style={styles.actionBtn}>
-              <Ionicons name="add-circle-outline" size={16} color="#aaa" />
+              <Ionicons name="add-circle-outline" size={16} color={C.text2} />
               <Text style={styles.actionBtnText}>Ekle</Text>
             </Pressable>
           </View>
@@ -818,7 +819,7 @@ export default function ProfileScreen() {
               {userConditions.map((c) => (
                 <Pressable key={c.id} style={styles.condChip} onPress={() => void removeCondition(c.id)}>
                   <Text style={styles.condChipText}>{c.name}</Text>
-                  <Ionicons name="close-circle" size={15} color="#8ab4ff" />
+                  <Ionicons name="close-circle" size={15} color={C.primary} />
                 </Pressable>
               ))}
             </View>
@@ -830,7 +831,7 @@ export default function ProfileScreen() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Düzenli Kullandığım İlaçlar</Text>
             <Pressable onPress={() => void openMedsModal()} style={styles.actionBtn}>
-              <Ionicons name="add-circle-outline" size={16} color="#aaa" />
+              <Ionicons name="add-circle-outline" size={16} color={C.text2} />
               <Text style={styles.actionBtnText}>Ekle</Text>
             </Pressable>
           </View>
@@ -861,7 +862,7 @@ export default function ProfileScreen() {
             <View style={styles.pastSection}>
               <Pressable style={styles.pastToggle} onPress={() => setShowPastMeds((v) => !v)}>
                 <Text style={styles.pastToggleText}>Geçmiş İlaçlar ({pastMeds.length})</Text>
-                <Ionicons name={showPastMeds ? 'chevron-up' : 'chevron-down'} size={16} color="#666" />
+                <Ionicons name={showPastMeds ? 'chevron-up' : 'chevron-down'} size={16} color={C.text3} />
               </Pressable>
               {showPastMeds
                 ? pastMeds.map((um) => (
@@ -884,7 +885,7 @@ export default function ProfileScreen() {
 
         {/* ── Çıkış ── */}
         <Pressable style={styles.signOutBtn} onPress={() => void supabase.auth.signOut()}>
-          <Ionicons name="log-out-outline" size={20} color="#ff6b6b" />
+          <Ionicons name="log-out-outline" size={20} color={C.error} />
           <Text style={styles.signOutText}>Çıkış Yap</Text>
         </Pressable>
       </ScrollView>
@@ -895,7 +896,7 @@ export default function ProfileScreen() {
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Hastalık Ekle / Çıkar</Text>
             <Pressable onPress={() => setConditionsModal(false)}>
-              <Ionicons name="close" size={24} color="#fff" />
+              <Ionicons name="close" size={24} color={C.text1} />
             </Pressable>
           </View>
           <TextInput style={styles.modalSearch} value={conditionsSearch} onChangeText={setConditionsSearch} placeholder="Hastalık ara..." placeholderTextColor="#888" />
@@ -928,7 +929,7 @@ export default function ProfileScreen() {
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>İlaç Ekle</Text>
             <Pressable onPress={closeMedsModal}>
-              <Ionicons name="close" size={24} color="#fff" />
+              <Ionicons name="close" size={24} color={C.text1} />
             </Pressable>
           </View>
 
@@ -969,7 +970,7 @@ export default function ProfileScreen() {
                 placeholderTextColor="#888"
               />
               {loadingCondMeds ? (
-                <ActivityIndicator style={styles.modalLoader} color="#fff" />
+                <ActivityIndicator style={styles.modalLoader} color={C.text1} />
               ) : condMedError ? (
                 <Text style={[styles.err, styles.modalPad]}>{condMedError}</Text>
               ) : (
@@ -1005,7 +1006,7 @@ export default function ProfileScreen() {
                     disabled={addingMed}
                   >
                     {addingMed
-                      ? <ActivityIndicator color="#0a0a0a" />
+                      ? <ActivityIndicator color={C.bg} />
                       : <Text style={styles.saveBtnText}>Ekle ({modalSelectedMedIds.size})</Text>}
                   </Pressable>
                 </View>
@@ -1050,7 +1051,7 @@ export default function ProfileScreen() {
                   autoFocus={userConditions.length === 0}
                 />
                 {searchingMeds ? (
-                  <ActivityIndicator style={styles.modalLoader} color="#fff" />
+                  <ActivityIndicator style={styles.modalLoader} color={C.text1} />
                 ) : medSearch.trim().length > 0 && medResults.length === 0 ? (
                   <Text style={[styles.emptyText, styles.modalPad]}>Sonuç bulunamadı.</Text>
                 ) : (
@@ -1085,107 +1086,107 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0a0a0a' },
-  center: { flex: 1, backgroundColor: '#0a0a0a', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  safe: { flex: 1, backgroundColor: C.bg },
+  center: { flex: 1, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', padding: 24 },
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 48 },
 
-  section: { backgroundColor: '#111', borderRadius: 14, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#222' },
+  section: { backgroundColor: C.surface, borderRadius: 14, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: C.border },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  sectionTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  sectionTitle: { color: C.text1, fontSize: 16, fontWeight: '700' },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  actionBtnText: { color: '#aaa', fontSize: 13 },
+  actionBtnText: { color: C.text2, fontSize: 13 },
 
   infoBlock: { gap: 2 },
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#1e1e1e' },
-  infoLabel: { color: '#888', fontSize: 14 },
-  infoValue: { color: '#fff', fontSize: 14, fontWeight: '500', maxWidth: '60%', textAlign: 'right' },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.surfaceAlt },
+  infoLabel: { color: C.text2, fontSize: 14 },
+  infoValue: { color: C.text1, fontSize: 14, fontWeight: '500', maxWidth: '60%', textAlign: 'right' },
 
-  fieldLabel: { color: '#fff', fontSize: 14, fontWeight: '500', marginBottom: 8, marginTop: 4 },
-  input: { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#2a2a2a', borderRadius: 10, color: '#fff', fontSize: 16, paddingHorizontal: 14, paddingVertical: 14, marginBottom: 14 },
+  fieldLabel: { color: C.text1, fontSize: 14, fontWeight: '500', marginBottom: 8, marginTop: 4 },
+  input: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 10, color: C.text1, fontSize: 16, paddingHorizontal: 14, paddingVertical: 14, marginBottom: 14 },
   pickerRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   pickerCol: { flex: 1 },
-  pickerCaption: { color: '#aaa', fontSize: 12, marginBottom: 6 },
-  pickerBox: { borderRadius: 10, borderWidth: 1, borderColor: '#2a2a2a', backgroundColor: '#1a1a1a', overflow: 'hidden' },
-  picker: { color: '#fff' },
+  pickerCaption: { color: C.text2, fontSize: 12, marginBottom: 6 },
+  pickerBox: { borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface, overflow: 'hidden' },
+  picker: { color: C.text1 },
   genderRow: { gap: 8, marginBottom: 14 },
-  chip: { borderRadius: 10, borderWidth: 1, borderColor: '#333', paddingVertical: 12, paddingHorizontal: 14, backgroundColor: '#141414' },
-  chipSelected: { borderColor: '#8ab4ff', backgroundColor: '#1a2332' },
-  chipText: { color: '#ccc', fontSize: 15 },
-  chipTextSelected: { color: '#fff', fontWeight: '600' },
+  chip: { borderRadius: 10, borderWidth: 1, borderColor: C.border, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: C.surface },
+  chipSelected: { borderColor: C.primary, backgroundColor: C.primaryDim },
+  chipText: { color: C.text2, fontSize: 15 },
+  chipTextSelected: { color: C.text1, fontWeight: '600' },
 
   editActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  cancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 10, borderWidth: 1, borderColor: '#444', alignItems: 'center' },
-  cancelBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  saveBtn: { flex: 1, paddingVertical: 13, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  cancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 10, borderWidth: 1, borderColor: C.border, alignItems: 'center' },
+  cancelBtnText: { color: C.text1, fontSize: 15, fontWeight: '600' },
+  saveBtn: { flex: 1, paddingVertical: 13, borderRadius: 10, backgroundColor: C.text1, alignItems: 'center', justifyContent: 'center' },
   saveBtnDisabled: { opacity: 0.6 },
-  saveBtnText: { color: '#0a0a0a', fontSize: 15, fontWeight: '700' },
+  saveBtnText: { color: C.bg, fontSize: 15, fontWeight: '700' },
 
-  emptyText: { color: '#666', fontSize: 14 },
+  emptyText: { color: C.text3, fontSize: 14 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  condChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1a1f28', borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: '#3a4a6a' },
-  condChipText: { color: '#c8d8ff', fontSize: 13 },
+  condChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.primaryDim, borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: C.border },
+  condChipText: { color: C.text1, fontSize: 13 },
 
   // İlaç listesi
-  medRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#1e1e1e' },
+  medRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.surfaceAlt },
   medInfo: { flex: 1 },
-  medName: { color: '#fff', fontSize: 15, fontWeight: '500' },
-  medDosage: { color: '#8ab4ff', fontSize: 12, marginTop: 2 },
-  medSub: { color: '#555', fontSize: 12, marginTop: 1 },
-  quitBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#3a2a2a', backgroundColor: '#1a0f0f' },
-  quitBtnText: { color: '#ff8a80', fontSize: 13, fontWeight: '600' },
+  medName: { color: C.text1, fontSize: 15, fontWeight: '500' },
+  medDosage: { color: C.primary, fontSize: 12, marginTop: 2 },
+  medSub: { color: C.text3, fontSize: 12, marginTop: 1 },
+  quitBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.errorDim },
+  quitBtnText: { color: C.error, fontSize: 13, fontWeight: '600' },
 
   // Geçmiş
-  pastSection: { marginTop: 14, borderTopWidth: 1, borderTopColor: '#1e1e1e', paddingTop: 10 },
+  pastSection: { marginTop: 14, borderTopWidth: 1, borderTopColor: C.surfaceAlt, paddingTop: 10 },
   pastToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
-  pastToggleText: { color: '#666', fontSize: 13 },
+  pastToggleText: { color: C.text3, fontSize: 13 },
   pastMedRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
-  pastMedName: { color: '#555', fontSize: 14 },
-  resumeBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#2a3a2a', backgroundColor: '#0f1a0f' },
-  resumeBtnText: { color: '#6abf6a', fontSize: 12, fontWeight: '600' },
+  pastMedName: { color: C.text3, fontSize: 14 },
+  resumeBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.successDim },
+  resumeBtnText: { color: C.success, fontSize: 12, fontWeight: '600' },
 
-  signOutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 6, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: '#3a1a1a', backgroundColor: '#180a0a' },
-  signOutText: { color: '#ff6b6b', fontSize: 16, fontWeight: '600' },
+  signOutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 6, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.errorDim },
+  signOutText: { color: C.error, fontSize: 16, fontWeight: '600' },
 
-  err: { color: '#ff8a80', fontSize: 13, marginTop: 6 },
-  retryBtn: { marginTop: 20, backgroundColor: '#fff', paddingVertical: 13, paddingHorizontal: 28, borderRadius: 10 },
-  retryBtnText: { color: '#0a0a0a', fontSize: 15, fontWeight: '700' },
+  err: { color: C.error, fontSize: 13, marginTop: 6 },
+  retryBtn: { marginTop: 20, backgroundColor: C.text1, paddingVertical: 13, paddingHorizontal: 28, borderRadius: 10 },
+  retryBtnText: { color: C.bg, fontSize: 15, fontWeight: '700' },
 
   // Modal
-  modal: { flex: 1, backgroundColor: '#0a0a0a', paddingTop: 16 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#222' },
-  modalTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  modalSearch: { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#2a2a2a', borderRadius: 10, color: '#fff', fontSize: 15, paddingHorizontal: 14, paddingVertical: 12, margin: 14 },
+  modal: { flex: 1, backgroundColor: C.bg, paddingTop: 16 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.border },
+  modalTitle: { color: C.text1, fontSize: 18, fontWeight: '700' },
+  modalSearch: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 10, color: C.text1, fontSize: 15, paddingHorizontal: 14, paddingVertical: 12, margin: 14 },
   modalScroll: { flex: 1 },
   modalListContent: { paddingHorizontal: 14, paddingBottom: 16 },
-  modalSectionTitle: { color: '#fff', fontSize: 15, fontWeight: '700', marginTop: 14, marginBottom: 8 },
+  modalSectionTitle: { color: C.text1, fontSize: 15, fontWeight: '700', marginTop: 14, marginBottom: 8 },
   modalLoader: { marginTop: 32 },
   modalPad: { padding: 16 },
-  modalFooter: { padding: 14, borderTopWidth: 1, borderTopColor: '#222' },
+  modalFooter: { padding: 14, borderTopWidth: 1, borderTopColor: C.border },
 
   // Sekmeler
-  tabRow: { flexDirection: 'row', marginHorizontal: 14, marginTop: 12, borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: '#2a2a2a' },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: '#141414' },
-  tabActive: { backgroundColor: '#1a2332' },
-  tabText: { color: '#666', fontSize: 14, fontWeight: '600' },
-  tabTextActive: { color: '#8ab4ff' },
+  tabRow: { flexDirection: 'row', marginHorizontal: 14, marginTop: 12, borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: C.border },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: C.surface },
+  tabActive: { backgroundColor: C.primaryDim },
+  tabText: { color: C.text3, fontSize: 14, fontWeight: '600' },
+  tabTextActive: { color: C.primary },
 
   categoryBlock: { paddingHorizontal: 14, marginBottom: 4 },
-  categoryTitle: { color: '#fff', fontSize: 15, fontWeight: '700', marginTop: 14, marginBottom: 8 },
-  checkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#2a2a2a', marginBottom: 6, backgroundColor: '#121212' },
-  checkRowSelected: { borderColor: '#4a5a7a', backgroundColor: '#1a1f28' },
+  categoryTitle: { color: C.text1, fontSize: 15, fontWeight: '700', marginTop: 14, marginBottom: 8 },
+  checkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: C.border, marginBottom: 6, backgroundColor: C.surface },
+  checkRowSelected: { borderColor: C.border, backgroundColor: C.primaryDim },
   checkRowDimmed: { opacity: 0.45 },
-  rowName: { color: '#fff', fontSize: 15, flex: 1, marginRight: 12 },
-  rowNameDimmed: { color: '#555' },
+  rowName: { color: C.text1, fontSize: 15, flex: 1, marginRight: 12 },
+  rowNameDimmed: { color: C.text3 },
   medInfoCol: { flex: 1, marginRight: 12 },
-  alreadyLabel: { color: '#4a5a7a', fontSize: 11, marginTop: 2 },
-  dosageInline: { backgroundColor: '#161616', borderWidth: 1, borderColor: '#2a2a2a', borderRadius: 8, color: '#ccc', fontSize: 14, paddingHorizontal: 12, paddingVertical: 10, marginTop: -2, marginBottom: 8, marginHorizontal: 2 },
+  alreadyLabel: { color: C.text3, fontSize: 11, marginTop: 2 },
+  dosageInline: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 8, color: C.text2, fontSize: 14, paddingHorizontal: 12, paddingVertical: 10, marginTop: -2, marginBottom: 8, marginHorizontal: 2 },
 
   dosageView: { padding: 16 },
-  selectedMedName: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  selectedMedSub: { color: '#888', fontSize: 13, marginTop: 4 },
+  selectedMedName: { color: C.text1, fontSize: 18, fontWeight: '700' },
+  selectedMedSub: { color: C.text2, fontSize: 13, marginTop: 4 },
 
-  medSearchRow: { flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
+  medSearchRow: { flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: 1, borderBottomColor: C.surface },
   medSearchRowAdded: { opacity: 0.45 },
   medSearchInfo: { flex: 1 },
 });
