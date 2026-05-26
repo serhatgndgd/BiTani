@@ -91,6 +91,20 @@ type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 const ICON_ON:  IoniconsName = 'checkmark-circle';
 const ICON_OFF: IoniconsName = 'checkmark-circle-outline';
 
+const ONBOARDING_SAVE_ERROR_TEXT = 'Bilgileriniz kaydedilemedi. Tekrar deneyin';
+const NETWORK_ERROR_TEXT = 'İnternet bağlantınızı kontrol edin';
+
+function isNetworkError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const message = 'message' in error ? String(error.message ?? '').toLowerCase() : '';
+  return (
+    message.includes('network') ||
+    message.includes('failed to fetch') ||
+    message.includes('request failed') ||
+    message.includes('timeout')
+  );
+}
+
 export default function OnboardingScreen({ onComplete }: Props) {
   const [resolvedUserId, setResolvedUserId]     = useState<string | null>(null);
   const [userResolveError, setUserResolveError] = useState<string | null>(null);
@@ -134,6 +148,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
       const id = await resolveAuthUserId();
       if (cancelled) return;
       if (!id) {
+        console.error('onboarding-screen:', new Error('auth-user-unresolved'));
         setUserResolveError('Hesap bilgisi henüz yüklenemedi. İnternetini kontrol et veya aşağıdan tekrar dene.');
         return;
       }
@@ -174,7 +189,11 @@ export default function OnboardingScreen({ onComplete }: Props) {
       const { data, error } = await supabase.from('conditions_catalog').select('id, name, category');
       if (cancelled) return;
       setLoadingCatalog(false);
-      if (error) { setCatalogError('Liste yüklenemedi. Bağlantını kontrol et.'); return; }
+      if (error) {
+        console.error('onboarding-screen:', error);
+        setCatalogError('Liste yüklenemedi. Bağlantını kontrol et.');
+        return;
+      }
       const rows = ((data ?? []) as ConditionCatalogRow[]).slice().sort((a, b) => {
         const c = (a.category || '').localeCompare(b.category || '', 'tr');
         return c !== 0 ? c : (a.name || '').localeCompare(b.name || '', 'tr');
@@ -195,7 +214,11 @@ export default function OnboardingScreen({ onComplete }: Props) {
         .in('condition_id', Array.from(selectedIds));
       if (cancelled) return;
       setLoadingMeds(false);
-      if (error) { setMedError('İlaçlar yüklenemedi. Bağlantını kontrol et.'); return; }
+      if (error) {
+        console.error('onboarding-screen:', error);
+        setMedError('İlaçlar yüklenemedi. Bağlantını kontrol et.');
+        return;
+      }
       type RawRow = {
         condition_id: string;
         medications: { id: string; ilac_adi: string; etkin_madde_adi: string | null } | null;
@@ -530,20 +553,36 @@ export default function OnboardingScreen({ onComplete }: Props) {
         { id: resolvedUserId, full_name: fullName.trim(), birth_date: birthIso, gender, height_cm: h, weight_kg: w, onboarding_completed: true },
         { onConflict: 'id' },
       );
-      if (e1) { setSaveError(e1.message || 'Profil kaydedilemedi.'); return; }
+      if (e1) {
+        console.error('onboarding-screen:', e1);
+        setSaveError(isNetworkError(e1) ? NETWORK_ERROR_TEXT : ONBOARDING_SAVE_ERROR_TEXT);
+        return;
+      }
 
       const { error: e2 } = await supabase.from('user_conditions').delete().eq('user_id', resolvedUserId);
-      if (e2) { setSaveError(e2.message || 'Kayıtlar temizlenemedi.'); return; }
+      if (e2) {
+        console.error('onboarding-screen:', e2);
+        setSaveError(isNetworkError(e2) ? NETWORK_ERROR_TEXT : ONBOARDING_SAVE_ERROR_TEXT);
+        return;
+      }
 
       if (!noChronic && selectedIds.size > 0) {
         const { error: e3 } = await supabase.from('user_conditions').insert(
           [...selectedIds].map((condition_id) => ({ user_id: resolvedUserId, condition_id })),
         );
-        if (e3) { setSaveError(e3.message || 'Hastalıklar kaydedilemedi.'); return; }
+        if (e3) {
+          console.error('onboarding-screen:', e3);
+          setSaveError(isNetworkError(e3) ? NETWORK_ERROR_TEXT : ONBOARDING_SAVE_ERROR_TEXT);
+          return;
+        }
       }
 
       const { error: e4 } = await supabase.from('user_medications').delete().eq('user_id', resolvedUserId);
-      if (e4) { setSaveError(e4.message || 'İlaç kayıtları temizlenemedi.'); return; }
+      if (e4) {
+        console.error('onboarding-screen:', e4);
+        setSaveError(isNetworkError(e4) ? NETWORK_ERROR_TEXT : ONBOARDING_SAVE_ERROR_TEXT);
+        return;
+      }
 
       if (selectedMedIds.size > 0) {
         const { error: e5 } = await supabase.from('user_medications').insert(
@@ -553,9 +592,16 @@ export default function OnboardingScreen({ onComplete }: Props) {
             is_active: true,
           })),
         );
-        if (e5) { setSaveError(e5.message || 'İlaçlar kaydedilemedi.'); return; }
+        if (e5) {
+          console.error('onboarding-screen:', e5);
+          setSaveError(isNetworkError(e5) ? NETWORK_ERROR_TEXT : ONBOARDING_SAVE_ERROR_TEXT);
+          return;
+        }
       }
       onComplete();
+    } catch (error) {
+      console.error('onboarding-screen:', error);
+      setSaveError(isNetworkError(error) ? NETWORK_ERROR_TEXT : ONBOARDING_SAVE_ERROR_TEXT);
     } finally { setSaving(false); }
   };
 
