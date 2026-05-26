@@ -67,6 +67,7 @@ export default function SearchScreen() {
   const [searching, setSearching]     = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore]         = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [selected, setSelected]       = useState<MedResult | null>(null);
   const [userMedIds, setUserMedIds]   = useState<Set<string>>(new Set());
 
@@ -95,7 +96,7 @@ export default function SearchScreen() {
 
   const doSearch = useCallback(async (q: string, offset: number, append: boolean) => {
     if (q.length < MIN_QUERY) {
-      if (!append) { setResults([]); setHasMore(false); }
+      if (!append) { setResults([]); setHasMore(false); setSearchError(null); }
       return;
     }
 
@@ -117,8 +118,14 @@ export default function SearchScreen() {
       const rows = (data ?? []) as MedResult[];
       setHasMore(rows.length === PAGE_SIZE);
       setResults((prev) => append ? [...prev, ...rows] : rows);
-    } catch {
-      // Hata sessizce geçilir
+      setSearchError(null);
+    } catch (error) {
+      console.error('search:', error);
+      if (!append) {
+        setResults([]);
+      }
+      setHasMore(false);
+      setSearchError('Arama yapılamadı. Tekrar deneyin.');
     } finally {
       if (requestQuery === activeQuery.current) {
         setSearching(false);
@@ -131,6 +138,7 @@ export default function SearchScreen() {
 
   const onChangeText = useCallback((text: string) => {
     setQuery(text);
+    setSearchError(null);
     activeQuery.current = text;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -243,7 +251,13 @@ export default function SearchScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           ListEmptyComponent={
-            isEmpty ? (
+            searchError ? (
+              <EmptyState
+                icon="warning-outline"
+                title="Arama yapılamadı"
+                subtitle={searchError}
+              />
+            ) : isEmpty ? (
               <EmptyState
                 icon="search-outline"
                 title="Sonuç bulunamadı"
