@@ -147,3 +147,10 @@ URL: https://jabggkqjiwctwdbiipho.supabase.co
 
 ## GitHub
 https://github.com/serhatgndgd/BiTani
+
+## Pre-Production Rules
+
+- .cursor/rules/ klasöründeki kuralları takip et
+- Yeni feature: önce manual test checklist
+- Migration: pipeline tablolarına dokunma
+- Release: pre-prod checklist tamamlanmadan push yok

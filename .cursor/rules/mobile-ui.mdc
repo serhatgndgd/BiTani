@@ -1,0 +1,15 @@
+---
+description: React Native mobile UI patterns for BiTani
+globs: apps/mobile/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Mobile UI Rules
+
+- Use `theme/` tokens for colors, spacing, typography, and shared visual constants. Do not duplicate values from `theme/colors.ts`.
+- Prefer `StyleSheet.create()` for component styles and keep styles colocated with the screen or component that owns them.
+- Every screen should render inside a `SafeAreaView` or an equivalent safe-area aware wrapper.
+- Form screens should use `KeyboardAvoidingView` where keyboard overlap can block inputs or submit buttons.
+- Use `FlatList` for lists that can exceed 20 items; avoid mapping large arrays directly in scroll views.
+- Use `useMemo` and `useCallback` when passing derived arrays, callbacks, or render functions through props.
+- Keep Turkish UI copy consistent, concise, and appropriate for a healthcare app.

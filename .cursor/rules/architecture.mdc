@@ -1,0 +1,14 @@
+---
+description: BiTani architecture and TypeScript standards
+alwaysApply: true
+---
+
+# Architecture Rules
+
+- Target Expo SDK 54 and React Native 0.81 patterns; avoid APIs that require older or newer runtimes without checking compatibility.
+- Keep TypeScript in strict mode. Do not introduce `any`; use explicit domain types, generics, or `unknown` with narrowing.
+- Follow the existing mobile structure: `screens/` for screens, `components/` for reusable UI, `theme/` for tokens, and `lib/` for service clients.
+- Supabase is the boundary for auth, PostgreSQL, and Edge Functions. Client code should use the existing Supabase client helpers instead of ad hoc fetch wrappers.
+- Never hardcode secrets, API keys, project credentials, or service role values in app code.
+- Do not leave `console.log` in production code. Use intentional error handling or remove temporary diagnostics before release.
+- Keep feature edits scoped and compatible with the existing dark themed Turkish mobile UX.

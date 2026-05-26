@@ -1,0 +1,16 @@
+---
+description: Pre-production release checklist for BiTani
+alwaysApply: true
+---
+
+# Release Rules
+
+Complete this checklist before any production push or release candidate:
+
+- TypeScript completes without errors.
+- `any` usages introduced by the change are removed.
+- Temporary `console.log` calls are removed from production code.
+- `.env` and `.env.local` are not staged or pushed.
+- No client-side key exists without the `EXPO_PUBLIC_` prefix unless it is server-only and unreachable from the app bundle.
+- RLS behavior is tested for user-owned health data and public catalog tables.
+- Critical auth, onboarding, chat, and emergency navigation flows are crash tested on device or emulator.

@@ -1,0 +1,14 @@
+---
+description: Security rules for Supabase and mobile healthcare data
+alwaysApply: true
+---
+
+# Security Rules
+
+- Service role keys are allowed only in Supabase Edge Function or trusted server contexts. Never expose them in the mobile client.
+- Client Supabase access must use the anon key with an `EXPO_PUBLIC_` environment variable prefix.
+- Do not store sensitive health data, tokens, passwords, OTPs, or service credentials in `AsyncStorage`.
+- RLS must be active for user-owned tables, and queries must assume that rows can be filtered by policy.
+- Add null checks for Supabase query results before reading nested properties or rendering user health data.
+- Do not expose stack traces, raw database errors, SQL details, or provider secrets in user-facing error messages.
+- Keep `.env` and `.env.local` out of commits and never paste their values into source files or logs.
