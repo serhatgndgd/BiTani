@@ -11,7 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { supabase } from '../lib/supabase';
 import type { ConditionCatalogRow } from '../navigation/types';
@@ -107,6 +107,7 @@ function genderLabel(g: Gender | null): string {
 }
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -294,6 +295,34 @@ export default function ProfileScreen() {
 
   useEffect(() => { void loadData(); }, [loadData]);
 
+  const reloadMedications = useCallback(async () => {
+    if (!userId) return;
+    const { data } = await supabase
+      .from('user_medications')
+      .select('medication_id, dosage, is_active, medications(id, ilac_adi, etkin_madde_adi, firma_adi)')
+      .eq('user_id', userId);
+    if (!data) return;
+    type MedQueryRow = {
+      medication_id: string; dosage: string | null;
+      is_active: boolean; medications: MedicationRow | null;
+    };
+    setUserMedications(
+      (data as unknown as MedQueryRow[])
+        .filter((r) => r.medications !== null)
+        .map((r) => ({
+          medication_id: r.medication_id,
+          dosage: r.dosage,
+          is_active: r.is_active,
+          medications: r.medications as MedicationRow,
+        })),
+    );
+  }, [userId]);
+
+  const clearChatHistory = useCallback(async () => {
+    if (!userId) return;
+    await supabase.from('chat_history').delete().eq('user_id', userId);
+  }, [userId]);
+
   // ── Profil düzenleme ────────────────────────────────────────────────────
   const openEditProfile = () => {
     if (profile) {
@@ -379,8 +408,9 @@ export default function ProfileScreen() {
       setUserMedications((prev) =>
         prev.map((m) => m.medication_id === medicationId ? { ...m, is_active: false } : m),
       );
+      void clearChatHistory();
     }
-  }, [userId]);
+  }, [userId, clearChatHistory]);
 
   const resumeMedication = useCallback(async (medicationId: string) => {
     if (!userId) return;
@@ -393,8 +423,9 @@ export default function ProfileScreen() {
       setUserMedications((prev) =>
         prev.map((m) => m.medication_id === medicationId ? { ...m, is_active: true } : m),
       );
+      void clearChatHistory();
     }
-  }, [userId]);
+  }, [userId, clearChatHistory]);
 
   // ── İlaç modalı — aç / kapat ─────────────────────────────────────────────
   const openMedsModal = useCallback(async () => {
@@ -416,7 +447,9 @@ export default function ProfileScreen() {
     const { data, error } = await supabase
       .from('condition_medications')
       .select('condition_id, medications(id, ilac_adi, etkin_madde_adi)')
-      .in('condition_id', userConditions.map((c) => c.id));
+      .in('condition_id', userConditions.map((c) => c.id))
+      .eq('is_contraindication', false)
+      .gte('confidence_score', 0.5);
     setLoadingCondMeds(false);
     if (error) { setCondMedError('İlaçlar yüklenemedi.'); return; }
     type RawRow = {
@@ -448,58 +481,26 @@ export default function ProfileScreen() {
     setAddingMed(true);
     setAddMedError(null);
     try {
-      const toReactivate = [...modalSelectedMedIds].filter((id) => pastMedIds.has(id));
-      const toInsert = [...modalSelectedMedIds].filter((id) => !pastMedIds.has(id));
-
-      for (const medication_id of toReactivate) {
-        const dosage = modalMedDosages.get(medication_id)?.trim() || null;
-        const { error } = await supabase
-          .from('user_medications')
-          .update({ is_active: true, dosage })
-          .eq('user_id', userId)
-          .eq('medication_id', medication_id);
-        if (error) throw new Error(error.message);
-      }
-
-      if (toInsert.length > 0) {
-        const rows = toInsert.map((medication_id) => ({
-          user_id: userId,
-          medication_id,
-          dosage: modalMedDosages.get(medication_id)?.trim() || null,
-          is_active: true,
-        }));
-        const { error } = await supabase.from('user_medications').insert(rows);
-        if (error) throw new Error(error.message);
-      }
-
-      // Güncel listeyi çek
-      const { data: freshMeds } = await supabase
+      const rows = [...modalSelectedMedIds].map((medication_id) => ({
+        user_id: userId,
+        medication_id,
+        dosage: modalMedDosages.get(medication_id)?.trim() || null,
+        is_active: true,
+      }));
+      const { error } = await supabase
         .from('user_medications')
-        .select('medication_id, dosage, is_active, medications(id, ilac_adi, etkin_madde_adi, firma_adi)')
-        .eq('user_id', userId);
-      if (freshMeds) {
-        type MedQueryRow = {
-          medication_id: string; dosage: string | null;
-          is_active: boolean; medications: MedicationRow | null;
-        };
-        setUserMedications(
-          (freshMeds as unknown as MedQueryRow[])
-            .filter((r) => r.medications !== null)
-            .map((r) => ({
-              medication_id: r.medication_id,
-              dosage: r.dosage,
-              is_active: r.is_active,
-              medications: r.medications as MedicationRow,
-            })),
-        );
-      }
+        .upsert(rows, { onConflict: 'user_id,medication_id' });
+      if (error) throw new Error(error.message);
+
+      await reloadMedications();
+      void clearChatHistory();
       closeMedsModal();
     } catch (e) {
       setAddMedError(e instanceof Error ? e.message : 'Eklenemedi.');
     } finally {
       setAddingMed(false);
     }
-  }, [userId, modalSelectedMedIds, modalMedDosages, pastMedIds, closeMedsModal]);
+  }, [userId, modalSelectedMedIds, modalMedDosages, closeMedsModal, reloadMedications, clearChatHistory]);
 
   // Serbest arama sekmesi: tek ilaç ekle
   const addSingleMedication = useCallback(async () => {
@@ -507,35 +508,20 @@ export default function ProfileScreen() {
     setAddingMed(true);
     setAddMedError(null);
     const dosage = dosageInput.trim() || null;
-    const isReactivate = pastMedIds.has(selectedMed.id);
 
-    const { error } = isReactivate
-      ? await supabase
-          .from('user_medications')
-          .update({ is_active: true, dosage })
-          .eq('user_id', userId)
-          .eq('medication_id', selectedMed.id)
-      : await supabase
-          .from('user_medications')
-          .insert({ user_id: userId, medication_id: selectedMed.id, dosage, is_active: true });
+    const { error } = await supabase
+      .from('user_medications')
+      .upsert(
+        { user_id: userId, medication_id: selectedMed.id, dosage, is_active: true },
+        { onConflict: 'user_id,medication_id' },
+      );
 
     setAddingMed(false);
     if (error) { setAddMedError(error.message || 'Eklenemedi.'); return; }
 
-    if (isReactivate) {
-      setUserMedications((prev) =>
-        prev.map((m) =>
-          m.medication_id === selectedMed.id ? { ...m, is_active: true, dosage } : m,
-        ),
-      );
-    } else {
-      setUserMedications((prev) => [
-        ...prev,
-        { medication_id: selectedMed.id, dosage, is_active: true, medications: selectedMed },
-      ]);
-    }
+    await reloadMedications();
     closeMedsModal();
-  }, [userId, selectedMed, dosageInput, pastMedIds, closeMedsModal]);
+  }, [userId, selectedMed, dosageInput, closeMedsModal, reloadMedications, clearChatHistory]);
 
   // ── Serbest arama debounce ───────────────────────────────────────────────
   useEffect(() => {
@@ -916,7 +902,7 @@ export default function ProfileScreen() {
 
               {/* Ekle footer */}
               {modalSelectedMedIds.size > 0 ? (
-                <View style={styles.modalFooter}>
+                <View style={[styles.modalFooter, { paddingBottom: insets.bottom + 14 }]}>
                   {addMedError ? <Text style={[styles.err, { marginBottom: 8 }]}>{addMedError}</Text> : null}
                   <Pressable
                     style={[styles.saveBtn, addingMed && styles.saveBtnDisabled]}

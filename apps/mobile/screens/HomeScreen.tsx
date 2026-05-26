@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -219,7 +220,7 @@ export default function HomeScreen() {
     }
   }, []);
 
-  useEffect(() => { void loadData(); }, [loadData]);
+  useFocusEffect(useCallback(() => { void loadData(); }, [loadData]));
 
   // ─── Yükleniyor ───────────────────────────────────────────────────────────
 

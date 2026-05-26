@@ -61,7 +61,7 @@ function buildSystemPrompt(
 - Gerektiğinde mutlaka bir doktora başvurmasını hatırlatırsın.
 - Yanıtlarını kısa, anlaşılır ve Türkçe tut.
 
-Kullanıcı Profili:
+Kullanıcı Profili (her mesajda veritabanından anlık çekilir, kesin ve günceldir):
 - Ad: ${name}
 - Yaş: ${age}
 - Cinsiyet: ${gender}
@@ -69,6 +69,8 @@ Kullanıcı Profili:
 - Kilo: ${weight}
 - Kronik hastalıklar: ${conditionsList}
 - Düzenli kullandığı ilaçlar: ${medicationsList}
+
+ZORUNLU KURAL: Kullanıcı ilaçlarını, hastalıklarını veya kişisel bilgilerini sorduğunda YALNIZCA yukarıdaki güncel profil bilgilerini kullan. Konuşma geçmişinde farklı bilgiler geçmiş olsa bile geçmişi değil bu profili esas al.
 
 Bu profil bilgilerini dikkate alarak kişiselleştirilmiş ve güvenli sağlık rehberliği sun.`
 }
@@ -115,7 +117,8 @@ Deno.serve(async (req) => {
         supabaseAdmin
           .from('user_medications')
           .select('dosage, medications(ilac_adi)')
-          .eq('user_id', userId),
+          .eq('user_id', userId)
+          .eq('is_active', true),
       ])
 
       profile = profileRes.data as Profile | null

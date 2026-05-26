@@ -52,7 +52,7 @@ from supabase import create_client
 # ── .env yükle ───────────────────────────────────────────────────────────────
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
-PIPELINE_VERSION = "v3.5.0"
+PIPELINE_VERSION = "v3.8.0"
 
 # Kontrendikasyon için minimum confidence eşiği
 KONTRA_MIN_CONFIDENCE: float = 0.15
@@ -107,6 +107,16 @@ _STOPWORDS: frozenset[str] = frozenset({
 # Gut Hastalığı / Parkinson / Alzheimer:
 #   Stopword fix ("hastalığı") ana sorunu çözer; ek olarak
 #   "hastalıklarda", "hastalıklı" gibi genel "morbid" kelimeler de dışlanır.
+# ── Endikasyon bölümü negasyon kuralları (v3.6.0) ────────────────────────────
+# Rule 1/2/3 için — match_keywords() + _endi_sentence_override() tarafından kullanılır
+_NEGATION = re.compile(
+    r"önerilmez|kullanılmamalı|kullanılmaz|kontrendikedir"
+    r"|kontrendike\b|kullanmayınız|kullanmayın|kullanılmaması\s+gerekir",
+    re.I,
+)
+_MONOTERAPI  = re.compile(r"tek\s+başına|monoterapi|mono\s+terapi", re.I)
+_KONTRA_OLAN = re.compile(r"kontrendike\s+olduğu", re.I)
+
 _CONDITION_EXCLUDES: dict[str, list[re.Pattern]] = {
     "mesane aşırı aktivitesi": [
         re.compile(
@@ -155,6 +165,11 @@ MEDICATION_LIMIT:  int | None = int(_lim_raw) if _lim_raw.isdigit() else None
 CONCURRENT_DOWNLOADS: int = int(_env("CONCURRENT_DOWNLOADS", "10"))
 REPROCESS_ALL: bool = _env("REPROCESS_ALL", "0").lower() in ("1", "true", "yes")
 DEBUG: bool = _env("KUB_DEBUG", "0").lower() in ("1", "true", "yes")
+
+# Kuru çalıştırma — DB'ye yazmaz, eşleşmeleri stdout'a basar
+DRY_RUN: bool = "--dry-run" in sys.argv or _env("DRY_RUN", "0") in ("1", "true")
+# Virgülle ayrılmış ilaç adı parçaları — sadece eşleşenleri işle
+DRUG_FILTER: list[str] = [s.strip().lower() for s in _env("DRUG_FILTER").split(",") if s.strip()]
 
 MEDICATIONS_PAGE = 500
 DEBUG_PREVIEW_LEN = 600
@@ -296,6 +311,48 @@ def _sentence_around(text: str, pos: int, radius: int = 300) -> str:
     return chunk[start:end].strip()
 
 
+def _endi_sentence_override(
+    sentence: str,
+    kw_variants: frozenset[str],
+) -> bool | None:
+    """
+    4.1 / KT bölümünde bulunan eşleşmenin gerçekten endikasyon mu olduğunu
+    cümle düzeyinde kontrol eder.
+
+    Dönüş:
+      None  → eşleşmeyi tamamen atla  (Rule 3)
+      True  → kontrendikasyon olarak yeniden sınıflandır  (Rule 2)
+      False → endikasyon olarak bırak  (Rule 1 veya negasyon yok)
+    """
+    # Rule 3: "kontrendike olduğu X hastalarında" — ilaç X'i tedavi etmiyor
+    if _KONTRA_OLAN.search(sentence):
+        return None
+
+    sent_lower = text_for_match(sentence)
+    neg_m = _NEGATION.search(sent_lower)
+
+    # Negasyon kelimesi yok → endikasyon
+    if not neg_m:
+        return False
+
+    # Rule 1: "tek başına / monoterapi" → dozaj uyarısı, endikasyon kalmalı
+    if _MONOTERAPI.search(sent_lower):
+        return False
+
+    # Rule 2: negasyon kelimesinin ±40 karakterinde hastalık keyword'ü varsa → kontra
+    neg_pos = neg_m.start()
+    lo = max(0, neg_pos - 40)
+    hi = min(len(sent_lower), neg_pos + 40)
+    window = sent_lower[lo:hi]
+
+    for variant in kw_variants:
+        if variant in window:
+            return True  # hastalık negasyona yakın → kontrendikasyon
+
+    # Negasyon var ama hastalık yakında değil (genel uyarı cümlesi) → endikasyon
+    return False
+
+
 def _keywords_for_condition(name: str) -> frozenset[str]:
     n = text_for_match(name.strip())
     terms: set[str] = {n}
@@ -320,26 +377,54 @@ def match_keywords(
     is_contraindication: bool = False,
 ) -> list[dict]:
     """
-    Keyword matching → [{condition_id, confidence_score, evidence_snippet}]
+    Keyword matching → [{condition_id, confidence_score, evidence_snippet, is_contraindication}]
 
-    Filtre katmanları (v3.4.0):
+    Filtre katmanları (v3.8.0):
 
-    1. Stopword filtresi (_STOPWORDS):
-       "hastalarda", "hastalığı" gibi genel Türkçe tıp kelimeleri variant
-       olarak üretilse bile sayılmaz.  Tüm bölümlerde aktif.
+    1. Stopword filtresi (_STOPWORDS): genel Türkçe tıp kelimeleri atlanır.
 
     2. Generic aşırı duyarlılık filtresi (_GENERIC_HYPERSENSITIVITY):
-       is_contraindication=True olduğunda, eşleşmenin cümlesi jenerik bir
-       "bileşenlerine karşı aşırı duyarlılık" kalıbı içeriyorsa bu keyword
-       atlanır; gerçek kontra cümleleri (ör. "kalp yetmezliğinde") korunur.
+       4.3 bölümünde jenerik "bileşenlerine karşı aşırı duyarlılık" cümleleri atlanır.
 
-    3. Hastalığa özgü negatif cümle filtresi (_CONDITION_EXCLUDES):
-       Örn. "Mesane Aşırı Aktivitesi" için "mesane boynu obstrüksiyonu"
-       içeren cümleler atlanır.  Tüm bölümlerde aktif.
+    3. Hastalığa özgü negatif cümle filtresi (_CONDITION_EXCLUDES): tüm bölümlerde.
+
+    4. Endikasyon bölümü negasyon analizi (_endi_sentence_override) — v3.6.0:
+       4.1 / KT bölümündeki her eşleşme için cümle incelenir:
+       - Rule 3: "kontrendike olduğu" → eşleşmeyi tamamen atla
+       - Rule 1: negasyon + "tek başına/monoterapi" → endikasyon olarak bırak
+       - Rule 2: negasyon + hastalık ±40 karakter yakınında → kontrendikasyon
+
+    5. Kaynak-kelime birlikte bulunma kuralı (co-occurrence gate) — v3.7.0:
+       Çok kelimeli hastalık adlarında en az 2 kaynak kelime (condition adının
+       boşluk-ayrılmış token'ları) aynı bölümde bulunmalı.
+       _CATALOG_EXTRAS'tan gelen ekstra keyword'ler confidence'a katkıda bulunur
+       ama co-occurrence sayısına sayılmaz — böylece "sistem" veya "sendrom" gibi
+       generic token'ların yanlış eşleşmeleri önlenir.
+
+    5a. Yama 1 — tek kelimeli bypass (v3.8.0):
+       Hastalık adı tek token'dan oluşuyorsa (KOAH, Depresyon, Tonsillit)
+       co-occurrence gate tamamen devre dışı — extras eşleşmesi yeterli.
+       Gerekçe: extras-only eşleşme (depresif → Depresyon) gerçek TP'dir ve
+       false negative, false positive'den daha tehlikelidir.
+
+    5b. Yama 2 — katalog-frekans anchor (v3.8.0):
+       3+ kelimeli hastalıklarda, en nadir token (en az sayıda hastalıkta geçen)
+       "anchor" olarak belirlenir ve eşleşmede ZORUNLU tutulur.
+       Gerekçe: "Üriner Sistem Enfeksiyonu"nda "sistem"+"enfeksiyon" yeterli görünür
+       ama GERÇEK eşleşme için "üriner" (en nadir, en ayırt edici) zorunlu olmalı.
     """
     hay = text_for_match(section_text)
     section_len = max(len(section_text), 1)
     results: list[dict] = []
+
+    # ── Yama 2: katalog-frekans (kaç hastalık adında geçiyor) ─────────────────
+    # Düşük frekans = ayırt edici token (anchor). Koşullar kataloğundan önceden hesaplanır.
+    _token_catalog_freq: dict[str, int] = {}
+    for _c in conditions:
+        _cname = text_for_match(_c.get("name") or "")
+        for _tok in re.split(r"[\s,;/\(\)\[\]]+", _cname):
+            if len(_tok) >= 3 and _tok not in _STOPWORDS:
+                _token_catalog_freq[_tok] = _token_catalog_freq.get(_tok, 0) + 1
 
     for c in conditions:
         cid  = c.get("id")
@@ -347,51 +432,112 @@ def match_keywords(
         if not cid or not name:
             continue
 
-        hit_count     = 0
-        first_snippet = ""
-        cname_key     = text_for_match(name)
-        cond_excludes = _CONDITION_EXCLUDES.get(cname_key, ())
+        hit_count      = 0
+        first_snippet  = ""
+        first_sentence = ""
+        cname_key      = text_for_match(name)
+        cond_excludes  = _CONDITION_EXCLUDES.get(cname_key, ())
+        cond_kws       = _keywords_for_condition(name)
 
-        for kw in _keywords_for_condition(name):
+        # ── Co-occurrence: kaynak kelime variant setleri ───────────────────────
+        # Sadece hastalık adının kendi token'larından türetilir; extras dahil değil.
+        sw_variant_sets: list[frozenset[str]] = []
+        sw_source_toks: list[str] = []        # Yama 2 için paralel token listesi
+        for tok in re.split(r"[\s,;/\(\)\[\]]+", cname_key):
+            if len(tok) < 3:
+                continue
+            tok_vars = frozenset(
+                v for v in _strip_suffix(tok)
+                if len(v) >= 3 and v not in _STOPWORDS
+            )
+            if tok_vars:
+                sw_variant_sets.append(tok_vars)
+                sw_source_toks.append(tok)
+        matched_sw: set[int] = set()
+
+        # ── Yama 2: anchor token (3+ kelimeli hastalıklar) ────────────────────
+        # En nadir token = en ayırt edici; eşleşmede zorunlu tutulur.
+        anchor_sw_idx: int | None = None
+        if len(sw_variant_sets) >= 3:
+            min_freq: int | None = None
+            for _i, _tok in enumerate(sw_source_toks):
+                _freq = _token_catalog_freq.get(_tok, 0)
+                if min_freq is None or _freq < min_freq:
+                    min_freq = _freq
+                    anchor_sw_idx = _i
+
+        for kw in cond_kws:
             for variant in _strip_suffix(text_for_match(kw)):
                 # ── 1. Uzunluk + stopword kontrolü ────────────────────────────
                 if len(variant) < 3 or variant in _STOPWORDS:
-                    continue  # bu variant'ı atla; başka variant dene
+                    continue
                 if variant not in hay:
                     continue
 
-                idx = hay.find(variant)
-
-                # Cümle bir kez hesaplanır, her iki filtre tarafından paylaşılır
-                sentence: str | None = None
-                if is_contraindication or cond_excludes:
-                    sentence = _sentence_around(section_text, idx)
+                idx      = hay.find(variant)
+                sentence = _sentence_around(section_text, idx)
 
                 # ── 2. Generic aşırı duyarlılık filtresi (sadece 4.3) ──────────
-                if is_contraindication and sentence and \
-                        _GENERIC_HYPERSENSITIVITY.search(sentence):
-                    break  # bu kw tamamen generic — sonraki kw'ye geç
+                if is_contraindication and _GENERIC_HYPERSENSITIVITY.search(sentence):
+                    break
 
                 # ── 3. Hastalığa özgü negatif filtre ──────────────────────────
-                if cond_excludes and sentence and \
-                        any(pat.search(sentence) for pat in cond_excludes):
-                    break  # bu cümle bu condition için geçersiz — sonraki kw
+                if cond_excludes and any(pat.search(sentence) for pat in cond_excludes):
+                    break
 
                 hit_count += 1
                 if not first_snippet:
                     start = max(0, idx - 40)
                     end   = min(len(section_text), idx + 80)
                     first_snippet = section_text[start:end].strip()
-                break  # bu kw için yeter
+                if not first_sentence:
+                    first_sentence = sentence
 
-        if hit_count > 0:
-            raw_score  = hit_count / (1 + math.log(section_len / 100 + 1))
-            confidence = min(round(raw_score, 3), 1.0)
-            results.append({
-                "condition_id":     cid,
-                "confidence_score": confidence,
-                "evidence_snippet": first_snippet[:200],
-            })
+                # ── 5. Kaynak kelime takibi ────────────────────────────────────
+                for sw_idx, sw_vars in enumerate(sw_variant_sets):
+                    if variant in sw_vars:
+                        matched_sw.add(sw_idx)
+                        break
+
+                break
+
+        if hit_count == 0:
+            continue
+
+        # ── 5a. Co-occurrence gate (Yama 1: tek kelimeli bypass) ──────────────
+        # len(sw_variant_sets) <= 1 → tek token'lı hastalık, gate tamamen bypass.
+        # Gerekçe: extras-only eşleşme (depresif→Depresyon) gerçek TP'dir.
+        if len(sw_variant_sets) >= 2 and len(matched_sw) < 2:
+            continue
+
+        # ── 5b. Anchor gate (Yama 2: 3+ kelimeli hastalıklarda nadir token zorunlu)
+        if anchor_sw_idx is not None and anchor_sw_idx not in matched_sw:
+            continue
+
+        raw_score  = hit_count / (1 + math.log(section_len / 100 + 1))
+        confidence = min(round(raw_score, 3), 1.0)
+
+        # ── 4. Endikasyon bölümü negasyon analizi (v3.6.0) ───────────────────
+        final_is_contra = is_contraindication
+        if not is_contraindication and first_sentence:
+            kw_variants = frozenset(
+                v
+                for kw in cond_kws
+                for v in _strip_suffix(text_for_match(kw))
+                if len(v) >= 5 and v not in _STOPWORDS
+            )
+            override = _endi_sentence_override(first_sentence, kw_variants)
+            if override is None:
+                continue  # Rule 3: eşleşmeyi tamamen atla
+            final_is_contra = override  # Rule 1 → False, Rule 2 → True
+
+        results.append({
+            "condition_id":        cid,
+            "_cond_name":          name,
+            "confidence_score":    confidence,
+            "evidence_snippet":    first_snippet[:200],
+            "is_contraindication": final_is_contra,
+        })
 
     return results
 
@@ -495,6 +641,11 @@ def fetch_medications(skip_ids: set[str]) -> list[dict]:
         )
         for med in rows:
             if med.get("id") not in skip_ids:
+                # DRUG_FILTER: ilaç adı filtresi (dry-run / test modu)
+                if DRUG_FILTER:
+                    name_lower = (med.get("ilac_adi") or "").lower()
+                    if not any(f in name_lower for f in DRUG_FILTER):
+                        continue
                 out.append(med)
                 if effective_limit and len(out) >= effective_limit:
                     return out
@@ -513,6 +664,22 @@ def fetch_conditions() -> list[dict]:
     )
 
 
+def delete_existing_matches(medication_id: str) -> None:
+    """İlaç için mevcut TÜM condition_medications satırlarını siler.
+
+    Kapsam: WHERE medication_id = <medication_id> — başka hiçbir koşul yok.
+    DRY_RUN modunda çalışmaz.
+    """
+    if DRY_RUN:
+        return
+    try:
+        supabase.table("condition_medications").delete().eq(
+            "medication_id", medication_id
+        ).execute()
+    except Exception as exc:
+        print(f"    ❌ DELETE hatası (medication_id={medication_id[:8]}): {exc}")
+
+
 def upsert_matches(
     medication_id: str,
     matches: list[dict],
@@ -521,6 +688,13 @@ def upsert_matches(
 ) -> int:
     if not matches:
         return 0
+    if DRY_RUN:
+        label = "KONTRA" if is_contraindication else "ENDİ  "
+        for m in matches:
+            snippet = (m.get("evidence_snippet") or "")[:120].replace("\n", " ")
+            print(f"      [{label}] score={m['confidence_score']:.3f} "
+                  f"cond={m.get('_cond_name','?'):30s} | {snippet}")
+        return len(matches)
     rows = [
         {
             "medication_id":       medication_id,
@@ -535,9 +709,16 @@ def upsert_matches(
         for m in matches
     ]
     try:
-        supabase.table("condition_medications").upsert(
+        resp = supabase.table("condition_medications").upsert(
             rows, on_conflict="medication_id,condition_id"
         ).execute()
+        # SDK v2 hataları exception fırlatmaz — response'u kontrol et
+        if hasattr(resp, "error") and resp.error:
+            print(f"    ❌ DB kayıt hatası (resp.error): {resp.error}")
+            return 0
+        if resp.data is None:
+            print(f"    ❌ DB kayıt hatası: execute() data=None döndü")
+            return 0
         return len(rows)
     except Exception as e:
         print(f"    ❌ DB kayıt hatası: {e}")
@@ -559,7 +740,8 @@ async def _download(
             try:
                 async with session.get(
                     url, headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=90)
+                    timeout=aiohttp.ClientTimeout(total=90),
+                    ssl=False,
                 ) as r:
                     if r.status == 200:
                         return await r.read()
@@ -599,9 +781,10 @@ async def download_pdfs(
 
 @dataclass
 class MedStats:
-    endikasyon: int = 0
-    kontra:     int = 0
-    errors:     int = 0
+    endikasyon:  int  = 0
+    kontra:      int  = 0
+    errors:      int  = 0
+    pdf_failed:  bool = False  # PDF indirilemedi veya okunamadı
 
 
 async def process_medication(
@@ -620,6 +803,7 @@ async def process_medication(
     if not pdfs:
         print(f"  ⚠️  {name}: PDF yok")
         st.errors += 1
+        st.pdf_failed = True
         return st
 
     # 2. Parse (CPU-bound)
@@ -645,6 +829,7 @@ async def process_medication(
     if not texts:
         print(f"  ⚠️  {name}: PDF okunamadı veya OCR kalitesi yetersiz")
         st.errors += 1
+        st.pdf_failed = True
         return st
 
     # 3. Bölümleri çıkar + eşleştir
@@ -680,6 +865,9 @@ async def process_medication(
             print(kt_text[:DEBUG_PREVIEW_LEN])
 
     if not sections_to_process:
+        # PDFs okunabildi ama 4.1/KT bölümü bulunamadı.
+        # Eski satırları yine de temizle — "eşleşme yok" ile eşdeğer.
+        delete_existing_matches(med["id"])
         print(f"  ─  {name}: İşlenebilir bölüm yok")
         return st
 
@@ -688,28 +876,30 @@ async def process_medication(
     endi_map: dict[str, dict] = {}   # condition_id → match
     kontra_map: dict[str, dict] = {} # condition_id → match
 
-    for source, (section_text, is_contra) in sections_to_process.items():
+    for _, (section_text, is_contra) in sections_to_process.items():
 
-        # match_keywords: is_contraindication=True olduğunda her eşleşmenin
-        # geçtiği cümleyi kontrol eder; jenerik aşırı duyarlılık cümleleri atlanır.
         matches = match_keywords(section_text, conditions,
                                  is_contraindication=is_contra)
         for m in matches:
-            cid  = m["condition_id"]
-            conf = m["confidence_score"]
+            cid             = m["condition_id"]
+            conf            = m["confidence_score"]
+            match_is_contra = m["is_contraindication"]
 
-            if is_contra:
-                # ── Düzeltme 1: Kontrendikasyon confidence eşiği ─────────────
+            if match_is_contra:
                 if conf < KONTRA_MIN_CONFIDENCE:
                     continue  # yanlış pozitif — atla
                 kontra_map[cid] = m
-                endi_map.pop(cid, None)   # endikasyon listesinden çıkar
+                endi_map.pop(cid, None)
             else:
-                if cid not in kontra_map:  # kontrendike değilse ekle
+                if cid not in kontra_map:
                     if cid not in endi_map or conf > endi_map[cid]["confidence_score"]:
                         endi_map[cid] = m
 
     # 5. Kaydet
+    # Önce bu ilacın TÜM eski satırlarını sil (FP temizliği).
+    # Kapsam: sadece medication_id = med["id"]. 0 eşleşme durumunda da çalışır.
+    delete_existing_matches(med["id"])
+
     if endi_map:
         cnt = upsert_matches(med["id"], list(endi_map.values()),
                              source="KUB_4_1+KT", is_contraindication=False)
@@ -761,11 +951,12 @@ async def main_async() -> None:
         print("✅ İşlenecek ilaç yok.")
         return
 
-    total      = MedStats()
-    start_time = time.time()
-    dl_sem     = asyncio.Semaphore(CONCURRENT_DOWNLOADS)
+    total         = MedStats()
+    start_time    = time.time()
+    dl_sem        = asyncio.Semaphore(CONCURRENT_DOWNLOADS)
+    pdf_failed_meds: list[tuple[str, str]] = []  # (medication_id, ilac_adi)
 
-    connector = aiohttp.TCPConnector(limit_per_host=CONCURRENT_DOWNLOADS)
+    connector = aiohttp.TCPConnector(limit_per_host=CONCURRENT_DOWNLOADS, ssl=False)
     async with aiohttp.ClientSession(connector=connector) as session:
         with ProcessPoolExecutor(max_workers=4) as executor:
             for idx, med in enumerate(medications, 1):
@@ -774,6 +965,18 @@ async def main_async() -> None:
                 total.endikasyon += st.endikasyon
                 total.kontra     += st.kontra
                 total.errors     += st.errors
+                if st.pdf_failed:
+                    pdf_failed_meds.append((med["id"], med.get("ilac_adi") or ""))
+
+    # PDF hatalı ilaçları logla
+    if pdf_failed_meds:
+        log_path = os.path.join(os.path.dirname(__file__), "pdf_failed_meds.txt")
+        mode = "a"  # birden fazla çalıştırmada biriksin
+        with open(log_path, mode, encoding="utf-8") as f:
+            import datetime as _dt
+            f.write(f"\n# {_dt.datetime.now().isoformat()}  ({PIPELINE_VERSION})\n")
+            for mid, ad in pdf_failed_meds:
+                f.write(f"{mid}\t{ad}\n")
 
     elapsed = time.time() - start_time
     print("\n" + "═" * 58)
@@ -782,9 +985,89 @@ async def main_async() -> None:
     print(f"  İşlenen ilaç         : {len(medications)}")
     print(f"  Endikasyon kaydı     : {total.endikasyon}")
     print(f"  Kontrendikasyon kaydı: {total.kontra}")
-    print(f"  Hata                 : {total.errors}")
+    print(f"  PDF okunamadı        : {len(pdf_failed_meds)}")
+    print(f"  Diğer hata           : {total.errors - len(pdf_failed_meds)}")
     print(f"  Süre                 : {elapsed / 60:.1f} dakika")
     print("═" * 58)
+
+
+def _run_tests() -> None:
+    """
+    DB'ye dokunmadan negasyon kurallarını (Rule 1/2/3) test eder.
+    Çalıştır: python kub_endikasyon_cikarici.py --test
+    """
+    KOAH     = {"id": "cond-koah",    "name": "KOAH"}
+    TONSILIT = {"id": "cond-tons",    "name": "Akut Tonsillit"}
+    LOSEMI   = {"id": "cond-los",     "name": "Kronik Lenfositik Lösemi"}
+    HIPERTS  = {"id": "cond-hiper",   "name": "Hipertansiyon"}
+    MONO     = {"id": "cond-mono",    "name": "Monoterapi"}
+
+    cases = [
+        # (açıklama, metin, condition, beklenen is_contraindication)
+        (
+            "Rule 1 — tek başına/KOAH → endikasyon kalmalı",
+            "KOAH'ta tek başına kullanılması önerilmez, kombinasyon gerekir.",
+            KOAH,
+            False,
+        ),
+        (
+            "Rule 2 — akut tonsillit → kontrendikasyon",
+            "Akut tonsillit tedavisinde önerilmez.",
+            TONSILIT,
+            True,
+        ),
+        (
+            "Rule 3 — kontrendike olduğu lösemi → atla (None)",
+            "Kontrendike olduğu kronik lenfositik lösemi hastalarında kullanılır.",
+            LOSEMI,
+            None,
+        ),
+        (
+            "Rule 2 — hipertansiyonda kullanılmamalı → kontrendikasyon",
+            "Hipertansiyonlu hastalarda kullanılmamalıdır.",
+            HIPERTS,
+            True,
+        ),
+        (
+            "Rule 1 — monoterapi önerilmez → endikasyon kalmalı",
+            "Monoterapi olarak kullanılması önerilmez, kombine edilmelidir.",
+            MONO,
+            False,
+        ),
+    ]
+
+    print("═" * 60)
+    print("  Negasyon Kural Testi  (DB yok)")
+    print("═" * 60)
+    passed = failed = 0
+
+    for desc, text, cond, expected in cases:
+        results = match_keywords(text, [cond], is_contraindication=False)
+
+        if expected is None:
+            # Rule 3: eşleşme hiç dönmemeli
+            got = None if not results else results[0]["is_contraindication"]
+            ok  = not results
+        else:
+            if not results:
+                got = "EŞLEŞMEDİ"
+                ok  = False
+            else:
+                got = results[0]["is_contraindication"]
+                ok  = (got == expected)
+
+        status = "✅" if ok else "❌"
+        print(f"\n{status} {desc}")
+        print(f"   Metin    : {text}")
+        print(f"   Beklenen : {expected}   |   Gelen: {got}")
+        if ok:
+            passed += 1
+        else:
+            failed += 1
+
+    print("\n" + "─" * 60)
+    print(f"  {passed} geçti / {failed} başarısız")
+    print("═" * 60)
 
 
 def main() -> None:
@@ -792,4 +1075,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    if "--test" in sys.argv:
+        _run_tests()
+    else:
+        main()
