@@ -4,10 +4,10 @@ import { useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -164,7 +164,7 @@ export default function ChatScreen() {
   const [sending, setSending]               = useState(false);
   const [sendError, setSendError]           = useState<string | null>(null);
   const [showEmergency, setShowEmergency]   = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
+  const listRef = useRef<FlatList<Message>>(null);
 
   const loadProfile = useCallback(async () => {
     setLoadingProfile(true);
@@ -195,9 +195,26 @@ export default function ChatScreen() {
 
   useEffect(() => {
     if (messages.length > 0) {
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     }
   }, [messages, sending]);
+
+  const keyExtractor = useCallback((item: Message) => item.id, []);
+
+  const renderMessage = useCallback(
+    ({ item }: { item: Message }) => <MessageBubble message={item} />,
+    [],
+  );
+
+  const renderListFooter = useCallback(() => {
+    if (!sending && !sendError) return null;
+    return (
+      <>
+        {sending && <TypingIndicator />}
+        {sendError && <Text style={styles.errorText}>{sendError}</Text>}
+      </>
+    );
+  }, [sending, sendError]);
 
   const send = useCallback(async () => {
     const text = input.trim();
@@ -255,16 +272,16 @@ export default function ChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={90}
       >
-        <ScrollView
-          ref={scrollRef}
+        <FlatList
+          ref={listRef}
+          data={messages}
           style={styles.list}
           contentContainerStyle={styles.listContent}
+          keyExtractor={keyExtractor}
+          renderItem={renderMessage}
+          ListFooterComponent={renderListFooter}
           keyboardShouldPersistTaps="handled"
-        >
-          {messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)}
-          {sending && <TypingIndicator />}
-          {sendError && <Text style={styles.errorText}>{sendError}</Text>}
-        </ScrollView>
+        />
 
         {showEmergency && (
           <Pressable
