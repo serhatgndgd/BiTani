@@ -3,9 +3,11 @@ import { Picker } from '@react-native-picker/picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Modal,
   Pressable,
   ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   TextInput,
@@ -48,6 +50,9 @@ type CondMedRow = {
     etkin_madde_adi: string | null;
   };
 };
+
+type ProfileConditionSection = { title: string; data: ConditionCatalogRow[] };
+type ProfileMedSection       = { conditionId: string; title: string; data: CondMedRow[] };
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: 'male', label: 'Erkek' },
@@ -215,6 +220,23 @@ export default function ProfileScreen() {
     }
     return map;
   }, [condMedRows, condMedSearch]);
+
+  // ─── SectionList veri dönüşümleri (modal listeler) ───────────────────────
+
+  const conditionModalSections = useMemo<ProfileConditionSection[]>(
+    () => [...grouped.entries()].map(([title, data]) => ({ title, data })),
+    [grouped],
+  );
+
+  const condMedModalSections = useMemo<ProfileMedSection[]>(
+    () =>
+      [...condMedGrouped.entries()].map(([conditionId, meds]) => ({
+        conditionId,
+        title: conditionNameMap.get(conditionId) ?? conditionId,
+        data: meds,
+      })),
+    [condMedGrouped, conditionNameMap],
+  );
 
   // ── Veri yükleme ────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
@@ -558,6 +580,111 @@ export default function ProfileScreen() {
     setModalMedDosages((prev) => { const next = new Map(prev); next.set(medId, value); return next; });
   }, []);
 
+  // ─── Modal SectionList / FlatList render callbackleri ────────────────────
+
+  // Hastalık modalı
+  const keyExtractorCond = useCallback((item: ConditionCatalogRow) => item.id, []);
+
+  const renderConditionModalItem = useCallback(
+    ({ item: row }: { item: ConditionCatalogRow }) => {
+      const on = userConditionIds.has(row.id);
+      return (
+        <Pressable
+          style={[styles.checkRow, on && styles.checkRowSelected]}
+          onPress={() => void toggleCondition(row)}>
+          <Text style={styles.rowName}>{row.name}</Text>
+          <Ionicons name={on ? 'checkbox' : 'square-outline'} size={22} color={on ? '#8ab4ff' : '#aaa'} />
+        </Pressable>
+      );
+    },
+    [userConditionIds, toggleCondition],
+  );
+
+  const renderConditionModalSectionHeader = useCallback(
+    ({ section: { title } }: { section: ProfileConditionSection }) => (
+      <Text style={styles.modalSectionTitle}>{title}</Text>
+    ),
+    [],
+  );
+
+  // İlaç modalı — Hastalığa Göre sekmesi
+  const keyExtractorCondMed = useCallback(
+    (item: CondMedRow) => `${item.condition_id}:${item.medication.id}`,
+    [],
+  );
+
+  const renderCondMedItem = useCallback(
+    ({ item: { medication } }: { item: CondMedRow }) => {
+      const isActive = activeMedIds.has(medication.id);
+      const selected = modalSelectedMedIds.has(medication.id);
+      return (
+        <View>
+          <Pressable
+            style={[styles.checkRow, selected && styles.checkRowSelected, isActive && styles.checkRowDimmed]}
+            onPress={() => { if (!isActive) toggleModalMed(medication.id); }}
+            disabled={isActive}>
+            <View style={styles.medInfoCol}>
+              <Text style={[styles.rowName, isActive && styles.rowNameDimmed]}>
+                {medication.ilac_adi}
+              </Text>
+              {medication.etkin_madde_adi
+                ? <Text style={styles.medSub}>{medication.etkin_madde_adi}</Text>
+                : null}
+              {isActive ? <Text style={styles.alreadyLabel}>Zaten kullanılıyor</Text> : null}
+            </View>
+            {isActive
+              ? <Ionicons name="checkmark-circle" size={22} color="#4a5a7a" />
+              : <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={22} color={selected ? '#8ab4ff' : '#aaa'} />}
+          </Pressable>
+          {selected ? (
+            <TextInput
+              style={styles.dosageInline}
+              value={modalMedDosages.get(medication.id) ?? ''}
+              onChangeText={(v) => setModalDosage(medication.id, v)}
+              placeholder="Doz (örn: 500 mg, günde 2×) — opsiyonel"
+              placeholderTextColor="#555"
+            />
+          ) : null}
+        </View>
+      );
+    },
+    [activeMedIds, modalSelectedMedIds, toggleModalMed, modalMedDosages, setModalDosage],
+  );
+
+  const renderCondMedSectionHeader = useCallback(
+    ({ section: { title } }: { section: ProfileMedSection }) => (
+      <Text style={styles.modalSectionTitle}>{title}</Text>
+    ),
+    [],
+  );
+
+  // İlaç modalı — Serbest Arama sekmesi
+  const keyExtractorMedSearch = useCallback((item: MedicationRow) => item.id, []);
+
+  const renderSearchMedItem = useCallback(
+    ({ item: med }: { item: MedicationRow }) => {
+      const isActive = activeMedIds.has(med.id);
+      return (
+        <Pressable
+          style={[styles.medSearchRow, isActive && styles.medSearchRowAdded]}
+          onPress={() => { if (!isActive) { setSelectedMed(med); setDosageInput(''); } }}
+          disabled={isActive}>
+          <View style={styles.medSearchInfo}>
+            <Text style={styles.medName}>{med.ilac_adi}</Text>
+            {med.etkin_madde_adi ? <Text style={styles.medSub}>{med.etkin_madde_adi}</Text> : null}
+            {med.firma_adi ? <Text style={styles.medSub}>{med.firma_adi}</Text> : null}
+          </View>
+          <Ionicons
+            name={isActive ? 'checkmark-circle' : 'add-circle-outline'}
+            size={22}
+            color={isActive ? '#8ab4ff' : '#aaa'}
+          />
+        </Pressable>
+      );
+    },
+    [activeMedIds, setSelectedMed],
+  );
+
   // ── Loading / hata ───────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -777,22 +904,20 @@ export default function ProfileScreen() {
           ) : conditionsError ? (
             <Text style={[styles.err, styles.modalPad]}>{conditionsError}</Text>
           ) : (
-            <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
-              {[...grouped.entries()].map(([category, rows]) => (
-                <View key={category} style={styles.categoryBlock}>
-                  <Text style={styles.categoryTitle}>{category}</Text>
-                  {rows.map((row) => {
-                    const on = userConditionIds.has(row.id);
-                    return (
-                      <Pressable key={row.id} style={[styles.checkRow, on && styles.checkRowSelected]} onPress={() => void toggleCondition(row)}>
-                        <Text style={styles.rowName}>{row.name}</Text>
-                        <Ionicons name={on ? 'checkbox' : 'square-outline'} size={22} color={on ? '#8ab4ff' : '#aaa'} />
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ))}
-            </ScrollView>
+            <SectionList<ConditionCatalogRow, ProfileConditionSection>
+              sections={conditionModalSections}
+              keyExtractor={keyExtractorCond}
+              renderItem={renderConditionModalItem}
+              renderSectionHeader={renderConditionModalSectionHeader}
+              stickySectionHeadersEnabled={false}
+              style={styles.modalScroll}
+              contentContainerStyle={styles.modalListContent}
+              keyboardShouldPersistTaps="handled"
+              initialNumToRender={15}
+              maxToRenderPerBatch={20}
+              windowSize={10}
+              removeClippedSubviews={true}
+            />
           )}
         </View>
       </Modal>
@@ -848,56 +973,26 @@ export default function ProfileScreen() {
               ) : condMedError ? (
                 <Text style={[styles.err, styles.modalPad]}>{condMedError}</Text>
               ) : (
-                <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
-                  {[...condMedGrouped.entries()].map(([conditionId, meds]) => {
-                    const condName = conditionNameMap.get(conditionId) ?? conditionId;
-                    return (
-                      <View key={conditionId} style={styles.categoryBlock}>
-                        <Text style={styles.categoryTitle}>{condName}</Text>
-                        {meds.map(({ medication }) => {
-                          const isActive = activeMedIds.has(medication.id);
-                          const selected = modalSelectedMedIds.has(medication.id);
-                          return (
-                            <View key={medication.id}>
-                              <Pressable
-                                style={[styles.checkRow, selected && styles.checkRowSelected, isActive && styles.checkRowDimmed]}
-                                onPress={() => { if (!isActive) toggleModalMed(medication.id); }}
-                                disabled={isActive}
-                              >
-                                <View style={styles.medInfoCol}>
-                                  <Text style={[styles.rowName, isActive && styles.rowNameDimmed]}>
-                                    {medication.ilac_adi}
-                                  </Text>
-                                  {medication.etkin_madde_adi
-                                    ? <Text style={styles.medSub}>{medication.etkin_madde_adi}</Text>
-                                    : null}
-                                  {isActive ? <Text style={styles.alreadyLabel}>Zaten kullanılıyor</Text> : null}
-                                </View>
-                                {isActive
-                                  ? <Ionicons name="checkmark-circle" size={22} color="#4a5a7a" />
-                                  : <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={22} color={selected ? '#8ab4ff' : '#aaa'} />}
-                              </Pressable>
-                              {selected ? (
-                                <TextInput
-                                  style={styles.dosageInline}
-                                  value={modalMedDosages.get(medication.id) ?? ''}
-                                  onChangeText={(v) => setModalDosage(medication.id, v)}
-                                  placeholder="Doz (örn: 500 mg, günde 2×) — opsiyonel"
-                                  placeholderTextColor="#555"
-                                />
-                              ) : null}
-                            </View>
-                          );
-                        })}
-                      </View>
-                    );
-                  })}
-                  {!loadingCondMeds && condMedGrouped.size === 0 && !condMedError ? (
-                    <Text style={[styles.emptyText, styles.modalPad]}>
-                      Hastalıklarınla eşleşen ilaç bulunamadı.{'\n'}Serbest arama sekmesini dene.
-                    </Text>
-                  ) : null}
-                </ScrollView>
+                <SectionList<CondMedRow, ProfileMedSection>
+                  sections={condMedModalSections}
+                  keyExtractor={keyExtractorCondMed}
+                  renderItem={renderCondMedItem}
+                  renderSectionHeader={renderCondMedSectionHeader}
+                  stickySectionHeadersEnabled={false}
+                  ListEmptyComponent={
+                    !loadingCondMeds && !condMedError ? (
+                      <Text style={[styles.emptyText, styles.modalPad]}>
+                        Hastalıklarınla eşleşen ilaç bulunamadı.{'\n'}Serbest arama sekmesini dene.
+                      </Text>
+                    ) : null
+                  }
+                  style={styles.modalScroll}
+                  contentContainerStyle={styles.modalListContent}
+                  keyboardShouldPersistTaps="handled"
+                  initialNumToRender={10}
+                  maxToRenderPerBatch={20}
+                  windowSize={10}
+                />
               )}
 
               {/* Ekle footer */}
@@ -959,30 +1054,17 @@ export default function ProfileScreen() {
                 ) : medSearch.trim().length > 0 && medResults.length === 0 ? (
                   <Text style={[styles.emptyText, styles.modalPad]}>Sonuç bulunamadı.</Text>
                 ) : (
-                  <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
-                    {medResults.map((med) => {
-                      const isActive = activeMedIds.has(med.id);
-                      return (
-                        <Pressable
-                          key={med.id}
-                          style={[styles.medSearchRow, isActive && styles.medSearchRowAdded]}
-                          onPress={() => { if (!isActive) { setSelectedMed(med); setDosageInput(''); } }}
-                          disabled={isActive}
-                        >
-                          <View style={styles.medSearchInfo}>
-                            <Text style={styles.medName}>{med.ilac_adi}</Text>
-                            {med.etkin_madde_adi ? <Text style={styles.medSub}>{med.etkin_madde_adi}</Text> : null}
-                            {med.firma_adi ? <Text style={styles.medSub}>{med.firma_adi}</Text> : null}
-                          </View>
-                          <Ionicons
-                            name={isActive ? 'checkmark-circle' : 'add-circle-outline'}
-                            size={22}
-                            color={isActive ? '#8ab4ff' : '#aaa'}
-                          />
-                        </Pressable>
-                      );
-                    })}
-                  </ScrollView>
+                  <FlatList<MedicationRow>
+                    data={medResults}
+                    keyExtractor={keyExtractorMedSearch}
+                    renderItem={renderSearchMedItem}
+                    style={styles.modalScroll}
+                    contentContainerStyle={styles.modalListContent}
+                    keyboardShouldPersistTaps="handled"
+                    initialNumToRender={10}
+                    maxToRenderPerBatch={20}
+                    windowSize={5}
+                  />
                 )}
               </>
             )
@@ -1075,6 +1157,8 @@ const styles = StyleSheet.create({
   modalTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   modalSearch: { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#2a2a2a', borderRadius: 10, color: '#fff', fontSize: 15, paddingHorizontal: 14, paddingVertical: 12, margin: 14 },
   modalScroll: { flex: 1 },
+  modalListContent: { paddingHorizontal: 14, paddingBottom: 16 },
+  modalSectionTitle: { color: '#fff', fontSize: 15, fontWeight: '700', marginTop: 14, marginBottom: 8 },
   modalLoader: { marginTop: 32 },
   modalPad: { padding: 16 },
   modalFooter: { padding: 14, borderTopWidth: 1, borderTopColor: '#222' },
