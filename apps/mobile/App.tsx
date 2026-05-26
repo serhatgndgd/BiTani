@@ -288,9 +288,9 @@ export default function App() {
         disableDeviceFallback: false,
       });
       setBiometricPassed(result.success);
-    } catch {
-      // Hata durumunda da geç (güvenlik > kullanılabilirlik için false yapılabilir)
-      setBiometricPassed(true);
+    } catch (error) {
+      console.error('biometric-auth:', error);
+      setBiometricPassed(false);
     } finally {
       setBiometricChecking(false);
     }
