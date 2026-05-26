@@ -48,7 +48,34 @@ type ApiMessage = {
 
 type ChatNavProp = BottomTabNavigationProp<MainTabParamList, 'Chat'>;
 
-const GENERIC_CHAT_ERROR = 'Asistan yanıtı alınamadı. Lütfen tekrar deneyin.';
+const CHAT_ERROR_NETWORK = 'İnternet bağlantınızı kontrol edin';
+const CHAT_ERROR_SERVER = 'Asistan şu an yanıt veremiyor';
+const CHAT_ERROR_GENERIC = 'Bir sorun oluştu, tekrar deneyin';
+
+function mapChatError(error: unknown): string {
+  if (!(error instanceof Error)) return CHAT_ERROR_GENERIC;
+  const msg = error.message.toLowerCase();
+  if (
+    msg.includes('network') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('request failed') ||
+    msg.includes('timeout')
+  ) {
+    return CHAT_ERROR_NETWORK;
+  }
+  if (
+    msg.includes('500') ||
+    msg.includes('502') ||
+    msg.includes('503') ||
+    msg.includes('504') ||
+    msg.includes('server') ||
+    msg.includes('edge function') ||
+    msg.includes('function')
+  ) {
+    return CHAT_ERROR_SERVER;
+  }
+  return CHAT_ERROR_GENERIC;
+}
 
 // ─── Markdown parser ──────────────────────────────────────────────────────────
 
@@ -239,17 +266,18 @@ export default function ChatScreen() {
           Authorization: `Bearer ${session.access_token}`,
         },
       });
-      if (error) throw new Error(GENERIC_CHAT_ERROR);
+      if (error) throw error;
 
       const reply = (data as { reply: string }).reply;
-      if (!reply) throw new Error('Yanıt alınamadı.');
+      if (!reply) throw new Error('server-empty-reply');
 
       setMessages((prev) => [...prev, { id: `${msgId}-a`, role: 'assistant', content: reply, ts: Date.now() }]);
       setApiMessages([...nextApiMessages, { role: 'assistant', content: reply }]);
 
       if (containsAcilKeyword(text) || containsAcilKeyword(reply)) setShowEmergency(true);
-    } catch (e) {
-      setSendError(e instanceof Error ? e.message : 'Bir hata oluştu.');
+    } catch (error) {
+      console.error('chat-screen:', error);
+      setSendError(mapChatError(error));
       setMessages((prev) => prev.filter((m) => m.id !== msgId));
       setInput(text);
     } finally {
