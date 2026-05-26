@@ -211,7 +211,7 @@ export default function OtpScreen({ route }: Props) {
           {error ? <Text style={styles.err}>{error}</Text> : null}
           {sessionSyncing ? (
             <View style={styles.syncBox}>
-              <ActivityIndicator color="#fff" size="small" />
+              <ActivityIndicator color={C.text1} size="small" />
               <Text style={styles.syncText}>Oturum açılıyor…</Text>
             </View>
           ) : null}
@@ -221,7 +221,7 @@ export default function OtpScreen({ route }: Props) {
             disabled={blocking}
           >
             {verifyLoading || sessionSyncing ? (
-              <ActivityIndicator color="#0a0a0a" />
+              <ActivityIndicator color={C.bg} />
             ) : (
               <Text style={styles.primaryText}>Doğrula</Text>
             )}
@@ -232,7 +232,7 @@ export default function OtpScreen({ route }: Props) {
             disabled={!canResend || resendLoading || blocking}
           >
             {resendLoading ? (
-              <ActivityIndicator color="#8ab4ff" />
+              <ActivityIndicator color={C.primary} />
             ) : (
               <Text style={styles.resendText}>
                 {canResend ? 'Tekrar Gönder' : `Tekrar Gönder (${secondsLeft}s)`}
@@ -259,14 +259,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   hint: {
-    color: '#ffffff',
+    color: C.text1,
     fontSize: 16,
     lineHeight: 24,
     textAlign: 'center',
     marginBottom: 8,
   },
   email: {
-    color: '#a3a3a3',
+    color: C.text2,
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 28,
@@ -282,9 +282,9 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#333',
-    backgroundColor: '#1a1a1a',
-    color: '#fff',
+    borderColor: C.border,
+    backgroundColor: C.surface,
+    color: C.text1,
     fontSize: 22,
     fontWeight: '700',
     textAlign: 'center',
@@ -295,12 +295,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   pasteText: {
-    color: '#8ab4ff',
+    color: C.primary,
     fontSize: 14,
     fontWeight: '600',
   },
   err: {
-    color: '#ff8a80',
+    color: C.error,
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 12,
@@ -313,18 +313,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   syncText: {
-    color: '#ccc',
+    color: C.text2,
     fontSize: 14,
   },
   primary: {
-    backgroundColor: '#ffffff',
+    backgroundColor: C.text1,
     borderRadius: 10,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 8,
   },
   primaryText: {
-    color: '#0a0a0a',
+    color: C.bg,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   resendText: {
-    color: '#8ab4ff',
+    color: C.primary,
     fontSize: 15,
     fontWeight: '600',
   },
