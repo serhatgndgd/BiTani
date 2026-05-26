@@ -105,6 +105,22 @@ interface PlaceItem {
 
 // ─── Yardımcı fonksiyonlar ────────────────────────────────────────────────────
 
+const NETWORK_ERROR_TEXT = 'İnternet bağlantınızı kontrol edin';
+const LOCATION_ERROR_TEXT = 'Konum alınamadı. Lütfen ayarları kontrol edin';
+const PHARMACY_FETCH_ERROR_TEXT = 'Nöbetçi eczaneler şu an yüklenemiyor';
+const HOSPITAL_FETCH_ERROR_TEXT = 'Yakın hastaneler şu an yüklenemiyor';
+
+function isNetworkError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const msg = error.message.toLowerCase();
+  return (
+    msg.includes('network') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('request failed') ||
+    msg.includes('timeout')
+  );
+}
+
 function haversineKm(a: Coords, b: { lat: number; lng: number }): number {
   const R = 6371;
   const dLat = ((b.lat - a.latitude)  * Math.PI) / 180;
@@ -377,15 +393,16 @@ export default function NearbyScreen() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setLocationError('Konum iznine ihtiyaç var.\nAyarlar → Gizlilik → Konum');
+        setLocationError(LOCATION_ERROR_TEXT);
         return;
       }
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
       setCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-    } catch {
-      setLocationError('Konum alınamadı. Tekrar deneyin.');
+    } catch (error) {
+      console.error('nearby-screen:', error);
+      setLocationError(LOCATION_ERROR_TEXT);
     } finally {
       setLoadingLocation(false);
     }
@@ -412,8 +429,9 @@ export default function NearbyScreen() {
         .map((r) => normalizeEczane(r))
         .sort((a, b) => (a.mesafeKm ?? 999) - (b.mesafeKm ?? 999));
       setEczaneler(items);
-    } catch (e) {
-      setEczaneError(e instanceof Error ? e.message : 'Eczaneler yüklenemedi.');
+    } catch (error) {
+      console.error('nearby-screen:', error);
+      setEczaneError(isNetworkError(error) ? NETWORK_ERROR_TEXT : PHARMACY_FETCH_ERROR_TEXT);
     } finally {
       setLoadingEczane(false);
     }
@@ -434,8 +452,9 @@ export default function NearbyScreen() {
         .sort((a, b) => a.mesafeKm - b.mesafeKm);
 
       setOsmEczaneler(items);
-    } catch (e) {
-      setOsmEczaneError(e instanceof Error ? e.message : 'Eczaneler yüklenemedi.');
+    } catch (error) {
+      console.error('nearby-screen:', error);
+      setOsmEczaneError(isNetworkError(error) ? NETWORK_ERROR_TEXT : PHARMACY_FETCH_ERROR_TEXT);
     } finally {
       setLoadingOsmEczane(false);
     }
@@ -456,8 +475,9 @@ export default function NearbyScreen() {
         .sort((a, b) => a.mesafeKm - b.mesafeKm);
 
       setHastaneler(items);
-    } catch (e) {
-      setHastaneError(e instanceof Error ? e.message : 'Hastaneler yüklenemedi.');
+    } catch (error) {
+      console.error('nearby-screen:', error);
+      setHastaneError(isNetworkError(error) ? NETWORK_ERROR_TEXT : HOSPITAL_FETCH_ERROR_TEXT);
     } finally {
       setLoadingHastane(false);
     }
