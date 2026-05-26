@@ -6,11 +6,12 @@ interface Props {
 
 /**
  * Türk eczane sembolü — kırmızı kare içinde beyaz "E"
+ * #e30613 Türk eczane standardı — tema tokenına bağlanmaz
  */
 export function PharmacyIcon({ size = 36 }: Props) {
   return (
     <Svg width={size} height={size} viewBox="0 0 100 100">
-      {/* Kırmızı dış kare */}
+      {/* Kırmızı dış kare — Türk eczane standardı (#e30613 korunur) */}
       <Rect width="100" height="100" fill="#e30613" rx="8" />
       {/* İnce beyaz çerçeve */}
       <Rect x="10" y="10" width="80" height="80" fill="none" stroke="#fff" strokeWidth="3" />

@@ -10,13 +10,7 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 
-const BRAND = {
-  blue: '#1a6ef5',
-  blueDeep: '#0d4fcc',
-  ink: '#0a0a0a',
-  white: '#ffffff',
-  mute: '#8a8f98',
-};
+import { C } from '../theme';
 
 // ---------- Icon Mark ----------
 
@@ -27,7 +21,7 @@ interface IconMarkProps {
   radius?: number;
 }
 
-export function IconMark({ size = 1024, bg = BRAND.blue, stroke = BRAND.white, radius = 0.225 }: IconMarkProps) {
+export function IconMark({ size = 1024, bg = C.primary, stroke = C.text1, radius = 0.225 }: IconMarkProps) {
   const r = size * radius;
   const pad = size * 0.16;
   const cy = size * 0.52;
@@ -93,14 +87,14 @@ interface WordmarkProps {
 export function Wordmark({ height = 48, onDark = true, showIcon = true }: WordmarkProps) {
   const iconSize = height;
   const fontSize = height * 0.7;
-  const color = onDark ? BRAND.white : BRAND.ink;
+  const color = onDark ? C.text1 : C.bg;
   const gap = height * 0.22;
 
   return (
     <View style={[styles.wordmarkRow, { gap }]}>
       {showIcon && (
         <View style={[styles.iconWrap, { width: iconSize, height: iconSize, borderRadius: iconSize * 0.225 }]}>
-          <IconMark size={iconSize} bg={BRAND.blue} stroke={BRAND.white} />
+          <IconMark size={iconSize} bg={C.primary} stroke={C.text1} />
         </View>
       )}
       <View style={styles.textRow}>
@@ -117,11 +111,11 @@ export function SplashBrand() {
   return (
     <View style={styles.splashCenter}>
       <View style={styles.splashIconWrap}>
-        <IconMark size={132} bg={BRAND.blue} stroke={BRAND.white} />
+        <IconMark size={132} bg={C.primary} stroke={C.text1} />
       </View>
       <View style={[styles.textRow, { marginTop: 28 }]}>
-        <Text style={[styles.light, { fontSize: 42, color: BRAND.white }]}>Bi</Text>
-        <Text style={[styles.bold, { fontSize: 42, color: BRAND.white }]}>Tanı</Text>
+        <Text style={[styles.light, { fontSize: 42, color: C.text1 }]}>Bi</Text>
+        <Text style={[styles.bold, { fontSize: 42, color: C.text1 }]}>Tanı</Text>
       </View>
       <Text style={styles.tagline}>Sağlığın için akıllı asistan</Text>
     </View>
@@ -162,7 +156,7 @@ const styles = StyleSheet.create({
   tagline: {
     marginTop: 12,
     fontSize: 15,
-    color: 'rgba(255,255,255,0.55)',
+    color: C.text3,
     letterSpacing: -0.1,
     textAlign: 'center',
     maxWidth: 280,

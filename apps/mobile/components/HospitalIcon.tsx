@@ -12,9 +12,9 @@ export function HospitalIcon({ size = 36 }: Props) {
     <Svg width={size} height={size} viewBox="0 0 100 100">
       {/* Beyaz dış kare */}
       <Rect width="100" height="100" fill="#fff" rx="8" />
-      {/* Kırmızı artı — dikey bar */}
+      {/* Kırmızı artı — dikey bar — Türk Kızılay/sağlık standardı (#e30613 korunur) */}
       <Rect x="40" y="20" width="20" height="60" fill="#e30613" />
-      {/* Kırmızı artı — yatay bar */}
+      {/* Kırmızı artı — yatay bar — Türk Kızılay/sağlık standardı (#e30613 korunur) */}
       <Rect x="20" y="40" width="60" height="20" fill="#e30613" />
     </Svg>
   );
