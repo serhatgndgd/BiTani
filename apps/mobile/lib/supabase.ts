@@ -6,8 +6,13 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 const SECURE_STORE_CHUNK_SIZE = 1800;
 
-const chunkCountKey = (key: string) => `${key}:chunks`;
-const chunkKey = (key: string, index: number) => `${key}:chunk:${index}`;
+function safeStoreKey(key: string): string {
+  const normalized = key.replace(/[^A-Za-z0-9._-]/g, '_');
+  return normalized.length > 0 ? normalized : 'supabase_key';
+}
+
+const chunkCountKey = (key: string) => `${safeStoreKey(key)}.chunks`;
+const chunkKey = (key: string, index: number) => `${safeStoreKey(key)}.chunk.${index}`;
 
 const ExpoSecureStoreAdapter = {
   async getItem(key: string): Promise<string | null> {
@@ -23,14 +28,14 @@ const ExpoSecureStoreAdapter = {
       return chunks.every((chunk): chunk is string => chunk !== null) ? chunks.join('') : null;
     }
 
-    return SecureStore.getItemAsync(key);
+    return SecureStore.getItemAsync(safeStoreKey(key));
   },
 
   async setItem(key: string, value: string): Promise<void> {
     await this.removeItem(key);
 
     if (value.length <= SECURE_STORE_CHUNK_SIZE) {
-      await SecureStore.setItemAsync(key, value);
+      await SecureStore.setItemAsync(safeStoreKey(key), value);
       return;
     }
 
@@ -52,7 +57,7 @@ const ExpoSecureStoreAdapter = {
     const chunkCountValue = await SecureStore.getItemAsync(chunkCountKey(key));
     const chunkCount = Number.parseInt(chunkCountValue ?? '', 10);
 
-    await SecureStore.deleteItemAsync(key);
+    await SecureStore.deleteItemAsync(safeStoreKey(key));
     if (Number.isFinite(chunkCount) && chunkCount > 0) {
       await Promise.all(
         Array.from({ length: chunkCount }, (_, index) =>
