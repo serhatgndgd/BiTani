@@ -55,6 +55,12 @@ type CondMedRow = {
 type ProfileConditionSection = { title: string; data: ConditionCatalogRow[] };
 type ProfileMedSection       = { conditionId: string; title: string; data: CondMedRow[] };
 
+const PROFILE_LOAD_ERROR_TEXT = 'Bilgileriniz yüklenemedi';
+const PROFILE_SAVE_ERROR_TEXT = 'Bilgileriniz kaydedilemedi. Tekrar deneyin';
+const CONDITION_SAVE_ERROR_TEXT = 'Hastalık eklenemedi. Tekrar deneyin';
+const MED_ADD_ERROR_TEXT = 'İlaç eklenemedi. Tekrar deneyin';
+const UPDATE_ERROR_TEXT = 'Güncellenemedi. Tekrar deneyin';
+
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: 'male', label: 'Erkek' },
   { value: 'female', label: 'Kadın' },
@@ -130,6 +136,8 @@ export default function ProfileScreen() {
   const [weightKg, setWeightKg] = useState('');
   const [profileError, setProfileError] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [conditionActionError, setConditionActionError] = useState<string | null>(null);
+  const [medicationActionError, setMedicationActionError] = useState<string | null>(null);
 
   // ── Hastalıklar ─────────────────────────────────────────────────────────
   const [userConditions, setUserConditions] = useState<ConditionCatalogRow[]>([]);
@@ -246,7 +254,8 @@ export default function ProfileScreen() {
 
     const { data: { user }, error: userErr } = await supabase.auth.getUser();
     if (userErr || !user?.id) {
-      setLoadError('Kullanıcı bilgisi alınamadı.');
+      console.error('profile-screen:', userErr);
+      setLoadError(PROFILE_LOAD_ERROR_TEXT);
       setLoading(false);
       return;
     }
@@ -269,7 +278,8 @@ export default function ProfileScreen() {
     ]);
 
     if (profileRes.error) {
-      setLoadError(profileRes.error.message || 'Profil yüklenemedi.');
+      console.error('profile-screen:', profileRes.error);
+      setLoadError(PROFILE_LOAD_ERROR_TEXT);
       setLoading(false);
       return;
     }
@@ -378,7 +388,11 @@ export default function ProfileScreen() {
       .update({ full_name: fullName.trim(), birth_date: iso, gender, height_cm: h, weight_kg: w })
       .eq('id', userId);
     setSavingProfile(false);
-    if (error) { setProfileError(error.message || 'Kaydedilemedi.'); return; }
+    if (error) {
+      console.error('profile-screen:', error);
+      setProfileError(PROFILE_SAVE_ERROR_TEXT);
+      return;
+    }
     setProfile({ full_name: fullName.trim(), birth_date: iso, gender, height_cm: h, weight_kg: w });
     setEditingProfile(false);
   };
@@ -401,27 +415,45 @@ export default function ProfileScreen() {
 
   const toggleCondition = useCallback(async (cond: ConditionCatalogRow) => {
     if (!userId) return;
+    setConditionActionError(null);
     if (userConditionIds.has(cond.id)) {
       const { error } = await supabase
         .from('user_conditions').delete().eq('user_id', userId).eq('condition_id', cond.id);
-      if (!error) setUserConditions((prev) => prev.filter((c) => c.id !== cond.id));
+      if (!error) {
+        setUserConditions((prev) => prev.filter((c) => c.id !== cond.id));
+      } else {
+        console.error('profile-screen:', error);
+        setConditionActionError(CONDITION_SAVE_ERROR_TEXT);
+      }
     } else {
       const { error } = await supabase
         .from('user_conditions').insert({ user_id: userId, condition_id: cond.id });
-      if (!error) setUserConditions((prev) => [...prev, cond]);
+      if (!error) {
+        setUserConditions((prev) => [...prev, cond]);
+      } else {
+        console.error('profile-screen:', error);
+        setConditionActionError(CONDITION_SAVE_ERROR_TEXT);
+      }
     }
   }, [userId, userConditionIds]);
 
   const removeCondition = useCallback(async (id: string) => {
     if (!userId) return;
+    setConditionActionError(null);
     const { error } = await supabase
       .from('user_conditions').delete().eq('user_id', userId).eq('condition_id', id);
-    if (!error) setUserConditions((prev) => prev.filter((c) => c.id !== id));
+    if (!error) {
+      setUserConditions((prev) => prev.filter((c) => c.id !== id));
+    } else {
+      console.error('profile-screen:', error);
+      setConditionActionError(CONDITION_SAVE_ERROR_TEXT);
+    }
   }, [userId]);
 
   // ── İlaç listesi aksiyonları ─────────────────────────────────────────────
   const quitMedication = useCallback(async (medicationId: string) => {
     if (!userId) return;
+    setMedicationActionError(null);
     const { error } = await supabase
       .from('user_medications')
       .update({ is_active: false })
@@ -432,11 +464,15 @@ export default function ProfileScreen() {
         prev.map((m) => m.medication_id === medicationId ? { ...m, is_active: false } : m),
       );
       void clearChatHistory();
+    } else {
+      console.error('profile-screen:', error);
+      setMedicationActionError(UPDATE_ERROR_TEXT);
     }
   }, [userId, clearChatHistory]);
 
   const resumeMedication = useCallback(async (medicationId: string) => {
     if (!userId) return;
+    setMedicationActionError(null);
     const { error } = await supabase
       .from('user_medications')
       .update({ is_active: true })
@@ -447,6 +483,9 @@ export default function ProfileScreen() {
         prev.map((m) => m.medication_id === medicationId ? { ...m, is_active: true } : m),
       );
       void clearChatHistory();
+    } else {
+      console.error('profile-screen:', error);
+      setMedicationActionError(UPDATE_ERROR_TEXT);
     }
   }, [userId, clearChatHistory]);
 
@@ -519,7 +558,8 @@ export default function ProfileScreen() {
       void clearChatHistory();
       closeMedsModal();
     } catch (e) {
-      setAddMedError(e instanceof Error ? e.message : 'Eklenemedi.');
+      console.error('profile-screen:', e);
+      setAddMedError(MED_ADD_ERROR_TEXT);
     } finally {
       setAddingMed(false);
     }
@@ -540,7 +580,11 @@ export default function ProfileScreen() {
       );
 
     setAddingMed(false);
-    if (error) { setAddMedError(error.message || 'Eklenemedi.'); return; }
+    if (error) {
+      console.error('profile-screen:', error);
+      setAddMedError(MED_ADD_ERROR_TEXT);
+      return;
+    }
 
     await reloadMedications();
     closeMedsModal();
@@ -824,6 +868,7 @@ export default function ProfileScreen() {
               ))}
             </View>
           )}
+          {conditionActionError ? <Text style={styles.err}>{conditionActionError}</Text> : null}
         </View>
 
         {/* ── Düzenli Kullandığım İlaçlar ── */}
@@ -856,6 +901,7 @@ export default function ProfileScreen() {
               ))}
             </View>
           )}
+          {medicationActionError ? <Text style={styles.err}>{medicationActionError}</Text> : null}
 
           {/* Geçmiş İlaçlar toggle */}
           {pastMeds.length > 0 ? (
