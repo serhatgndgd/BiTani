@@ -3,8 +3,10 @@ import { Picker } from '@react-native-picker/picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Pressable,
   ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   TextInput,
@@ -26,6 +28,9 @@ type MedRow = {
     etkin_madde_adi: string | null;
   };
 };
+
+type ConditionSection = { title: string; data: ConditionCatalogRow[] };
+type MedSection      = { conditionId: string; title: string; data: MedRow[] };
 
 type Props = { onComplete: () => void };
 
@@ -209,7 +214,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
     return conditions.filter((c) => c.name.toLowerCase().includes(q) || (c.category ?? '').toLowerCase().includes(q));
   }, [conditions, search]);
 
-  const grouped     = useMemo(() => groupByCategory(filteredConditions), [filteredConditions]);
+  const grouped      = useMemo(() => groupByCategory(filteredConditions), [filteredConditions]);
   const selectedRows = useMemo(() => conditions.filter((c) => selectedIds.has(c.id)), [conditions, selectedIds]);
   const conditionNameMap = useMemo(() => new Map(selectedRows.map((c) => [c.id, c.name])), [selectedRows]);
 
@@ -227,13 +232,62 @@ export default function OnboardingScreen({ onComplete }: Props) {
     return map;
   }, [medRows, medSearch]);
 
+  // ─── SectionList veri dönüşümleri ────────────────────────────────────────────
+
+  const conditionSections = useMemo<ConditionSection[]>(
+    () => [...grouped.entries()].map(([title, data]) => ({ title, data })),
+    [grouped],
+  );
+
+  const medSections = useMemo<MedSection[]>(
+    () =>
+      [...medsGrouped.entries()].map(([conditionId, meds]) => ({
+        conditionId,
+        title: conditionNameMap.get(conditionId) ?? conditionId,
+        data: noMedConditions.has(conditionId) ? [] : meds,
+      })),
+    [medsGrouped, conditionNameMap, noMedConditions],
+  );
+
+  // Serbest arama: condition başvurusu olmaksızın, unique ilaçların düz listesi
+  const flatMedResults = useMemo<MedRow[]>(() => {
+    const q = medSearch.trim().toLowerCase();
+    if (!q) return [];
+    const seen = new Set<string>();
+    const result: MedRow[] = [];
+    for (const row of medRows) {
+      if (!seen.has(row.medication.id)) {
+        if (
+          row.medication.ilac_adi.toLowerCase().includes(q) ||
+          (row.medication.etkin_madde_adi?.toLowerCase().includes(q) ?? false)
+        ) {
+          seen.add(row.medication.id);
+          result.push(row);
+        }
+      }
+    }
+    return result;
+  }, [medRows, medSearch]);
+
+  // Step 4 için tek SectionList kullanılır; search modunda tek section, normal modda condition'a göre gruplu.
+  // Bu şekilde TextInput focus kaybedilmez.
+  const step4Sections = useMemo<MedSection[]>(() => {
+    if (medSearch.trim()) {
+      return [{ conditionId: '__search__', title: '', data: flatMedResults }];
+    }
+    return medSections;
+  }, [medSearch, flatMedResults, medSections]);
+
+  // ─── Callbacks ───────────────────────────────────────────────────────────────
+
   const toggleCondition = useCallback((id: string) => {
     setNoChronic(false);
     setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   }, []);
 
-  const removeChip = (id: string) =>
+  const removeChip = useCallback((id: string) => {
     setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+  }, []);
 
   const toggleNoChronic = useCallback(() => {
     setNoChronic((prev) => { if (!prev) setSelectedIds(new Set()); return !prev; });
@@ -265,6 +319,177 @@ export default function OnboardingScreen({ onComplete }: Props) {
   const setDosage = useCallback((medId: string, val: string) => {
     setMedDosages((prev) => { const n = new Map(prev); n.set(medId, val); return n; });
   }, []);
+
+  // ─── SectionList render callbackleri — Step 3 ────────────────────────────────
+
+  const keyExtractorCondition = useCallback((item: ConditionCatalogRow) => item.id, []);
+
+  const renderConditionItem = useCallback(
+    ({ item }: { item: ConditionCatalogRow }) => {
+      const on = selectedIds.has(item.id);
+      return (
+        <Pressable
+          style={[styles.checkRow, on && styles.checkRowSelected]}
+          onPress={() => toggleCondition(item.id)}
+          disabled={saving || noChronic || loadingCatalog}>
+          <Text style={styles.rowName}>{item.name}</Text>
+          <Ionicons name={on ? ICON_ON : ICON_OFF} size={22} color={on ? C.primary : C.text3} />
+        </Pressable>
+      );
+    },
+    [selectedIds, saving, noChronic, loadingCatalog, toggleCondition],
+  );
+
+  const renderConditionSectionHeader = useCallback(
+    ({ section: { title } }: { section: ConditionSection }) => (
+      <View style={styles.stickyHeader}>
+        <Text style={styles.categoryTitle}>{title}</Text>
+      </View>
+    ),
+    [],
+  );
+
+  // useMemo → React element: ListHeaderComponent'a geçildiğinde TextInput focus kaybolmaz
+  const step3Header = useMemo(
+    () => (
+      <>
+        <Text style={styles.title}>Kronik hastalıklar</Text>
+        {selectedRows.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            style={styles.chipScroll} contentContainerStyle={styles.chipScrollInner}>
+            {selectedRows.map((row) => (
+              <Pressable key={row.id} style={styles.badge} onPress={() => removeChip(row.id)}>
+                <Text style={styles.badgeText} numberOfLines={1}>{row.name}</Text>
+                <Ionicons name="close-circle" size={18} color={C.text2} />
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+        <TextInput
+          style={styles.input}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Hastalık ara..."
+          placeholderTextColor={C.text3}
+          editable={!saving}
+        />
+        <Pressable
+          style={[styles.checkRow, styles.noChronicRow, noChronic && styles.checkRowSelected]}
+          onPress={toggleNoChronic}
+          disabled={saving || loadingCatalog}>
+          <Ionicons name={noChronic ? ICON_ON : ICON_OFF} size={22} color={noChronic ? C.primary : C.text3} />
+          <Text style={styles.noChronicLabel}>Kronik hastalığım yok</Text>
+        </Pressable>
+        {loadingCatalog && <ActivityIndicator style={{ marginVertical: 20 }} color={C.primary} />}
+        {catalogError   && <Text style={styles.err}>{catalogError}</Text>}
+      </>
+    ),
+    [selectedRows, search, saving, noChronic, loadingCatalog, catalogError, toggleNoChronic, removeChip],
+  );
+
+  // ─── SectionList / FlatList render callbackleri — Step 4 ─────────────────────
+
+  const keyExtractorMed = useCallback(
+    (item: MedRow) => `${item.condition_id}:${item.medication.id}`,
+    [],
+  );
+
+  const renderMedItemRow = useCallback(
+    ({ item }: { item: MedRow }) => {
+      const { medication } = item;
+      const sel = selectedMedIds.has(medication.id);
+      return (
+        <View>
+          <Pressable
+            style={[styles.checkRow, sel && styles.checkRowSelected]}
+            onPress={() => toggleMed(medication.id)}
+            disabled={saving}>
+            <View style={styles.medInfo}>
+              <Text style={styles.rowName}>{medication.ilac_adi}</Text>
+              {medication.etkin_madde_adi
+                ? <Text style={styles.medSub}>{medication.etkin_madde_adi}</Text>
+                : null}
+            </View>
+            <Ionicons name={sel ? ICON_ON : ICON_OFF} size={22} color={sel ? C.primary : C.text3} />
+          </Pressable>
+          {sel && (
+            <TextInput
+              style={styles.dosageInput}
+              value={medDosages.get(medication.id) ?? ''}
+              onChangeText={(v) => setDosage(medication.id, v)}
+              placeholder="Doz (örn: 500 mg, günde 2×) — opsiyonel"
+              placeholderTextColor={C.text3}
+              editable={!saving}
+            />
+          )}
+        </View>
+      );
+    },
+    [selectedMedIds, saving, toggleMed, medDosages, setDosage],
+  );
+
+  const renderMedSectionHeader = useCallback(
+    ({ section }: { section: MedSection }) => {
+      // Serbest arama modunda bölüm başlığı yok
+      if (!section.title) return null;
+      const { conditionId, title } = section;
+      const noMed = noMedConditions.has(conditionId);
+      return (
+        <View style={styles.medSectionHeaderWrap}>
+          <Text style={styles.categoryTitle}>{title}</Text>
+          <Pressable
+            style={[styles.checkRow, styles.noChronicRow, noMed && styles.checkRowSelected]}
+            onPress={() => toggleNoMedCondition(conditionId)}
+            disabled={saving}>
+            <Ionicons name={noMed ? ICON_ON : ICON_OFF} size={22} color={noMed ? C.primary : C.text3} />
+            <Text style={styles.noChronicLabel}>Bu hastalık için ilaç kullanmıyorum</Text>
+          </Pressable>
+        </View>
+      );
+    },
+    [noMedConditions, toggleNoMedCondition, saving],
+  );
+
+  const step4Header = useMemo(
+    () => (
+      <>
+        <Text style={styles.title}>Kullandığın İlaçlar</Text>
+        <TextInput
+          style={styles.input}
+          value={medSearch}
+          onChangeText={setMedSearch}
+          placeholder="İlaç adı ara..."
+          placeholderTextColor={C.text3}
+          editable={!saving}
+        />
+        {loadingMeds && <ActivityIndicator style={{ marginVertical: 20 }} color={C.primary} />}
+        {medError    && <Text style={styles.err}>{medError}</Text>}
+      </>
+    ),
+    [medSearch, saving, loadingMeds, medError],
+  );
+
+  const step4Footer = useMemo(() => {
+    const isSearching = medSearch.trim().length > 0;
+    const showEmpty = !loadingMeds && !medError && (
+      isSearching ? flatMedResults.length === 0 : medsGrouped.size === 0
+    );
+    return (
+      <>
+        {showEmpty && (
+          <Text style={styles.infoText}>
+            {isSearching
+              ? 'Aramanızla eşleşen ilaç bulunamadı.'
+              : 'Seçilen hastalıklar için veritabanında ilaç kaydı bulunamadı.'}
+          </Text>
+        )}
+        {stepError && <Text style={styles.err}>{stepError}</Text>}
+        {saveError  && <Text style={styles.err}>{saveError}</Text>}
+      </>
+    );
+  }, [medSearch, loadingMeds, medError, flatMedResults, medsGrouped.size, stepError, saveError]);
+
+  // ─── Validasyon ve navigasyon ─────────────────────────────────────────────────
 
   const validateStep1 = (): boolean => {
     if (!fullName.trim())                { setStepError('Ad soyad gerekli.'); return false; }
@@ -360,6 +585,8 @@ export default function OnboardingScreen({ onComplete }: Props) {
     );
   }
 
+  const hasMedConditions = !noChronic && selectedIds.size > 0;
+
   return (
     <SafeAreaView style={styles.safe} edges={['top','left','right']}>
 
@@ -371,194 +598,142 @@ export default function OnboardingScreen({ onComplete }: Props) {
         </View>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      {/* ── Adım 1 & 2: ScrollView ── */}
+      {(step === 1 || step === 2) && (
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
 
-        {/* ── Adım 1 ── */}
-        {step === 1 && (
-          <>
-            <Text style={styles.title}>Kişisel bilgiler</Text>
-            <Text style={styles.fieldLabel}>Ad Soyad</Text>
-            <TextInput style={styles.input} value={fullName} onChangeText={setFullName}
-              placeholder="Adın Soyadın" placeholderTextColor={C.text3}
-              autoCapitalize="words" editable={!saving} />
+          {/* Adım 1 */}
+          {step === 1 && (
+            <>
+              <Text style={styles.title}>Kişisel bilgiler</Text>
+              <Text style={styles.fieldLabel}>Ad Soyad</Text>
+              <TextInput style={styles.input} value={fullName} onChangeText={setFullName}
+                placeholder="Adın Soyadın" placeholderTextColor={C.text3}
+                autoCapitalize="words" editable={!saving} />
 
-            <Text style={styles.fieldLabel}>Doğum tarihi</Text>
-            <View style={styles.pickerRow}>
-              <View style={styles.pickerCol}>
-                <Text style={styles.pickerCaption}>Gün</Text>
-                <View style={styles.pickerBox}>
-                  <Picker selectedValue={day} onValueChange={(v) => setDay(String(v))} style={styles.picker} dropdownIconColor={C.text1}>
-                    {dayItems.map((d) => <Picker.Item key={d} label={d} value={d} color={C.text1} />)}
-                  </Picker>
+              <Text style={styles.fieldLabel}>Doğum tarihi</Text>
+              <View style={styles.pickerRow}>
+                <View style={styles.pickerCol}>
+                  <Text style={styles.pickerCaption}>Gün</Text>
+                  <View style={styles.pickerBox}>
+                    <Picker selectedValue={day} onValueChange={(v) => setDay(String(v))} style={styles.picker} dropdownIconColor={C.text1}>
+                      {dayItems.map((d) => <Picker.Item key={d} label={d} value={d} color={C.text1} />)}
+                    </Picker>
+                  </View>
+                </View>
+                <View style={styles.pickerCol}>
+                  <Text style={styles.pickerCaption}>Ay</Text>
+                  <View style={styles.pickerBox}>
+                    <Picker selectedValue={month} onValueChange={(v) => setMonth(String(v))} style={styles.picker} dropdownIconColor={C.text1}>
+                      {MONTH_LABELS.map((lbl, idx) => {
+                        const v = String(idx + 1);
+                        return <Picker.Item key={v} label={lbl} value={v} color={C.text1} />;
+                      })}
+                    </Picker>
+                  </View>
+                </View>
+                <View style={styles.pickerCol}>
+                  <Text style={styles.pickerCaption}>Yıl</Text>
+                  <View style={styles.pickerBox}>
+                    <Picker selectedValue={year} onValueChange={(v) => setYear(String(v))} style={styles.picker} dropdownIconColor={C.text1}>
+                      {years.map((y) => <Picker.Item key={y} label={y} value={y} color={C.text1} />)}
+                    </Picker>
+                  </View>
                 </View>
               </View>
-              <View style={styles.pickerCol}>
-                <Text style={styles.pickerCaption}>Ay</Text>
-                <View style={styles.pickerBox}>
-                  <Picker selectedValue={month} onValueChange={(v) => setMonth(String(v))} style={styles.picker} dropdownIconColor={C.text1}>
-                    {MONTH_LABELS.map((lbl, idx) => {
-                      const v = String(idx + 1);
-                      return <Picker.Item key={v} label={lbl} value={v} color={C.text1} />;
-                    })}
-                  </Picker>
-                </View>
-              </View>
-              <View style={styles.pickerCol}>
-                <Text style={styles.pickerCaption}>Yıl</Text>
-                <View style={styles.pickerBox}>
-                  <Picker selectedValue={year} onValueChange={(v) => setYear(String(v))} style={styles.picker} dropdownIconColor={C.text1}>
-                    {years.map((y) => <Picker.Item key={y} label={y} value={y} color={C.text1} />)}
-                  </Picker>
-                </View>
-              </View>
-            </View>
 
-            <Text style={styles.fieldLabel}>Cinsiyet</Text>
-            <View style={styles.genderRow}>
-              {GENDER_OPTIONS.map(({ value, label }) => {
-                const on = gender === value;
-                return (
-                  <Pressable key={value} style={[styles.chip, on && styles.chipSelected]}
-                    onPress={() => setGender(value)} disabled={saving}>
-                    <Text style={[styles.chipText, on && styles.chipTextSelected]}>{label}</Text>
-                    {on && <Ionicons name={ICON_ON} size={18} color={C.primary} />}
-                  </Pressable>
-                );
-              })}
-            </View>
-          </>
-        )}
-
-        {/* ── Adım 2 ── */}
-        {step === 2 && (
-          <>
-            <Text style={styles.title}>Vücut bilgileri</Text>
-            <Text style={styles.fieldLabel}>Boy (cm)</Text>
-            <TextInput style={styles.input} value={heightCm}
-              onChangeText={(t) => setHeightCm(t.replace(/[^0-9]/g, ''))}
-              placeholder="50 – 250" placeholderTextColor={C.text3}
-              keyboardType="number-pad" editable={!saving} />
-            <Text style={styles.fieldLabel}>Kilo (kg)</Text>
-            <TextInput style={styles.input} value={weightKg}
-              onChangeText={(t) => setWeightKg(t.replace(/[^0-9]/g, ''))}
-              placeholder="10 – 300" placeholderTextColor={C.text3}
-              keyboardType="number-pad" editable={!saving} />
-            {bmiWarning && <Text style={styles.bmiWarn}>Lütfen değerleri kontrol edin.</Text>}
-          </>
-        )}
-
-        {/* ── Adım 3 ── */}
-        {step === 3 && (
-          <>
-            <Text style={styles.title}>Kronik hastalıklar</Text>
-            {selectedRows.length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                style={styles.chipScroll} contentContainerStyle={styles.chipScrollInner}>
-                {selectedRows.map((row) => (
-                  <Pressable key={row.id} style={styles.badge} onPress={() => removeChip(row.id)}>
-                    <Text style={styles.badgeText} numberOfLines={1}>{row.name}</Text>
-                    <Ionicons name="close-circle" size={18} color={C.text2} />
-                  </Pressable>
-                ))}
-              </ScrollView>
-            )}
-            <TextInput style={styles.input} value={search} onChangeText={setSearch}
-              placeholder="Hastalık ara..." placeholderTextColor={C.text3} editable={!saving} />
-
-            <Pressable style={[styles.checkRow, styles.noChronicRow, noChronic && styles.checkRowSelected]}
-              onPress={toggleNoChronic} disabled={saving || loadingCatalog}>
-              <Ionicons name={noChronic ? ICON_ON : ICON_OFF} size={22} color={noChronic ? C.primary : C.text3} />
-              <Text style={styles.noChronicLabel}>Kronik hastalığım yok</Text>
-            </Pressable>
-
-            {loadingCatalog && <ActivityIndicator style={{ marginVertical: 20 }} color={C.primary} />}
-            {catalogError   && <Text style={styles.err}>{catalogError}</Text>}
-
-            {[...grouped.entries()].map(([category, rows]) => (
-              <View key={category} style={styles.categoryBlock}>
-                <Text style={styles.categoryTitle}>{category}</Text>
-                {rows.map((row) => {
-                  const on = selectedIds.has(row.id);
+              <Text style={styles.fieldLabel}>Cinsiyet</Text>
+              <View style={styles.genderRow}>
+                {GENDER_OPTIONS.map(({ value, label }) => {
+                  const on = gender === value;
                   return (
-                    <Pressable key={row.id}
-                      style={[styles.checkRow, on && styles.checkRowSelected]}
-                      onPress={() => toggleCondition(row.id)}
-                      disabled={saving || noChronic || loadingCatalog}>
-                      <Text style={styles.rowName}>{row.name}</Text>
-                      <Ionicons name={on ? ICON_ON : ICON_OFF} size={22} color={on ? C.primary : C.text3} />
+                    <Pressable key={value} style={[styles.chip, on && styles.chipSelected]}
+                      onPress={() => setGender(value)} disabled={saving}>
+                      <Text style={[styles.chipText, on && styles.chipTextSelected]}>{label}</Text>
+                      {on && <Ionicons name={ICON_ON} size={18} color={C.primary} />}
                     </Pressable>
                   );
                 })}
               </View>
-            ))}
-          </>
-        )}
+            </>
+          )}
 
-        {/* ── Adım 4 ── */}
-        {step === 4 && (
-          <>
-            <Text style={styles.title}>Kullandığın İlaçlar</Text>
-            {noChronic || selectedIds.size === 0 ? (
-              <Text style={styles.infoText}>Kronik hastalık seçmediğin için bu adımı atlayabilirsin.</Text>
-            ) : (
-              <>
-                <TextInput style={styles.input} value={medSearch} onChangeText={setMedSearch}
-                  placeholder="İlaç adı ara..." placeholderTextColor={C.text3} editable={!saving} />
-                {loadingMeds && <ActivityIndicator style={{ marginVertical: 20 }} color={C.primary} />}
-                {medError    && <Text style={styles.err}>{medError}</Text>}
+          {/* Adım 2 */}
+          {step === 2 && (
+            <>
+              <Text style={styles.title}>Vücut bilgileri</Text>
+              <Text style={styles.fieldLabel}>Boy (cm)</Text>
+              <TextInput style={styles.input} value={heightCm}
+                onChangeText={(t) => setHeightCm(t.replace(/[^0-9]/g, ''))}
+                placeholder="50 – 250" placeholderTextColor={C.text3}
+                keyboardType="number-pad" editable={!saving} />
+              <Text style={styles.fieldLabel}>Kilo (kg)</Text>
+              <TextInput style={styles.input} value={weightKg}
+                onChangeText={(t) => setWeightKg(t.replace(/[^0-9]/g, ''))}
+                placeholder="10 – 300" placeholderTextColor={C.text3}
+                keyboardType="number-pad" editable={!saving} />
+              {bmiWarning && <Text style={styles.bmiWarn}>Lütfen değerleri kontrol edin.</Text>}
+            </>
+          )}
 
-                {[...medsGrouped.entries()].map(([conditionId, meds]) => {
-                  const condName = conditionNameMap.get(conditionId) ?? conditionId;
-                  const noMed   = noMedConditions.has(conditionId);
-                  return (
-                    <View key={conditionId} style={styles.categoryBlock}>
-                      <Text style={styles.categoryTitle}>{condName}</Text>
-                      <Pressable
-                        style={[styles.checkRow, styles.noChronicRow, noMed && styles.checkRowSelected]}
-                        onPress={() => toggleNoMedCondition(conditionId)} disabled={saving}>
-                        <Ionicons name={noMed ? ICON_ON : ICON_OFF} size={22} color={noMed ? C.primary : C.text3} />
-                        <Text style={styles.noChronicLabel}>Bu hastalık için ilaç kullanmıyorum</Text>
-                      </Pressable>
-                      {!noMed && meds.map(({ medication }) => {
-                        const sel = selectedMedIds.has(medication.id);
-                        return (
-                          <View key={medication.id}>
-                            <Pressable
-                              style={[styles.checkRow, sel && styles.checkRowSelected]}
-                              onPress={() => toggleMed(medication.id)} disabled={saving}>
-                              <View style={styles.medInfo}>
-                                <Text style={styles.rowName}>{medication.ilac_adi}</Text>
-                                {medication.etkin_madde_adi
-                                  ? <Text style={styles.medSub}>{medication.etkin_madde_adi}</Text>
-                                  : null}
-                              </View>
-                              <Ionicons name={sel ? ICON_ON : ICON_OFF} size={22} color={sel ? C.primary : C.text3} />
-                            </Pressable>
-                            {sel && (
-                              <TextInput style={styles.dosageInput}
-                                value={medDosages.get(medication.id) ?? ''}
-                                onChangeText={(v) => setDosage(medication.id, v)}
-                                placeholder="Doz (örn: 500 mg, günde 2×) — opsiyonel"
-                                placeholderTextColor={C.text3} editable={!saving} />
-                            )}
-                          </View>
-                        );
-                      })}
-                    </View>
-                  );
-                })}
+          {stepError && <Text style={styles.err}>{stepError}</Text>}
+          {saveError  && <Text style={styles.err}>{saveError}</Text>}
+        </ScrollView>
+      )}
 
-                {!loadingMeds && medsGrouped.size === 0 && !medError && (
-                  <Text style={styles.infoText}>Seçilen hastalıklar için veritabanında ilaç kaydı bulunamadı.</Text>
-                )}
-              </>
-            )}
-          </>
-        )}
+      {/* ── Adım 3: Hastalık seçimi — SectionList ── */}
+      {step === 3 && (
+        <SectionList<ConditionCatalogRow, ConditionSection>
+          sections={conditionSections}
+          keyExtractor={keyExtractorCondition}
+          renderItem={renderConditionItem}
+          renderSectionHeader={renderConditionSectionHeader}
+          stickySectionHeadersEnabled={true}
+          ListHeaderComponent={step3Header}
+          ListFooterComponent={
+            <>
+              {stepError && <Text style={styles.err}>{stepError}</Text>}
+              {saveError  && <Text style={styles.err}>{saveError}</Text>}
+            </>
+          }
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          initialNumToRender={10}
+          maxToRenderPerBatch={20}
+          windowSize={10}
+          removeClippedSubviews={true}
+        />
+      )}
 
-        {stepError && <Text style={styles.err}>{stepError}</Text>}
-        {saveError  && <Text style={styles.err}>{saveError}</Text>}
-      </ScrollView>
+      {/* ── Adım 4: Kronik hastalık yok ── */}
+      {step === 4 && !hasMedConditions && (
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.title}>Kullandığın İlaçlar</Text>
+          <Text style={styles.infoText}>Kronik hastalık seçmediğin için bu adımı atlayabilirsin.</Text>
+          {stepError && <Text style={styles.err}>{stepError}</Text>}
+          {saveError  && <Text style={styles.err}>{saveError}</Text>}
+        </ScrollView>
+      )}
+
+      {/* ── Adım 4: İlaç seçimi — tek SectionList (search/gruplu mod) ── */}
+      {step === 4 && hasMedConditions && (
+        <SectionList<MedRow, MedSection>
+          sections={step4Sections}
+          keyExtractor={keyExtractorMed}
+          renderItem={renderMedItemRow}
+          renderSectionHeader={renderMedSectionHeader}
+          stickySectionHeadersEnabled={false}
+          ListHeaderComponent={step4Header}
+          ListFooterComponent={step4Footer}
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          initialNumToRender={10}
+          maxToRenderPerBatch={20}
+          windowSize={10}
+        />
+      )}
 
       {/* ── Footer ── */}
       <View style={styles.footer}>
@@ -628,7 +803,21 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: C.text1, fontSize: 13, flexShrink: 1 },
 
-  categoryBlock: { marginTop: 16 },
+  // Sticky kategori başlığı (Step 3)
+  stickyHeader: {
+    backgroundColor: C.bg,
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 2,
+  },
+
+  // İlaç grubu bölüm başlığı (Step 4, sticky değil)
+  medSectionHeaderWrap: {
+    backgroundColor: C.bg,
+    marginTop: 16,
+  },
+
   categoryTitle: { color: C.text1, fontSize: 16, fontWeight: '700', marginBottom: 10 },
 
   checkRow: {
