@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Wordmark } from '../components/Brand';
 import { supabase } from '../lib/supabase';
@@ -129,84 +130,87 @@ export default function LoginScreen({ navigation }: Props) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.inner}>
-          <View style={styles.wordmarkWrap}>
-            <Wordmark height={36} onDark showIcon />
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.inner}>
+            <View style={styles.wordmarkWrap}>
+              <Wordmark height={36} onDark showIcon />
+            </View>
+
+            <Text style={styles.heading}>Giriş Yap</Text>
+
+            <Text style={styles.label}>E-posta</Text>
+            <FocusInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder="ornek@email.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              editable={!loading}
+            />
+
+            <Text style={styles.label}>Şifre</Text>
+            <FocusInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="••••••••"
+              secureTextEntry
+              autoCapitalize="none"
+              autoComplete="password"
+              editable={!loading}
+            />
+
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            <Pressable
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleSignIn}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={C.bg} />
+              ) : (
+                <Text style={styles.buttonText}>Giriş Yap</Text>
+              )}
+            </Pressable>
+
+            <Pressable
+              style={styles.linkWrap}
+              onPress={() => navigation.navigate('Register')}
+              disabled={loading}
+            >
+              <Text style={styles.link}>
+                Hesabın yok mu?{' '}
+                <Text style={styles.linkBold}>Kayıt Ol</Text>
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.backWelcome}
+              onPress={() => navigation.navigate('Welcome')}
+            >
+              <Text style={styles.backWelcomeText}>← Ana ekrana dön</Text>
+            </Pressable>
           </View>
-
-          <Text style={styles.heading}>Giriş Yap</Text>
-
-          <Text style={styles.label}>E-posta</Text>
-          <FocusInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="ornek@email.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="email"
-            editable={!loading}
-          />
-
-          <Text style={styles.label}>Şifre</Text>
-          <FocusInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••"
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="password"
-            editable={!loading}
-          />
-
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-
-          <Pressable
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleSignIn}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color={C.bg} />
-            ) : (
-              <Text style={styles.buttonText}>Giriş Yap</Text>
-            )}
-          </Pressable>
-
-          <Pressable
-            style={styles.linkWrap}
-            onPress={() => navigation.navigate('Register')}
-            disabled={loading}
-          >
-            <Text style={styles.link}>
-              Hesabın yok mu?{' '}
-              <Text style={styles.linkBold}>Kayıt Ol</Text>
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={styles.backWelcome}
-            onPress={() => navigation.navigate('Welcome')}
-          >
-            <Text style={styles.backWelcomeText}>← Ana ekrana dön</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 // ─── Stiller ─────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  safe:   { flex: 1, backgroundColor: C.bg },
   flex:   { flex: 1, backgroundColor: C.bg },
   scroll: { flexGrow: 1, padding: 24, paddingBottom: 40 },
   inner:  { width: '100%', maxWidth: 400, alignSelf: 'center' },

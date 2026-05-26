@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Wordmark } from '../components/Brand';
 import { supabase } from '../lib/supabase';
@@ -190,128 +191,131 @@ export default function RegisterScreen({ navigation }: Props) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.inner}>
-          <View style={styles.wordmarkWrap}>
-            <Wordmark height={36} onDark showIcon />
-          </View>
-
-          <Text style={styles.heading}>Hesap oluştur</Text>
-
-          <Text style={styles.label}>E-posta</Text>
-          <FocusInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="ornek@email.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="email"
-            editable={!loading}
-            style={styles.inputGap}
-          />
-
-          <Text style={styles.label}>Şifre</Text>
-          <FocusInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Güçlü bir şifre seç"
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="new-password"
-            editable={!loading}
-            style={styles.inputGapSm}
-          />
-
-          {/* Şifre kuralları */}
-          <View style={styles.rules}>
-            <Text style={[styles.rule, rules.minLen && styles.ruleOk]}>• En az 8 karakter</Text>
-            <Text style={[styles.rule, rules.upper  && styles.ruleOk]}>• En az 1 büyük harf</Text>
-            <Text style={[styles.rule, rules.digit  && styles.ruleOk]}>• En az 1 rakam</Text>
-            <Text style={[styles.rule, rules.special && styles.ruleOk]}>• En az 1 özel karakter</Text>
-          </View>
-
-          {/* Şifre gücü */}
-          {password.length > 0 && (
-            <View style={styles.strengthBlock}>
-              <View style={styles.strengthLabels}>
-                <Text style={styles.strengthCaption}>Şifre gücü</Text>
-                <Text style={[styles.strengthLabel, { color: strengthColors[strength] }]}>
-                  {strength === 'weak' ? 'Zayıf' : strength === 'medium' ? 'Orta' : 'Güçlü'}
-                </Text>
-              </View>
-              <View style={styles.barTrack}>
-                <View
-                  style={[
-                    styles.barFill,
-                    {
-                      width: `${Math.round(barFill * 100)}%` as `${number}%`,
-                      backgroundColor: strengthColors[strength],
-                    },
-                  ]}
-                />
-              </View>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.inner}>
+            <View style={styles.wordmarkWrap}>
+              <Wordmark height={36} onDark showIcon />
             </View>
-          )}
 
-          <Text style={styles.label}>Şifre tekrar</Text>
-          <FocusInput
-            value={confirm}
-            onChangeText={setConfirm}
-            placeholder="Şifreni tekrar gir"
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="new-password"
-            editable={!loading}
-            style={styles.inputGap}
-          />
+            <Text style={styles.heading}>Hesap oluştur</Text>
 
-          {/* KVKK */}
-          <Pressable
-            style={styles.kvkkRow}
-            onPress={() => setKvkk(!kvkk)}
-            disabled={loading}
-          >
-            <Ionicons
-              name={kvkk ? 'checkbox' : 'square-outline'}
-              size={22}
-              color={kvkk ? C.primary : C.text3}
+            <Text style={styles.label}>E-posta</Text>
+            <FocusInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder="ornek@email.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              editable={!loading}
+              style={styles.inputGap}
             />
-            <Text style={styles.kvkkText}>
-              <Text style={styles.kvkkBold}>KVKK</Text> kapsamında kişisel verilerimin işlenmesini
-              okudum ve kabul ediyorum.
-            </Text>
-          </Pressable>
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+            <Text style={styles.label}>Şifre</Text>
+            <FocusInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Güçlü bir şifre seç"
+              secureTextEntry
+              autoCapitalize="none"
+              autoComplete="new-password"
+              editable={!loading}
+              style={styles.inputGapSm}
+            />
 
-          <Pressable
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleSignUp}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color={C.bg} />
-            ) : (
-              <Text style={styles.buttonText}>Kayıt Ol</Text>
+            {/* Şifre kuralları */}
+            <View style={styles.rules}>
+              <Text style={[styles.rule, rules.minLen && styles.ruleOk]}>• En az 8 karakter</Text>
+              <Text style={[styles.rule, rules.upper  && styles.ruleOk]}>• En az 1 büyük harf</Text>
+              <Text style={[styles.rule, rules.digit  && styles.ruleOk]}>• En az 1 rakam</Text>
+              <Text style={[styles.rule, rules.special && styles.ruleOk]}>• En az 1 özel karakter</Text>
+            </View>
+
+            {/* Şifre gücü */}
+            {password.length > 0 && (
+              <View style={styles.strengthBlock}>
+                <View style={styles.strengthLabels}>
+                  <Text style={styles.strengthCaption}>Şifre gücü</Text>
+                  <Text style={[styles.strengthLabel, { color: strengthColors[strength] }]}>
+                    {strength === 'weak' ? 'Zayıf' : strength === 'medium' ? 'Orta' : 'Güçlü'}
+                  </Text>
+                </View>
+                <View style={styles.barTrack}>
+                  <View
+                    style={[
+                      styles.barFill,
+                      {
+                        width: `${Math.round(barFill * 100)}%` as `${number}%`,
+                        backgroundColor: strengthColors[strength],
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
             )}
-          </Pressable>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+            <Text style={styles.label}>Şifre tekrar</Text>
+            <FocusInput
+              value={confirm}
+              onChangeText={setConfirm}
+              placeholder="Şifreni tekrar gir"
+              secureTextEntry
+              autoCapitalize="none"
+              autoComplete="new-password"
+              editable={!loading}
+              style={styles.inputGap}
+            />
+
+            {/* KVKK */}
+            <Pressable
+              style={styles.kvkkRow}
+              onPress={() => setKvkk(!kvkk)}
+              disabled={loading}
+            >
+              <Ionicons
+                name={kvkk ? 'checkbox' : 'square-outline'}
+                size={22}
+                color={kvkk ? C.primary : C.text3}
+              />
+              <Text style={styles.kvkkText}>
+                <Text style={styles.kvkkBold}>KVKK</Text> kapsamında kişisel verilerimin işlenmesini
+                okudum ve kabul ediyorum.
+              </Text>
+            </Pressable>
+
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            <Pressable
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleSignUp}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={C.bg} />
+              ) : (
+                <Text style={styles.buttonText}>Kayıt Ol</Text>
+              )}
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 // ─── Stiller ─────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  safe:   { flex: 1, backgroundColor: C.bg },
   flex:   { flex: 1, backgroundColor: C.bg },
   scroll: { flexGrow: 1, padding: 24, paddingBottom: 40 },
   inner:  { width: '100%', maxWidth: 400, alignSelf: 'center' },

@@ -12,10 +12,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useOtpFlow } from '../context/OtpFlowContext';
 import { supabase } from '../lib/supabase';
 import type { AuthStackParamList } from '../navigation/types';
+import { C } from '../theme';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Otp'>;
 
@@ -177,74 +179,80 @@ export default function OtpScreen({ route }: Props) {
   const blocking = verifyLoading || sessionSyncing;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <View style={styles.inner}>
-        <Text style={styles.hint}>E-posta adresinize 6 haneli kod gönderildi</Text>
-        <Text style={styles.email}>{email}</Text>
-        <View style={styles.row}>
-          {digits.map((d, i) => (
-            <TextInput
-              key={i}
-              ref={(el) => {
-                refs.current[i] = el;
-              }}
-              style={styles.cell}
-              value={d}
-              onChangeText={(t) => handleChange(i, t)}
-              onKeyPress={({ nativeEvent }) => handleKeyPress(i, nativeEvent.key)}
-              keyboardType="number-pad"
-              maxLength={6}
-              selectTextOnFocus
-              editable={!blocking}
-            />
-          ))}
-        </View>
-        <Pressable style={styles.pasteBtn} onPress={handlePasteFromClipboard} disabled={blocking}>
-          <Text style={styles.pasteText}>Panodan yapıştır</Text>
-        </Pressable>
-        {error ? <Text style={styles.err}>{error}</Text> : null}
-        {sessionSyncing ? (
-          <View style={styles.syncBox}>
-            <ActivityIndicator color="#fff" size="small" />
-            <Text style={styles.syncText}>Oturum açılıyor…</Text>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.inner}>
+          <Text style={styles.hint}>E-posta adresinize 6 haneli kod gönderildi</Text>
+          <Text style={styles.email}>{email}</Text>
+          <View style={styles.row}>
+            {digits.map((d, i) => (
+              <TextInput
+                key={i}
+                ref={(el) => {
+                  refs.current[i] = el;
+                }}
+                style={styles.cell}
+                value={d}
+                onChangeText={(t) => handleChange(i, t)}
+                onKeyPress={({ nativeEvent }) => handleKeyPress(i, nativeEvent.key)}
+                keyboardType="number-pad"
+                maxLength={6}
+                selectTextOnFocus
+                editable={!blocking}
+              />
+            ))}
           </View>
-        ) : null}
-        <Pressable
-          style={[styles.primary, blocking && styles.disabled]}
-          onPress={handleVerify}
-          disabled={blocking}
-        >
-          {verifyLoading || sessionSyncing ? (
-            <ActivityIndicator color="#0a0a0a" />
-          ) : (
-            <Text style={styles.primaryText}>Doğrula</Text>
-          )}
-        </Pressable>
-        <Pressable
-          style={[styles.resend, (!canResend || resendLoading) && styles.resendDisabled]}
-          onPress={handleResend}
-          disabled={!canResend || resendLoading || blocking}
-        >
-          {resendLoading ? (
-            <ActivityIndicator color="#8ab4ff" />
-          ) : (
-            <Text style={styles.resendText}>
-              {canResend ? 'Tekrar Gönder' : `Tekrar Gönder (${secondsLeft}s)`}
-            </Text>
-          )}
-        </Pressable>
-      </View>
-    </KeyboardAvoidingView>
+          <Pressable style={styles.pasteBtn} onPress={handlePasteFromClipboard} disabled={blocking}>
+            <Text style={styles.pasteText}>Panodan yapıştır</Text>
+          </Pressable>
+          {error ? <Text style={styles.err}>{error}</Text> : null}
+          {sessionSyncing ? (
+            <View style={styles.syncBox}>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={styles.syncText}>Oturum açılıyor…</Text>
+            </View>
+          ) : null}
+          <Pressable
+            style={[styles.primary, blocking && styles.disabled]}
+            onPress={handleVerify}
+            disabled={blocking}
+          >
+            {verifyLoading || sessionSyncing ? (
+              <ActivityIndicator color="#0a0a0a" />
+            ) : (
+              <Text style={styles.primaryText}>Doğrula</Text>
+            )}
+          </Pressable>
+          <Pressable
+            style={[styles.resend, (!canResend || resendLoading) && styles.resendDisabled]}
+            onPress={handleResend}
+            disabled={!canResend || resendLoading || blocking}
+          >
+            {resendLoading ? (
+              <ActivityIndicator color="#8ab4ff" />
+            ) : (
+              <Text style={styles.resendText}>
+                {canResend ? 'Tekrar Gönder' : `Tekrar Gönder (${secondsLeft}s)`}
+              </Text>
+            )}
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
   flex: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: C.bg,
     justifyContent: 'center',
   },
   inner: {
