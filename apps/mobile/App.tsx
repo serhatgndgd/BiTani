@@ -24,6 +24,7 @@ import RegisterScreen from './screens/RegisterScreen';
 import SearchScreen from './screens/SearchScreen';
 import { OtpFlowContext } from './context/OtpFlowContext';
 import { supabase } from './lib/supabase';
+import { C } from './theme';
 import type { AuthStackParamList } from './navigation/types';
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -33,18 +34,18 @@ const navigationTheme = {
   ...DarkTheme,
   colors: {
     ...DarkTheme.colors,
-    background: '#0a0a0a',
-    card: '#0a0a0a',
-    primary: '#ffffff',
-    text: '#ffffff',
-    border: '#222222',
+    background: C.bg,
+    card:       C.bg,
+    primary:    C.text1,
+    text:       C.text1,
+    border:     C.border,
   },
 };
 
 function SignOutButton() {
   return (
-    <Pressable onPress={() => supabase.auth.signOut()} style={{ marginRight: 16 }}>
-      <Text style={{ color: '#ff8a80', fontSize: 16 }}>Çıkış</Text>
+    <Pressable onPress={() => supabase.auth.signOut()} style={styles.signOutBtn}>
+      <Text style={styles.signOutText}>Çıkış</Text>
     </Pressable>
   );
 }
@@ -55,11 +56,11 @@ function AuthNavigator() {
       id="AuthStack"
       initialRouteName="Welcome"
       screenOptions={{
-        headerStyle: { backgroundColor: '#0a0a0a' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { color: '#fff' },
+        headerStyle:      { backgroundColor: C.bg },
+        headerTintColor:  C.text1,
+        headerTitleStyle: { color: C.text1 },
         headerShadowVisible: false,
-        contentStyle: { backgroundColor: '#0a0a0a' },
+        contentStyle: { backgroundColor: C.bg },
       }}
     >
       <AuthStack.Screen
@@ -92,14 +93,14 @@ function MainNavigator() {
       id="MainTabs"
       screenOptions={{
         tabBarStyle: {
-          backgroundColor: '#0a0a0a',
-          borderTopColor: '#222',
+          backgroundColor: C.bg,
+          borderTopColor:  C.border,
         },
-        tabBarActiveTintColor: '#fff',
-        tabBarInactiveTintColor: '#888',
-        headerStyle: { backgroundColor: '#0a0a0a' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { color: '#fff' },
+        tabBarActiveTintColor:   C.text1,
+        tabBarInactiveTintColor: C.text2,
+        headerStyle:      { backgroundColor: C.bg },
+        headerTintColor:  C.text1,
+        headerTitleStyle: { color: C.text1 },
         headerShadowVisible: false,
       }}
     >
@@ -173,7 +174,7 @@ function BiometricGate({ onRetry }: BiometricGateProps) {
   return (
     <View style={styles.biometricGate}>
       <View style={styles.biometricIcon}>
-        <Ionicons name="finger-print-outline" size={58} color="#1a6ef5" />
+        <Ionicons name="finger-print-outline" size={58} color={C.primary} />
       </View>
       <Text style={styles.biometricTitle}>BiTanı</Text>
       <Text style={styles.biometricSub}>
@@ -183,7 +184,7 @@ function BiometricGate({ onRetry }: BiometricGateProps) {
         style={({ pressed }) => [styles.biometricBtn, pressed && { opacity: 0.8 }]}
         onPress={onRetry}
       >
-        <Ionicons name="finger-print-outline" size={18} color="#fff" />
+        <Ionicons name="finger-print-outline" size={18} color={C.text1} />
         <Text style={styles.biometricBtnText}>Tekrar Dene</Text>
       </Pressable>
     </View>
@@ -317,10 +318,10 @@ export default function App() {
 
   if (showSplash) {
     return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureHandlerRootView style={styles.flex}>
         <SafeAreaProvider>
           <View style={styles.boot}>
-            <ActivityIndicator size="large" color="#ffffff" />
+            <ActivityIndicator size="large" color={C.text1} />
           </View>
           <StatusBar style="light" />
         </SafeAreaProvider>
@@ -331,7 +332,7 @@ export default function App() {
   // Biyometrik kapı (sadece showMain + geçilmedi + kontrol bitti)
   if (showMain && !biometricPassed) {
     return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureHandlerRootView style={styles.flex}>
         <SafeAreaProvider>
           <BiometricGate onRetry={() => void promptBiometric()} />
           <StatusBar style="light" />
@@ -343,7 +344,7 @@ export default function App() {
   // ─── Ana render ───────────────────────────────────────────────────────────
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={styles.flex}>
       <SafeAreaProvider>
         <OtpFlowContext.Provider value={{ onOtpSessionReady }}>
           {showOnboarding ? (
@@ -366,17 +367,22 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
+
   boot: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: C.bg,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
+  signOutBtn:  { marginRight: 16 },
+  signOutText: { color: C.error, fontSize: 16 },
+
   /* Biyometrik kapı */
   biometricGate: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: C.bg,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 40,
@@ -386,21 +392,21 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 24,
-    backgroundColor: 'rgba(26,110,245,0.1)',
+    backgroundColor: C.primaryDim,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 6,
     borderWidth: 1,
-    borderColor: 'rgba(26,110,245,0.2)',
+    borderColor: C.primaryDim,
   },
   biometricTitle: {
-    color: '#fff',
+    color: C.text1,
     fontSize: 26,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
   biometricSub: {
-    color: '#555',
+    color: C.text3,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 22,
@@ -410,14 +416,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#1a6ef5',
+    backgroundColor: C.primary,
     paddingHorizontal: 28,
     paddingVertical: 14,
     borderRadius: 14,
     marginTop: 8,
   },
   biometricBtnText: {
-    color: '#fff',
+    color: C.text1,
     fontSize: 15,
     fontWeight: '600',
   },
