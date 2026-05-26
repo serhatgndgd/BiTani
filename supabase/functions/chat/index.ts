@@ -1,5 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+const GENERIC_CHAT_ERROR = 'Asistan yanıtı alınamadı. Lütfen tekrar deneyin.'
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -81,9 +83,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { messages, userId } = (await req.json()) as {
+    const { messages } = (await req.json()) as {
       messages: ApiMessage[]
-      userId: string | null | undefined
     }
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -93,50 +94,68 @@ Deno.serve(async (req) => {
       )
     }
 
+    const authHeader = req.headers.get('Authorization')
+    const jwt = authHeader?.replace('Bearer ', '')
+    if (!jwt) {
+      return new Response(
+        JSON.stringify({ error: 'Oturum doğrulanamadı.' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
+
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt)
+    if (authError || !user) {
+      console.error('chat-fn:', authError)
+      return new Response(
+        JSON.stringify({ error: 'Oturum doğrulanamadı.' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    const userId = user.id
 
     // ── Kullanıcı profili, hastalıklar, ilaçlar ──────────────────────────────
     let profile: Profile | null = null
     let conditions: string[] = []
     let medications: string[] = []
 
-    if (userId) {
-      const [profileRes, condRes, medRes] = await Promise.all([
-        supabaseAdmin
-          .from('profiles')
-          .select('full_name, birth_date, gender, height_cm, weight_kg')
-          .eq('id', userId)
-          .maybeSingle(),
-        supabaseAdmin
-          .from('user_conditions')
-          .select('conditions_catalog(name)')
-          .eq('user_id', userId),
-        supabaseAdmin
-          .from('user_medications')
-          .select('dosage, medications(ilac_adi)')
-          .eq('user_id', userId)
-          .eq('is_active', true),
-      ])
+    const [profileRes, condRes, medRes] = await Promise.all([
+      supabaseAdmin
+        .from('profiles')
+        .select('full_name, birth_date, gender, height_cm, weight_kg')
+        .eq('id', userId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('user_conditions')
+        .select('conditions_catalog(name)')
+        .eq('user_id', userId),
+      supabaseAdmin
+        .from('user_medications')
+        .select('dosage, medications(ilac_adi)')
+        .eq('user_id', userId)
+        .eq('is_active', true),
+    ])
 
-      profile = profileRes.data as Profile | null
+    profile = profileRes.data as Profile | null
 
-      type CondRow = { conditions_catalog: { name: string } | null }
-      conditions = ((condRes.data ?? []) as CondRow[])
-        .map((r) => r.conditions_catalog?.name)
-        .filter((n): n is string => !!n)
+    type CondRow = { conditions_catalog: { name: string } | null }
+    conditions = ((condRes.data ?? []) as CondRow[])
+      .map((r) => r.conditions_catalog?.name)
+      .filter((n): n is string => !!n)
 
-      type MedRow = { dosage: string | null; medications: { ilac_adi: string } | null }
-      medications = ((medRes.data ?? []) as MedRow[])
-        .map((r) => {
-          const medName = r.medications?.ilac_adi
-          if (!medName) return null
-          return r.dosage ? `${medName} (${r.dosage})` : medName
-        })
-        .filter((n): n is string => !!n)
-    }
+    type MedRow = { dosage: string | null; medications: { ilac_adi: string } | null }
+    medications = ((medRes.data ?? []) as MedRow[])
+      .map((r) => {
+        const medName = r.medications?.ilac_adi
+        if (!medName) return null
+        return r.dosage ? `${medName} (${r.dosage})` : medName
+      })
+      .filter((n): n is string => !!n)
 
     // ── chat_history: son 20 mesajı çek ──────────────────────────────────────
     // Strateji: DB geçmişi (önceki oturumlar) + client'ın son mesajı (bu oturum).
@@ -144,28 +163,27 @@ Deno.serve(async (req) => {
     // DB geçmişiyle birleştiririz — böylece duplikasyon olmaz.
     let historyMessages: ApiMessage[] = []
 
-    if (userId) {
-      try {
-        const { data: historyRows } = await supabaseAdmin
-          .from('chat_history')
-          .select('role, content')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(20)
+    try {
+      const { data: historyRows } = await supabaseAdmin
+        .from('chat_history')
+        .select('role, content')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20)
 
-        if (historyRows && historyRows.length > 0) {
-          // DESC'ten ASC'ye çevir (en eski önce → Groq için doğru sıra)
-          historyMessages = (historyRows as ChatHistoryRow[])
-            .reverse()
-            .map((r) => ({
-              role: r.role as 'user' | 'assistant',
-              content: r.content,
-            }))
-        }
-      } catch {
-        // Geçmiş çekilemezse boş array ile devam et
-        historyMessages = []
+      if (historyRows && historyRows.length > 0) {
+        // DESC'ten ASC'ye çevir (en eski önce → Groq için doğru sıra)
+        historyMessages = (historyRows as ChatHistoryRow[])
+          .reverse()
+          .map((r) => ({
+            role: r.role as 'user' | 'assistant',
+            content: r.content,
+          }))
       }
+    } catch (e) {
+      console.error('chat-fn:', e)
+      // Geçmiş çekilemezse boş array ile devam et
+      historyMessages = []
     }
 
     // ── Groq'a gönderilecek mesaj dizisi ──────────────────────────────────────
@@ -175,8 +193,9 @@ Deno.serve(async (req) => {
 
     const groqKey = Deno.env.get('GROQ_API_KEY')
     if (!groqKey) {
+      console.error('chat-fn:', 'GROQ_API_KEY missing')
       return new Response(
-        JSON.stringify({ error: 'GROQ_API_KEY yapılandırılmamış' }),
+        JSON.stringify({ error: GENERIC_CHAT_ERROR }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
@@ -198,9 +217,9 @@ Deno.serve(async (req) => {
     })
 
     if (!groqRes.ok) {
-      const errData = await groqRes.json()
+      console.error('chat-fn:', 'Groq error', groqRes.status, await groqRes.text())
       return new Response(
-        JSON.stringify({ error: errData.error?.message ?? `Groq hatası: ${groqRes.status}` }),
+        JSON.stringify({ error: GENERIC_CHAT_ERROR }),
         { status: groqRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
@@ -209,22 +228,22 @@ Deno.serve(async (req) => {
     const reply: string = groqData.choices?.[0]?.message?.content ?? ''
 
     if (!reply) {
+      console.error('chat-fn:', 'Groq empty reply')
       return new Response(
-        JSON.stringify({ error: 'Groq boş yanıt döndürdü' }),
+        JSON.stringify({ error: GENERIC_CHAT_ERROR }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
 
     // ── chat_history'e kaydet (user + assistant) ──────────────────────────────
-    if (userId) {
-      try {
-        await supabaseAdmin.from('chat_history').insert([
-          { user_id: userId, role: 'user', content: currentMessage.content },
-          { user_id: userId, role: 'assistant', content: reply },
-        ])
-      } catch {
-        // Kayıt başarısız olursa asıl cevabı yine de döndür
-      }
+    try {
+      await supabaseAdmin.from('chat_history').insert([
+        { user_id: userId, role: 'user', content: currentMessage.content },
+        { user_id: userId, role: 'assistant', content: reply },
+      ])
+    } catch (e) {
+      console.error('chat-fn:', e)
+      // Kayıt başarısız olursa asıl cevabı yine de döndür
     }
 
     return new Response(
@@ -232,9 +251,9 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Bilinmeyen hata'
+    console.error('chat-fn:', e)
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: GENERIC_CHAT_ERROR }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }

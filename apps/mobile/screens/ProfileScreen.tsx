@@ -456,7 +456,7 @@ export default function ProfileScreen() {
       condition_id: string;
       medications: { id: string; ilac_adi: string; etkin_madde_adi: string | null } | null;
     };
-    const rows: CondMedRow[] = ((data ?? []) as RawRow[])
+    const rows: CondMedRow[] = ((data ?? []) as unknown as RawRow[])
       .filter((r) => r.medications != null)
       .map((r) => ({ condition_id: r.condition_id, medication: r.medications! }));
     setCondMedRows(rows);

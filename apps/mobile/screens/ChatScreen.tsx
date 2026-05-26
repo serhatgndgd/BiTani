@@ -48,6 +48,8 @@ type ApiMessage = {
 
 type ChatNavProp = BottomTabNavigationProp<MainTabParamList, 'Chat'>;
 
+const GENERIC_CHAT_ERROR = 'Asistan yanıtı alınamadı. Lütfen tekrar deneyin.';
+
 // ─── Markdown parser ──────────────────────────────────────────────────────────
 
 type Segment  = { text: string; bold: boolean; italic: boolean };
@@ -156,7 +158,6 @@ export default function ChatScreen() {
   const navigation = useNavigation<ChatNavProp>();
 
   const [loadingProfile, setLoadingProfile] = useState(true);
-  const [userId, setUserId]                 = useState<string | null>(null);
   const [messages, setMessages]             = useState<Message[]>([]);
   const [apiMessages, setApiMessages]       = useState<ApiMessage[]>([]);
   const [input, setInput]                   = useState('');
@@ -178,7 +179,6 @@ export default function ChatScreen() {
       return;
     }
 
-    setUserId(user.id);
     const { data: profile } = await supabase
       .from('profiles').select('full_name').eq('id', user.id).maybeSingle();
 
@@ -212,10 +212,17 @@ export default function ChatScreen() {
     const nextApiMessages: ApiMessage[] = [...apiMessages, { role: 'user', content: text }];
     setSending(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Oturum doğrulanamadı.');
+
       const { data, error } = await supabase.functions.invoke('chat', {
-        body: { messages: nextApiMessages, userId },
+        body: { messages: nextApiMessages },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(GENERIC_CHAT_ERROR);
 
       const reply = (data as { reply: string }).reply;
       if (!reply) throw new Error('Yanıt alınamadı.');
@@ -231,7 +238,7 @@ export default function ChatScreen() {
     } finally {
       setSending(false);
     }
-  }, [input, sending, loadingProfile, apiMessages, userId]);
+  }, [input, sending, loadingProfile, apiMessages]);
 
   if (loadingProfile) {
     return (
