@@ -4,6 +4,8 @@ const GENERIC_CHAT_ERROR = 'Asistan yanıtı alınamadı. Lütfen tekrar deneyin
 const RATE_LIMIT_ERROR = 'Çok fazla mesaj gönderdiniz. Lütfen 1 dakika bekleyin.'
 const RATE_LIMIT_WINDOW_SECONDS = 60
 const RATE_LIMIT_MAX_REQUESTS = 10
+const UNSAFE_LLM_FALLBACK =
+  'Bu konuda detaylı bilgi veremiyorum. Lütfen doktorunuza veya eczacınıza danışın. Acil durumlarda 112\'yi arayın.'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,6 +35,20 @@ interface RateLimitRow {
   request_count: number | null
   window_start: string | null
 }
+
+const FORBIDDEN_PATTERNS: RegExp[] = [
+  /(hastalığınız|sende|tanı|teşhis)\s+\w+/gi,
+  /\w+\s+hastasısınız/gi,
+  /(teşhis|tanı)\s+(konuldu|edildi|koyulabilir)/gi,
+  /\d+\s*mg\s+(alın|iç|kullan)/gi,
+  /(dozu|miktarı)\s+(artırın|azaltın|değiştirin|yükseltin)/gi,
+  /ilacın(ı|ızı)\s+bırakın/gi,
+  /kesinlikle\s+(güvenli|zararlı|iyi)/gi,
+  /zararlı\s+değil/gi,
+  /endişelenmeyin/gi,
+  /(metformin|parol|aspirin|apranax|advil|nurofen)\s+alın/gi,
+  /(eczaneden|eczane).*?(al|edinin|temin)/gi,
+]
 
 const INJECTION_PATTERNS: RegExp[] = [
   /ignore\s+(previous|all|system|önceki)/i,
@@ -104,6 +120,28 @@ async function checkAndIncrementRateLimit(
     window_start: currentWindowStart,
   })
   return { allowed: true, requestCount: nextCount, windowStart: currentWindowStart }
+}
+
+function validateLLMOutput(
+  reply: string,
+  userMeds: string[],
+): { safe: boolean; violations: string[]; sanitizedReply: string } {
+  const sanitizedReply = reply.trim()
+  const violations: string[] = []
+
+  for (const pattern of FORBIDDEN_PATTERNS) {
+    pattern.lastIndex = 0
+    if (pattern.test(sanitizedReply)) {
+      violations.push(pattern.source)
+    }
+  }
+
+  const _ = userMeds
+  if (violations.length > 0) {
+    return { safe: false, violations, sanitizedReply: UNSAFE_LLM_FALLBACK }
+  }
+
+  return { safe: true, violations: [], sanitizedReply }
 }
 
 function computeAge(birthDate: string | null): string {
@@ -423,11 +461,17 @@ Deno.serve(async (req) => {
       )
     }
 
+    const validation = validateLLMOutput(reply, medications)
+    if (!validation.safe) {
+      console.error('unsafe-llm-output:', validation.violations)
+    }
+    const safeReply = validation.sanitizedReply
+
     // ── chat_history'e kaydet (user + assistant) ──────────────────────────────
     try {
       await supabaseAdmin.from('chat_history').insert([
         { user_id: userId, role: 'user', content: currentMessage.content },
-        { user_id: userId, role: 'assistant', content: reply },
+        { user_id: userId, role: 'assistant', content: safeReply },
       ])
     } catch (e) {
       console.error('chat-fn:', e)
@@ -435,7 +479,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ reply }),
+      JSON.stringify({ reply: safeReply }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (e) {
