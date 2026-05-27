@@ -10,9 +10,17 @@ interface Props {
   visible: boolean;
   documentId: LegalDocumentId | null;
   onClose: () => void;
+  primaryActionLabel?: string;
+  onPrimaryAction?: () => void;
 }
 
-export function LegalDocumentModal({ visible, documentId, onClose }: Props) {
+export function LegalDocumentModal({
+  visible,
+  documentId,
+  onClose,
+  primaryActionLabel,
+  onPrimaryAction,
+}: Props) {
   const document = documentId ? LEGAL_DOCUMENTS[documentId] : null;
 
   return (
@@ -27,6 +35,17 @@ export function LegalDocumentModal({ visible, documentId, onClose }: Props) {
         <ScrollView contentContainerStyle={styles.content}>
           <Markdown style={markdownStyles}>{document?.markdown ?? ''}</Markdown>
         </ScrollView>
+        {primaryActionLabel ? (
+          <View style={styles.footer}>
+            <Pressable
+              style={styles.primaryButton}
+              onPress={onPrimaryAction ?? onClose}
+              accessibilityRole="button"
+            >
+              <Text style={styles.primaryButtonText}>{primaryActionLabel}</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </SafeAreaView>
     </Modal>
   );
@@ -98,5 +117,21 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 18,
+  },
+  footer: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+  },
+  primaryButton: {
+    backgroundColor: C.text1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    color: C.bg,
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

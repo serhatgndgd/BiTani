@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -15,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LegalDocumentModal } from '../components/LegalDocumentModal';
 import { supabase } from '../lib/supabase';
 import type { MainTabParamList } from '../navigation/types';
 import { C } from '../theme';
@@ -62,6 +64,7 @@ type ChatNavProp = BottomTabNavigationProp<MainTabParamList, 'Chat'>;
 const CHAT_ERROR_NETWORK = 'İnternet bağlantınızı kontrol edin';
 const CHAT_ERROR_SERVER = 'Asistan şu an yanıt veremiyor';
 const CHAT_ERROR_GENERIC = 'Bir sorun oluştu, tekrar deneyin';
+const CHAT_DISCLAIMER_ACCEPTED_KEY = 'chat_disclaimer_v1_accepted';
 
 function mapChatError(error: unknown): string {
   if (!(error instanceof Error)) return CHAT_ERROR_GENERIC;
@@ -264,6 +267,7 @@ export default function ChatScreen() {
   const [sending, setSending]               = useState(false);
   const [sendError, setSendError]           = useState<string | null>(null);
   const [showEmergency, setShowEmergency]   = useState(false);
+  const [showDisclaimer, setShowDisclaimer] = useState(false);
   const listRef = useRef<FlatList<Message>>(null);
 
   const loadProfile = useCallback(async () => {
@@ -294,6 +298,23 @@ export default function ChatScreen() {
   useEffect(() => { void loadProfile(); }, [loadProfile]);
 
   useEffect(() => {
+    let mounted = true;
+    async function loadDisclaimerState() {
+      try {
+        const accepted = await AsyncStorage.getItem(CHAT_DISCLAIMER_ACCEPTED_KEY);
+        if (mounted) setShowDisclaimer(accepted !== 'true');
+      } catch (error) {
+        console.error('chat-disclaimer:', error);
+        if (mounted) setShowDisclaimer(true);
+      }
+    }
+    void loadDisclaimerState();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     }
@@ -315,6 +336,16 @@ export default function ChatScreen() {
       </>
     );
   }, [sending, sendError]);
+
+  const acceptDisclaimer = useCallback(async () => {
+    try {
+      await AsyncStorage.setItem(CHAT_DISCLAIMER_ACCEPTED_KEY, 'true');
+    } catch (error) {
+      console.error('chat-disclaimer-accept:', error);
+    } finally {
+      setShowDisclaimer(false);
+    }
+  }, []);
 
   const send = useCallback(async () => {
     const text = input.trim();
@@ -423,6 +454,13 @@ export default function ChatScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+      <LegalDocumentModal
+        visible={showDisclaimer}
+        documentId="sorumluluk_reddi"
+        onClose={acceptDisclaimer}
+        primaryActionLabel="Okudum ve Kabul Ediyorum"
+        onPrimaryAction={acceptDisclaimer}
+      />
     </SafeAreaView>
   );
 }
