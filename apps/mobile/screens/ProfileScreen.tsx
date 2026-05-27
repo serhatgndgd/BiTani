@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { LegalDocumentModal } from '../components/LegalDocumentModal';
+import type { LegalDocumentId } from '../legal/documents';
 import { supabase } from '../lib/supabase';
 import type { ConditionCatalogRow } from '../navigation/types';
 import { C } from '../theme';
@@ -60,6 +62,7 @@ const PROFILE_SAVE_ERROR_TEXT = 'Bilgileriniz kaydedilemedi. Tekrar deneyin';
 const CONDITION_SAVE_ERROR_TEXT = 'Hastalık eklenemedi. Tekrar deneyin';
 const MED_ADD_ERROR_TEXT = 'İlaç eklenemedi. Tekrar deneyin';
 const UPDATE_ERROR_TEXT = 'Güncellenemedi. Tekrar deneyin';
+const DELETE_ACCOUNT_ERROR_TEXT = 'Hesabınız silinemedi. Tekrar deneyin';
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: 'male', label: 'Erkek' },
@@ -138,6 +141,10 @@ export default function ProfileScreen() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [conditionActionError, setConditionActionError] = useState<string | null>(null);
   const [medicationActionError, setMedicationActionError] = useState<string | null>(null);
+  const [legalDocument, setLegalDocument] = useState<LegalDocumentId | null>(null);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
 
   // ── Hastalıklar ─────────────────────────────────────────────────────────
   const [userConditions, setUserConditions] = useState<ConditionCatalogRow[]>([]);
@@ -355,6 +362,29 @@ export default function ProfileScreen() {
     if (!userId) return;
     await supabase.from('chat_history').delete().eq('user_id', userId);
   }, [userId]);
+
+  const deleteAccount = useCallback(async () => {
+    setDeletingAccount(true);
+    setDeleteAccountError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('missing-session');
+      const { error } = await supabase.functions.invoke('delete-account', {
+        body: {},
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      if (error) throw error;
+      await supabase.auth.signOut();
+      setDeleteModalVisible(false);
+    } catch (error) {
+      console.error('delete-account:', error);
+      setDeleteAccountError(DELETE_ACCOUNT_ERROR_TEXT);
+    } finally {
+      setDeletingAccount(false);
+    }
+  }, []);
 
   // ── Profil düzenleme ────────────────────────────────────────────────────
   const openEditProfile = () => {
@@ -929,6 +959,27 @@ export default function ProfileScreen() {
           ) : null}
         </View>
 
+        {/* ── Yasal Metinler ve Hesap ── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Yasal Metinler</Text>
+          <View style={styles.legalList}>
+            <LegalRow title="KVKK Aydınlatma Metni" onPress={() => setLegalDocument('kvkk_aydinlatma')} />
+            <LegalRow title="Açık Rıza Beyanı" onPress={() => setLegalDocument('acik_riza')} />
+            <LegalRow title="Sorumluluk Reddi Beyanı" onPress={() => setLegalDocument('sorumluluk_reddi')} />
+            <LegalRow title="Gizlilik Politikası" onPress={() => setLegalDocument('gizlilik_politikasi')} />
+          </View>
+          <Pressable
+            style={styles.deleteAccountBtn}
+            onPress={() => {
+              setDeleteAccountError(null);
+              setDeleteModalVisible(true);
+            }}
+          >
+            <Ionicons name="trash-outline" size={18} color={C.error} />
+            <Text style={styles.deleteAccountText}>Hesabımı Sil</Text>
+          </Pressable>
+        </View>
+
         {/* ── Çıkış ── */}
         <Pressable style={styles.signOutBtn} onPress={() => void supabase.auth.signOut()}>
           <Ionicons name="log-out-outline" size={20} color={C.error} />
@@ -1118,7 +1169,61 @@ export default function ProfileScreen() {
           ) : null}
         </View>
       </Modal>
+
+      <LegalDocumentModal
+        visible={legalDocument !== null}
+        documentId={legalDocument}
+        onClose={() => setLegalDocument(null)}
+      />
+
+      <Modal
+        visible={deleteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!deletingAccount) setDeleteModalVisible(false);
+        }}
+      >
+        <View style={styles.confirmBackdrop}>
+          <View style={styles.confirmBox}>
+            <Text style={styles.confirmTitle}>Hesabınızı silmek istiyor musunuz?</Text>
+            <Text style={styles.confirmText}>
+              Hesabınız ve uygulamadaki kayıtlı verileriniz silinir. Bu işlem geri alınamaz.
+            </Text>
+            {deleteAccountError ? <Text style={styles.err}>{deleteAccountError}</Text> : null}
+            <View style={styles.editActions}>
+              <Pressable
+                style={styles.cancelBtn}
+                onPress={() => setDeleteModalVisible(false)}
+                disabled={deletingAccount}
+              >
+                <Text style={styles.cancelBtnText}>Vazgeç</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.confirmDeleteBtn, deletingAccount && styles.saveBtnDisabled]}
+                onPress={() => void deleteAccount()}
+                disabled={deletingAccount}
+              >
+                {deletingAccount ? (
+                  <ActivityIndicator color={C.text1} />
+                ) : (
+                  <Text style={styles.confirmDeleteText}>Sil</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
+  );
+}
+
+function LegalRow({ title, onPress }: { title: string; onPress: () => void }) {
+  return (
+    <Pressable style={styles.legalRow} onPress={onPress}>
+      <Text style={styles.legalRowText}>{title}</Text>
+      <Ionicons name="chevron-forward" size={17} color={C.text3} />
+    </Pressable>
   );
 }
 
@@ -1194,6 +1299,30 @@ const styles = StyleSheet.create({
   signOutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 6, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.errorDim },
   signOutText: { color: C.error, fontSize: 16, fontWeight: '600' },
 
+  legalList: { marginTop: 14, borderTopWidth: 1, borderTopColor: C.surfaceAlt },
+  legalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: C.surfaceAlt,
+  },
+  legalRowText: { color: C.text1, fontSize: 14 },
+  deleteAccountBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 13,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.error,
+    backgroundColor: C.errorDim,
+  },
+  deleteAccountText: { color: C.error, fontSize: 15, fontWeight: '700' },
+
   err: { color: C.error, fontSize: 13, marginTop: 6 },
   retryBtn: { marginTop: 20, backgroundColor: C.text1, paddingVertical: 13, paddingHorizontal: 28, borderRadius: 10 },
   retryBtnText: { color: C.bg, fontSize: 15, fontWeight: '700' },
@@ -1209,6 +1338,31 @@ const styles = StyleSheet.create({
   modalLoader: { marginTop: 32 },
   modalPad: { padding: 16 },
   modalFooter: { padding: 14, borderTopWidth: 1, borderTopColor: C.border },
+
+  confirmBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+  },
+  confirmBox: {
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  confirmTitle: { color: C.text1, fontSize: 18, fontWeight: '800', marginBottom: 10 },
+  confirmText: { color: C.text2, fontSize: 14, lineHeight: 21 },
+  confirmDeleteBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 10,
+    backgroundColor: C.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmDeleteText: { color: C.text1, fontSize: 15, fontWeight: '700' },
 
   // Sekmeler
   tabRow: { flexDirection: 'row', marginHorizontal: 14, marginTop: 12, borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: C.border },
