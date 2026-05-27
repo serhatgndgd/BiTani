@@ -55,11 +55,6 @@ type Message = {
   ts: number;
 };
 
-type ApiMessage = {
-  role: 'user' | 'assistant';
-  content: string;
-};
-
 type ChatNavProp = BottomTabNavigationProp<MainTabParamList, 'Chat'>;
 
 const CHAT_ERROR_NETWORK = 'İnternet bağlantınızı kontrol edin';
@@ -263,7 +258,6 @@ export default function ChatScreen() {
 
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [messages, setMessages]             = useState<Message[]>([]);
-  const [apiMessages, setApiMessages]       = useState<ApiMessage[]>([]);
   const [input, setInput]                   = useState('');
   const [sending, setSending]               = useState(false);
   const [sendError, setSendError]           = useState<string | null>(null);
@@ -316,9 +310,9 @@ export default function ChatScreen() {
   }, []);
 
   useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
-    }
+    if (messages.length === 0) return;
+    const timer = setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+    return () => clearTimeout(timer);
   }, [messages, sending]);
 
   const keyExtractor = useCallback((item: Message) => item.id, []);
@@ -358,16 +352,17 @@ export default function ChatScreen() {
     const msgId = Date.now().toString();
     setMessages((prev) => [...prev, { id: msgId, role: 'user', content: text, ts: Date.now() }]);
 
-    const nextApiMessages: ApiMessage[] = [...apiMessages, { role: 'user', content: text }];
     setSending(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Oturum doğrulanamadı.');
 
       const isEmergency = detectEmergency(text);
+      // Edge function sadece son mesajı kullanıyor; geçmiş DB'den çekiliyor.
+      // Büyüyen apiMessages array'i yerine tek elemanlı array gönder.
       const { data, error } = await supabase.functions.invoke('chat', {
         body: {
-          messages: nextApiMessages,
+          messages: [{ role: 'user', content: text }],
           is_emergency_flagged: isEmergency,
         },
         headers: {
@@ -382,7 +377,6 @@ export default function ChatScreen() {
       if (!reply) throw new Error('server-empty-reply');
 
       setMessages((prev) => [...prev, { id: `${msgId}-a`, role: 'assistant', content: reply, ts: Date.now() }]);
-      setApiMessages([...nextApiMessages, { role: 'assistant', content: reply }]);
 
       if (isEmergency || payload.is_emergency === true || detectEmergency(reply)) {
         setShowEmergency(true);
@@ -395,7 +389,7 @@ export default function ChatScreen() {
     } finally {
       setSending(false);
     }
-  }, [input, sending, loadingProfile, apiMessages]);
+  }, [input, sending, loadingProfile]);
 
   if (loadingProfile) {
     return (
