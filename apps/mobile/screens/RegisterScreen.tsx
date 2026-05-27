@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   Animated,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -19,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Wordmark } from '../components/Brand';
+import { LegalDocumentModal } from '../components/LegalDocumentModal';
+import type { LegalDocumentId } from '../legal/documents';
 import { supabase } from '../lib/supabase';
 import type { AuthStackParamList, ConsentType, PendingConsent } from '../navigation/types';
 import { C } from '../theme';
@@ -28,7 +29,6 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 type Strength = 'weak' | 'medium' | 'strong';
 type ConsentKey = 'kvkk_read' | 'saglik_veri' | 'ai_transfer' | 'chat_history' | 'age_18';
 type ConsentState = Record<ConsentKey, boolean>;
-type LegalDetailKey = 'kvkk' | 'saglik' | 'ai' | 'chat';
 
 const INITIAL_CONSENTS: ConsentState = {
   kvkk_read: false,
@@ -36,25 +36,6 @@ const INITIAL_CONSENTS: ConsentState = {
   ai_transfer: false,
   chat_history: false,
   age_18: false,
-};
-
-const LEGAL_DETAILS: Record<LegalDetailKey, { title: string; body: string }> = {
-  kvkk: {
-    title: 'KVKK Aydınlatma Metni',
-    body: 'BiTanı akademik bir bitirme projesidir. Kimlik ve sağlık verileri; kişiselleştirilmiş prospektüs bilgisi, ilaç etkileşim uyarısı ve acil yönlendirme amacıyla işlenir. Sağlık verileriniz için ayrı açık rıza alınır.',
-  },
-  saglik: {
-    title: 'Sağlık Verilerinin İşlenmesi',
-    body: 'Boy, kilo, kronik hastalıklar ve kullandığınız ilaçlar KVKK md. 6 kapsamında özel nitelikli kişisel veridir. Bu veriler yalnızca açık rızanızla işlenir.',
-  },
-  ai: {
-    title: 'Yapay Zeka Servisine Veri Aktarımı',
-    body: 'Sohbet özelliğini kullandığınızda mesajlarınız ve ilgili sağlık bağlamınız ABD merkezli yapay zeka servis sağlayıcılarına cevap üretmek amacıyla aktarılabilir. Bu rıza opsiyoneldir; vermezseniz sadece sohbet özelliği devre dışı kalır.',
-  },
-  chat: {
-    title: 'Sohbet Geçmişi Saklanması',
-    body: 'Sohbet geçmişiniz daha tutarlı yardım sunabilmek için saklanabilir. Sağlık verisi içerebileceğinden açık rızanız alınır.',
-  },
 };
 
 function maxAdultBirthDate(): Date {
@@ -213,7 +194,7 @@ export default function RegisterScreen({ navigation }: Props) {
   const [consents, setConsents] = useState<ConsentState>(INITIAL_CONSENTS);
   const [birthDate, setBirthDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [legalDetail, setLegalDetail] = useState<LegalDetailKey | null>(null);
+  const [legalDetail, setLegalDetail] = useState<LegalDocumentId | null>(null);
   const [error, setError]       = useState<string | null>(null);
   const [loading, setLoading]   = useState(false);
 
@@ -450,28 +431,28 @@ export default function RegisterScreen({ navigation }: Props) {
                 checked={consents.kvkk_read}
                 label="KVKK Aydınlatma Metni'ni okudum"
                 onPress={() => toggleConsent('kvkk_read')}
-                onDetail={() => setLegalDetail('kvkk')}
+                onDetail={() => setLegalDetail('kvkk_aydinlatma')}
                 disabled={loading}
               />
               <ConsentRow
                 checked={consents.saglik_veri}
                 label="Sağlık verilerimin işlenmesine açık rıza veriyorum"
                 onPress={() => toggleConsent('saglik_veri')}
-                onDetail={() => setLegalDetail('saglik')}
+                onDetail={() => setLegalDetail('acik_riza')}
                 disabled={loading}
               />
               <ConsentRow
                 checked={consents.ai_transfer}
                 label="AI servisine veri aktarımına rıza veriyorum (opsiyonel)"
                 onPress={() => toggleConsent('ai_transfer')}
-                onDetail={() => setLegalDetail('ai')}
+                onDetail={() => setLegalDetail('acik_riza')}
                 disabled={loading}
               />
               <ConsentRow
                 checked={consents.chat_history}
                 label="Sohbet geçmişimin saklanmasına rıza veriyorum"
                 onPress={() => toggleConsent('chat_history')}
-                onDetail={() => setLegalDetail('chat')}
+                onDetail={() => setLegalDetail('acik_riza')}
                 disabled={loading}
               />
               <ConsentRow
@@ -501,23 +482,11 @@ export default function RegisterScreen({ navigation }: Props) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-      <Modal visible={legalDetail !== null} animationType="slide" onRequestClose={() => setLegalDetail(null)}>
-        <SafeAreaView style={styles.modalSafe} edges={['top', 'bottom', 'left', 'right']}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {legalDetail ? LEGAL_DETAILS[legalDetail].title : ''}
-            </Text>
-            <Pressable onPress={() => setLegalDetail(null)} hitSlop={8}>
-              <Ionicons name="close" size={24} color={C.text1} />
-            </Pressable>
-          </View>
-          <ScrollView contentContainerStyle={styles.modalContent}>
-            <Text style={styles.modalBody}>
-              {legalDetail ? LEGAL_DETAILS[legalDetail].body : ''}
-            </Text>
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+      <LegalDocumentModal
+        visible={legalDetail !== null}
+        documentId={legalDetail}
+        onClose={() => setLegalDetail(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -615,16 +584,4 @@ const styles = StyleSheet.create({
   button:         { backgroundColor: C.text1, borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginTop: 12 },
   buttonDisabled: { opacity: 0.7 },
   buttonText:     { color: C.bg, fontSize: 16, fontWeight: '700' },
-  modalSafe: { flex: 1, backgroundColor: C.bg },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-  },
-  modalTitle: { flex: 1, color: C.text1, fontSize: 18, fontWeight: '700', marginRight: 12 },
-  modalContent: { padding: 18 },
-  modalBody: { color: C.text2, fontSize: 15, lineHeight: 23 },
 });
