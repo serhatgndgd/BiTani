@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
   },
   bubbleAssistant: { backgroundColor: C.surface, borderBottomLeftRadius: 4 },
   bubbleUser:      { backgroundColor: C.primary,  borderBottomRightRadius: 4 },
-  bubbleText:      { color: '#e0e0e0', fontSize: 15, lineHeight: 22 },
+  bubbleText:      { color: C.text1, fontSize: 15, lineHeight: 22 },
   bubbleTextUser:  { color: C.text1 },
 
   /* Timestamp */
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
   /* Markdown */
   mdGap:     { height: 6 },
   mdListRow: { flexDirection: 'row', alignItems: 'flex-start', paddingLeft: 2 },
-  mdBullet:  { color: '#e0e0e0', fontSize: 15, lineHeight: 22, marginRight: 2 },
+  mdBullet:  { color: C.text1, fontSize: 15, lineHeight: 22, marginRight: 2 },
   mdListBody:{ flex: 1 },
   mdBold:    { fontWeight: '700' },
   mdItalic:  { fontStyle: 'italic' },
@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
   emergencyBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     marginHorizontal: 12, marginBottom: 8, paddingVertical: 14,
-    borderRadius: 14, backgroundColor: '#b91c1c',
+    borderRadius: 14, backgroundColor: C.error,
   },
   emergencyBtnIcon: { fontSize: 18 },
   emergencyBtnText: { color: C.text1, fontSize: 15, fontWeight: '700', flex: 1, textAlign: 'center' },

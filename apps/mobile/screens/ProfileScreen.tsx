@@ -671,7 +671,7 @@ export default function ProfileScreen() {
           style={[styles.checkRow, on && styles.checkRowSelected]}
           onPress={() => void toggleCondition(row)}>
           <Text style={styles.rowName}>{row.name}</Text>
-          <Ionicons name={on ? 'checkbox' : 'square-outline'} size={22} color={on ? '#8ab4ff' : '#aaa'} />
+          <Ionicons name={on ? 'checkbox' : 'square-outline'} size={22} color={on ? C.primary : C.text2} />
         </Pressable>
       );
     },
@@ -712,7 +712,7 @@ export default function ProfileScreen() {
             </View>
             {isActive
               ? <Ionicons name="checkmark-circle" size={22} color="#4a5a7a" />
-              : <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={22} color={selected ? '#8ab4ff' : '#aaa'} />}
+              : <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={22} color={selected ? C.primary : C.text2} />}
           </Pressable>
           {selected ? (
             <TextInput
@@ -755,7 +755,7 @@ export default function ProfileScreen() {
           <Ionicons
             name={isActive ? 'checkmark-circle' : 'add-circle-outline'}
             size={22}
-            color={isActive ? '#8ab4ff' : '#aaa'}
+            color={isActive ? C.primary : C.text2}
           />
         </Pressable>
       );

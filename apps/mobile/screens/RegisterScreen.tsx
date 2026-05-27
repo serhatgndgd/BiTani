@@ -202,8 +202,8 @@ export default function RegisterScreen({ navigation }: Props) {
   const strength = useMemo(() => passwordStrength(password),   [password]);
 
   const strengthColors: Record<Strength, string> = {
-    weak:   '#e53935',
-    medium: '#f59e0b',
+    weak:   C.error,
+    medium: C.warning,
     strong: C.success,
   };
 
