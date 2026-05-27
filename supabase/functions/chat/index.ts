@@ -55,6 +55,19 @@ const INJECTION_PATTERNS: RegExp[] = [
   /unutma|unut/i,
 ]
 
+const ABSOLUTE_EMERGENCY = [
+  'kalp krizi',
+  'inme', 'felç',
+  'intihar', 'kendime zarar', 'yaşamak istemiyorum',
+  'bilinç kaybı', 'bayıldı',
+  'nefes almıyor',
+  'anafilaksi',
+  'kan kaybı', 'çok kan',
+  'zehirlenme', 'çok fazla ilaç içti',
+  'kaza',
+  'bebek nefes almıyor', 'çocuk düştü',
+]
+
 function sanitizeUserInput(text: string, userId?: string): string {
   const trimmed = text.trim()
   const truncated = trimmed.slice(0, 500)
@@ -69,6 +82,89 @@ function sanitizeUserInput(text: string, userId?: string): string {
   }
 
   return truncated
+}
+
+function normalizeForMatch(text: string): string {
+  return text
+    .toLocaleLowerCase('tr')
+    .replace(/[.,!?;:]/g, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a.length === 0) return b.length
+  if (b.length === 0) return a.length
+
+  const matrix = Array.from({ length: b.length + 1 }, () =>
+    Array<number>(a.length + 1).fill(0),
+  )
+
+  for (let i = 0; i <= a.length; i += 1) matrix[0][i] = i
+  for (let j = 0; j <= b.length; j += 1) matrix[j][0] = j
+
+  for (let j = 1; j <= b.length; j += 1) {
+    for (let i = 1; i <= a.length; i += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      matrix[j][i] = Math.min(
+        matrix[j][i - 1] + 1,
+        matrix[j - 1][i] + 1,
+        matrix[j - 1][i - 1] + cost,
+      )
+    }
+  }
+
+  return matrix[b.length][a.length]
+}
+
+function isWordSimilar(word: string, target: string): boolean {
+  if (target.length <= 4) return word === target
+  const distance = levenshtein(word, target)
+  const tolerance = Math.floor(target.length / 4)
+  return distance <= tolerance
+}
+
+function matchesKeywordListFuzzy(message: string, keywords: string[]): boolean {
+  const normalized = normalizeForMatch(message)
+  const words = normalized.split(/\s+/).filter(Boolean)
+
+  for (const keyword of keywords) {
+    const normalizedKeyword = normalizeForMatch(keyword)
+
+    if (!normalizedKeyword.includes(' ')) {
+      for (const word of words) {
+        if (isWordSimilar(word, normalizedKeyword)) return true
+      }
+      continue
+    }
+
+    const keywordWords = normalizedKeyword.split(' ').filter(Boolean)
+    for (let i = 0; i <= words.length - keywordWords.length; i += 1) {
+      const allMatch = keywordWords.every((kw, idx) =>
+        isWordSimilar(words[i + idx] ?? '', kw),
+      )
+      if (allMatch) return true
+    }
+  }
+
+  return false
+}
+
+async function saveChatHistory(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  userId: string,
+  userMessage: string,
+  assistantReply: string,
+): Promise<void> {
+  try {
+    await supabaseAdmin.from('chat_history').insert([
+      { user_id: userId, role: 'user', content: userMessage },
+      { user_id: userId, role: 'assistant', content: assistantReply },
+    ])
+  } catch (error) {
+    console.error('chat-fn:', error)
+  }
 }
 
 async function checkAndIncrementRateLimit(
@@ -253,8 +349,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { messages } = (await req.json()) as {
+    const { messages, is_emergency_flagged } = (await req.json()) as {
       messages: ApiMessage[]
+      is_emergency_flagged?: boolean
     }
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -376,6 +473,34 @@ Deno.serve(async (req) => {
       role: 'user',
       content: sanitizeUserInput(latestMessage.content ?? '', userId),
     }
+    const isEmergencyFlagged = is_emergency_flagged === true
+
+    if (matchesKeywordListFuzzy(currentMessage.content, ABSOLUTE_EMERGENCY)) {
+      const absoluteEmergencyReply = `🚨 ACİL DURUM
+
+Belirttiğin durum hayati tehlike taşıyor.
+
+HEMEN 112'yi ARA.
+
+Telefonu açık tut, operatöre durumu anlat.
+Yanındakine de söyle.
+
+Ben buradayım, ambulans gelene kadar destek olabilirim.
+Ambulans yola çıktıktan sonra bana belirti detaylarını yazabilirsin.`
+
+      await saveChatHistory(
+        supabaseAdmin,
+        userId,
+        currentMessage.content,
+        absoluteEmergencyReply,
+      )
+
+      return new Response(
+        JSON.stringify({ reply: absoluteEmergencyReply, is_emergency: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
     const groqMessages: ApiMessage[] = [...historyMessages, currentMessage]
 
     const groqKey = Deno.env.get('GROQ_API_KEY')
@@ -431,19 +556,10 @@ Deno.serve(async (req) => {
     }
     const safeReply = validation.sanitizedReply
 
-    // ── chat_history'e kaydet (user + assistant) ──────────────────────────────
-    try {
-      await supabaseAdmin.from('chat_history').insert([
-        { user_id: userId, role: 'user', content: currentMessage.content },
-        { user_id: userId, role: 'assistant', content: safeReply },
-      ])
-    } catch (e) {
-      console.error('chat-fn:', e)
-      // Kayıt başarısız olursa asıl cevabı yine de döndür
-    }
+    await saveChatHistory(supabaseAdmin, userId, currentMessage.content, safeReply)
 
     return new Response(
-      JSON.stringify({ reply: safeReply }),
+      JSON.stringify({ reply: safeReply, is_emergency: isEmergencyFlagged }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (e) {
