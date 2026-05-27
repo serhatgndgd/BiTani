@@ -1,10 +1,12 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AuthError } from '@supabase/supabase-js';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -18,12 +20,57 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Wordmark } from '../components/Brand';
 import { supabase } from '../lib/supabase';
-import type { AuthStackParamList } from '../navigation/types';
+import type { AuthStackParamList, ConsentType, PendingConsent } from '../navigation/types';
 import { C } from '../theme';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
 type Strength = 'weak' | 'medium' | 'strong';
+type ConsentKey = 'kvkk_read' | 'saglik_veri' | 'ai_transfer' | 'chat_history' | 'age_18';
+type ConsentState = Record<ConsentKey, boolean>;
+type LegalDetailKey = 'kvkk' | 'saglik' | 'ai' | 'chat';
+
+const INITIAL_CONSENTS: ConsentState = {
+  kvkk_read: false,
+  saglik_veri: false,
+  ai_transfer: false,
+  chat_history: false,
+  age_18: false,
+};
+
+const LEGAL_DETAILS: Record<LegalDetailKey, { title: string; body: string }> = {
+  kvkk: {
+    title: 'KVKK Aydınlatma Metni',
+    body: 'BiTanı akademik bir bitirme projesidir. Kimlik ve sağlık verileri; kişiselleştirilmiş prospektüs bilgisi, ilaç etkileşim uyarısı ve acil yönlendirme amacıyla işlenir. Sağlık verileriniz için ayrı açık rıza alınır.',
+  },
+  saglik: {
+    title: 'Sağlık Verilerinin İşlenmesi',
+    body: 'Boy, kilo, kronik hastalıklar ve kullandığınız ilaçlar KVKK md. 6 kapsamında özel nitelikli kişisel veridir. Bu veriler yalnızca açık rızanızla işlenir.',
+  },
+  ai: {
+    title: 'Yapay Zeka Servisine Veri Aktarımı',
+    body: 'Sohbet özelliğini kullandığınızda mesajlarınız ve ilgili sağlık bağlamınız ABD merkezli yapay zeka servis sağlayıcılarına cevap üretmek amacıyla aktarılabilir. Bu rıza opsiyoneldir; vermezseniz sadece sohbet özelliği devre dışı kalır.',
+  },
+  chat: {
+    title: 'Sohbet Geçmişi Saklanması',
+    body: 'Sohbet geçmişiniz daha tutarlı yardım sunabilmek için saklanabilir. Sağlık verisi içerebileceğinden açık rızanız alınır.',
+  },
+};
+
+function maxAdultBirthDate(): Date {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 18);
+  return d;
+}
+
+function formatDate(date: Date | null): string {
+  if (!date) return 'Doğum tarihini seç';
+  return date.toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function isAtLeast18(date: Date | null): boolean {
+  return date !== null && date.getTime() <= maxAdultBirthDate().getTime();
+}
 
 function mapAuthError(error: AuthError): string {
   const raw = (error.message ?? '').toLowerCase();
@@ -129,13 +176,44 @@ function FocusInput(props: FocusInputProps) {
   );
 }
 
+interface ConsentRowProps {
+  checked: boolean;
+  label: string;
+  onPress: () => void;
+  onDetail?: () => void;
+  disabled?: boolean;
+}
+
+function ConsentRow({ checked, label, onPress, onDetail, disabled }: ConsentRowProps) {
+  return (
+    <View style={styles.consentRow}>
+      <Pressable style={styles.consentMain} onPress={onPress} disabled={disabled}>
+        <Ionicons
+          name={checked ? 'checkbox' : 'square-outline'}
+          size={22}
+          color={checked ? C.primary : C.text3}
+        />
+        <Text style={styles.consentText}>{label}</Text>
+      </Pressable>
+      {onDetail ? (
+        <Pressable onPress={onDetail} disabled={disabled} hitSlop={8}>
+          <Text style={styles.detailText}>Detay</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 // ─── Ana ekran ────────────────────────────────────────────────────────────────
 
 export default function RegisterScreen({ navigation }: Props) {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm]   = useState('');
-  const [kvkk, setKvkk]         = useState(false);
+  const [consents, setConsents] = useState<ConsentState>(INITIAL_CONSENTS);
+  const [birthDate, setBirthDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [legalDetail, setLegalDetail] = useState<LegalDetailKey | null>(null);
   const [error, setError]       = useState<string | null>(null);
   const [loading, setLoading]   = useState(false);
 
@@ -149,6 +227,66 @@ export default function RegisterScreen({ navigation }: Props) {
   };
 
   const barFill = strength === 'weak' ? 0.33 : strength === 'medium' ? 0.66 : 1;
+  const requiredConsentsAccepted =
+    consents.kvkk_read &&
+    consents.saglik_veri &&
+    consents.chat_history &&
+    consents.age_18 &&
+    isAtLeast18(birthDate);
+  const submitDisabled = loading || !requiredConsentsAccepted;
+
+  function toggleConsent(key: ConsentKey) {
+    setConsents((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function acceptAllConsents() {
+    setConsents({
+      kvkk_read: true,
+      saglik_veri: true,
+      ai_transfer: true,
+      chat_history: true,
+      age_18: true,
+    });
+  }
+
+  function buildPendingConsents(): PendingConsent[] {
+    const mapping: Record<ConsentKey, ConsentType> = {
+      kvkk_read: 'kvkk_aydinlatma',
+      saglik_veri: 'saglik_veri',
+      ai_transfer: 'ai_transfer',
+      chat_history: 'chat_history',
+      age_18: 'age_18',
+    };
+    return (Object.keys(consents) as ConsentKey[]).map((key) => ({
+      consent_type: mapping[key],
+      consent_given: consents[key],
+      version: 'v1.0',
+    }));
+  }
+
+  async function saveConsentsForUser(userId: string) {
+    const rows = buildPendingConsents().map((consent) => ({
+      user_id: userId,
+      consent_type: consent.consent_type,
+      consent_given: consent.consent_given,
+      version: consent.version,
+    }));
+    const { error: consentError } = await supabase.from('consent_records').insert(rows);
+    if (consentError) {
+      console.error('register-consents:', consentError);
+      throw new Error('Rıza kayıtları kaydedilemedi. Tekrar deneyin.');
+    }
+  }
+
+  function handleBirthDateChange(_event: DateTimePickerEvent, selected?: Date) {
+    if (Platform.OS !== 'ios') setShowDatePicker(false);
+    if (selected) {
+      setBirthDate(selected);
+      if (selected.getTime() > maxAdultBirthDate().getTime()) {
+        setConsents((prev) => ({ ...prev, age_18: false }));
+      }
+    }
+  }
 
   async function handleSignUp() {
     setError(null);
@@ -165,8 +303,12 @@ export default function RegisterScreen({ navigation }: Props) {
       setError('Şifreler eşleşmiyor.');
       return;
     }
-    if (!kvkk) {
-      setError('Devam etmek için KVKK metnini onaylamalısın.');
+    if (!isAtLeast18(birthDate)) {
+      setError('18 yaşından küçükler uygulamayı kullanamaz.');
+      return;
+    }
+    if (!requiredConsentsAccepted) {
+      setError('Devam etmek için zorunlu rıza kutularını işaretlemelisin.');
       return;
     }
     setLoading(true);
@@ -179,9 +321,12 @@ export default function RegisterScreen({ navigation }: Props) {
         setError(mapAuthError(signError));
         return;
       }
-      if (data.session) return;
+      if (data.session?.user?.id) {
+        await saveConsentsForUser(data.session.user.id);
+        return;
+      }
       if (data.user) {
-        navigation.replace('Otp', { email: trimmed });
+        navigation.replace('Otp', { email: trimmed, pendingConsents: buildPendingConsents() });
         return;
       }
       setError('Kayıt tamamlanamadı. Tekrar dene.');
@@ -275,29 +420,77 @@ export default function RegisterScreen({ navigation }: Props) {
               style={styles.inputGap}
             />
 
-            {/* KVKK */}
+            <Text style={styles.label}>Doğum Tarihi</Text>
             <Pressable
-              style={styles.kvkkRow}
-              onPress={() => setKvkk(!kvkk)}
+              style={styles.dateBtn}
+              onPress={() => setShowDatePicker(true)}
               disabled={loading}
             >
-              <Ionicons
-                name={kvkk ? 'checkbox' : 'square-outline'}
-                size={22}
-                color={kvkk ? C.primary : C.text3}
-              />
-              <Text style={styles.kvkkText}>
-                <Text style={styles.kvkkBold}>KVKK</Text> kapsamında kişisel verilerimin işlenmesini
-                okudum ve kabul ediyorum.
+              <Ionicons name="calendar-outline" size={18} color={C.text2} />
+              <Text style={birthDate ? styles.dateText : styles.datePlaceholder}>
+                {formatDate(birthDate)}
               </Text>
             </Pressable>
+            {birthDate && !isAtLeast18(birthDate) ? (
+              <Text style={styles.error}>18 yaşından küçükler kullanamaz.</Text>
+            ) : null}
+            {showDatePicker ? (
+              <DateTimePicker
+                value={birthDate ?? maxAdultBirthDate()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                maximumDate={maxAdultBirthDate()}
+                onChange={handleBirthDateChange}
+              />
+            ) : null}
+
+            <View style={styles.consentBlock}>
+              <Text style={styles.consentTitle}>Rıza ve Bilgilendirme</Text>
+              <ConsentRow
+                checked={consents.kvkk_read}
+                label="KVKK Aydınlatma Metni'ni okudum"
+                onPress={() => toggleConsent('kvkk_read')}
+                onDetail={() => setLegalDetail('kvkk')}
+                disabled={loading}
+              />
+              <ConsentRow
+                checked={consents.saglik_veri}
+                label="Sağlık verilerimin işlenmesine açık rıza veriyorum"
+                onPress={() => toggleConsent('saglik_veri')}
+                onDetail={() => setLegalDetail('saglik')}
+                disabled={loading}
+              />
+              <ConsentRow
+                checked={consents.ai_transfer}
+                label="AI servisine veri aktarımına rıza veriyorum (opsiyonel)"
+                onPress={() => toggleConsent('ai_transfer')}
+                onDetail={() => setLegalDetail('ai')}
+                disabled={loading}
+              />
+              <ConsentRow
+                checked={consents.chat_history}
+                label="Sohbet geçmişimin saklanmasına rıza veriyorum"
+                onPress={() => toggleConsent('chat_history')}
+                onDetail={() => setLegalDetail('chat')}
+                disabled={loading}
+              />
+              <ConsentRow
+                checked={consents.age_18}
+                label="18 yaşından büyüğüm"
+                onPress={() => toggleConsent('age_18')}
+                disabled={loading}
+              />
+              <Pressable style={styles.acceptAllBtn} onPress={acceptAllConsents} disabled={loading}>
+                <Text style={styles.acceptAllText}>Tümünü Kabul Ediyorum</Text>
+              </Pressable>
+            </View>
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <Pressable
-              style={[styles.button, loading && styles.buttonDisabled]}
+              style={[styles.button, submitDisabled && styles.buttonDisabled]}
               onPress={handleSignUp}
-              disabled={loading}
+              disabled={submitDisabled}
             >
               {loading ? (
                 <ActivityIndicator color={C.bg} />
@@ -308,6 +501,23 @@ export default function RegisterScreen({ navigation }: Props) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <Modal visible={legalDetail !== null} animationType="slide" onRequestClose={() => setLegalDetail(null)}>
+        <SafeAreaView style={styles.modalSafe} edges={['top', 'bottom', 'left', 'right']}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              {legalDetail ? LEGAL_DETAILS[legalDetail].title : ''}
+            </Text>
+            <Pressable onPress={() => setLegalDetail(null)} hitSlop={8}>
+              <Ionicons name="close" size={24} color={C.text1} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            <Text style={styles.modalBody}>
+              {legalDetail ? LEGAL_DETAILS[legalDetail].body : ''}
+            </Text>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -332,6 +542,21 @@ const styles = StyleSheet.create({
   inputGap:    { marginBottom: 16 },
   inputGapSm:  { marginBottom: 8 },
 
+  dateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 16,
+  },
+  dateText: { color: C.text1, fontSize: 15 },
+  datePlaceholder: { color: C.text3, fontSize: 15 },
+
   /* Kurallar */
   rules:  { marginBottom: 12 },
   rule:   { color: C.text3, fontSize: 13, marginBottom: 4 },
@@ -355,9 +580,51 @@ const styles = StyleSheet.create({
   kvkkText: { flex: 1, color: C.text2, fontSize: 13, lineHeight: 20 },
   kvkkBold: { color: C.text1, fontWeight: '700' },
 
+  consentBlock: {
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 4,
+    marginBottom: 12,
+    gap: 10,
+  },
+  consentTitle: { color: C.text1, fontSize: 15, fontWeight: '700', marginBottom: 2 },
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  consentMain: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  consentText: { flex: 1, color: C.text2, fontSize: 13, lineHeight: 19 },
+  detailText: { color: C.primary, fontSize: 12, fontWeight: '700' },
+  acceptAllBtn: {
+    borderWidth: 1,
+    borderColor: C.primary,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  acceptAllText: { color: C.primary, fontSize: 13, fontWeight: '700' },
+
   error: { color: C.error, fontSize: 14, marginBottom: 12 },
 
   button:         { backgroundColor: C.text1, borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginTop: 12 },
   buttonDisabled: { opacity: 0.7 },
   buttonText:     { color: C.bg, fontSize: 16, fontWeight: '700' },
+  modalSafe: { flex: 1, backgroundColor: C.bg },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  modalTitle: { flex: 1, color: C.text1, fontSize: 18, fontWeight: '700', marginRight: 12 },
+  modalContent: { padding: 18 },
+  modalBody: { color: C.text2, fontSize: 15, lineHeight: 23 },
 });

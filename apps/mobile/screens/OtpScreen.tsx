@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useOtpFlow } from '../context/OtpFlowContext';
 import { supabase } from '../lib/supabase';
-import type { AuthStackParamList } from '../navigation/types';
+import type { AuthStackParamList, PendingConsent } from '../navigation/types';
 import { C } from '../theme';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Otp'>;
@@ -48,8 +48,23 @@ async function waitForAuthenticatedSession(
   return null;
 }
 
+async function savePendingConsents(userId: string, pendingConsents?: PendingConsent[]): Promise<void> {
+  if (!pendingConsents || pendingConsents.length === 0) return;
+  const rows = pendingConsents.map((consent) => ({
+    user_id: userId,
+    consent_type: consent.consent_type,
+    consent_given: consent.consent_given,
+    version: consent.version,
+  }));
+  const { error } = await supabase.from('consent_records').insert(rows);
+  if (error) {
+    console.error('otp-consents:', error);
+    throw new Error('Rıza kayıtları kaydedilemedi. Tekrar deneyin.');
+  }
+}
+
 export default function OtpScreen({ route }: Props) {
-  const { email } = route.params;
+  const { email, pendingConsents } = route.params;
   const otpFlow = useOtpFlow();
   const [digits, setDigits] = useState<string[]>(() => Array(CELL_COUNT).fill(''));
   const [error, setError] = useState<string | null>(null);
@@ -149,6 +164,7 @@ export default function OtpScreen({ route }: Props) {
         setError('Oturum henüz hazır değil. Birkaç saniye sonra tekrar dene.');
         return;
       }
+      await savePendingConsents(nextSession.user.id, pendingConsents);
       await onCompleteAfterSession();
     } finally {
       setSessionSyncing(false);
