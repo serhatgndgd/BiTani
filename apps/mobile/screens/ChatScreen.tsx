@@ -232,8 +232,8 @@ function MessageBubble({ message }: { message: Message }) {
     <View style={[styles.bubbleRow, isUser && styles.bubbleRowUser]}>
       <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
         {content}
-        {/* Timestamp */}
-        <Text style={[styles.bubbleTs, isUser ? styles.bubbleTsLeft : styles.bubbleTsRight]}>
+        {/* Timestamp — sağ alt (standart mesajlaşma UX) */}
+        <Text style={styles.bubbleTs}>
           {fmtTime(message.ts)}
         </Text>
       </View>
@@ -484,10 +484,8 @@ const styles = StyleSheet.create({
   bubbleText:      { color: C.text1, fontSize: 15, lineHeight: 22 },
   bubbleTextUser:  { color: C.text1 },
 
-  /* Timestamp */
-  bubbleTs:      { fontSize: 10, color: C.text3, marginTop: 5 },
-  bubbleTsLeft:  { textAlign: 'left'  },  // kullanıcı mesajı (sağ balon) → solda
-  bubbleTsRight: { textAlign: 'right' },  // asistan mesajı (sol balon) → sağda
+  /* Timestamp — sağ alta hizalı (WhatsApp/Telegram standardı) */
+  bubbleTs: { fontSize: 10, color: C.text3, marginTop: 5, textAlign: 'right' },
 
   /* Markdown */
   mdGap:     { height: 6 },
