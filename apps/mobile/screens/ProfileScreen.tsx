@@ -376,8 +376,10 @@ export default function ProfileScreen() {
         },
       });
       if (error) throw error;
-      await supabase.auth.signOut();
+      // Modal önce kapat; auth.signOut() component'ı unmount eder —
+      // sonraki setState unmounted component uyarısını önler.
       setDeleteModalVisible(false);
+      await supabase.auth.signOut();
     } catch (error) {
       console.error('delete-account:', error);
       setDeleteAccountError(DELETE_ACCOUNT_ERROR_TEXT);
@@ -617,6 +619,7 @@ export default function ProfileScreen() {
     }
 
     await reloadMedications();
+    void clearChatHistory(); // addSelectedMedications ile tutarlı: kullanıcı bağlamı değişti
     closeMedsModal();
   }, [userId, selectedMed, dosageInput, closeMedsModal, reloadMedications, clearChatHistory]);
 
@@ -763,20 +766,24 @@ export default function ProfileScreen() {
   // ── Loading / hata ───────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={C.text1} />
-      </View>
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={C.text1} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (loadError) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.err}>{loadError}</Text>
-        <Pressable style={styles.retryBtn} onPress={() => void loadData()}>
-          <Text style={styles.retryBtnText}>Tekrar dene</Text>
-        </Pressable>
-      </View>
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
+        <View style={styles.center}>
+          <Text style={styles.err}>{loadError}</Text>
+          <Pressable style={styles.retryBtn} onPress={() => void loadData()}>
+            <Text style={styles.retryBtnText}>Tekrar dene</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
     );
   }
 
