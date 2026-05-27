@@ -90,7 +90,10 @@ const ABSOLUTE_EMERGENCY = [
   'bebek nefes almıyor', 'çocuk düştü',
 ]
 
-function sanitizeUserInput(text: string, userId?: string): string {
+function sanitizeUserInput(
+  text: string,
+  userId?: string,
+): { safe: boolean; cleaned: string; reason?: string } {
   const trimmed = text.trim()
   const truncated = trimmed.slice(0, 500)
 
@@ -101,9 +104,20 @@ function sanitizeUserInput(text: string, userId?: string): string {
       pattern: matched.source,
       snippet: truncated.slice(0, 100),
     })
+    return {
+      safe: false,
+      cleaned: truncated,
+      reason: 'Mesajınız güvenlik kontrolünden geçemedi.',
+    }
   }
 
-  return truncated
+  return { safe: true, cleaned: truncated }
+}
+
+// Geçmiş mesajlar için ayrı sanitizer — injection check yok (zaten doğrulandı),
+// sadece uzunluk sınırı uygular (asistan yanıtları 500 char'ı aşabilir).
+function sanitizeHistoryContent(text: string): string {
+  return (text ?? '').trim().slice(0, 2000)
 }
 
 function normalizeForMatch(text: string): string {
@@ -477,11 +491,13 @@ Deno.serve(async (req) => {
 
       if (historyRows && historyRows.length > 0) {
         // DESC'ten ASC'ye çevir (en eski önce → Groq için doğru sıra)
+        // sanitizeHistoryContent: sadece uzunluk sınırı, injection check yok
+        // (bu mesajlar kaydedilmeden önce zaten doğrulandı)
         historyMessages = (historyRows as ChatHistoryRow[])
           .reverse()
           .map((r) => ({
             role: r.role as 'user' | 'assistant',
-            content: sanitizeUserInput(r.content ?? '', userId),
+            content: sanitizeHistoryContent(r.content ?? ''),
           }))
       }
     } catch (e) {
@@ -493,9 +509,22 @@ Deno.serve(async (req) => {
     // ── Groq'a gönderilecek mesaj dizisi ──────────────────────────────────────
     // DB geçmişi + bu oturumun son (yeni) kullanıcı mesajı
     const latestMessage = messages[messages.length - 1]
+    const inputResult = sanitizeUserInput(latestMessage.content ?? '', userId)
+
+    if (!inputResult.safe) {
+      // Injection tespit edildi — mesajı LLM'e iletme, kullanıcıya bildir
+      return new Response(
+        JSON.stringify({
+          reply: 'Mesajınız işlenemedi. Lütfen farklı bir şekilde sormayı deneyin.',
+          is_emergency: false,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
     const currentMessage: ApiMessage = {
       role: 'user',
-      content: sanitizeUserInput(latestMessage.content ?? '', userId),
+      content: inputResult.cleaned,
     }
     const isEmergencyFlagged = is_emergency_flagged === true
 
