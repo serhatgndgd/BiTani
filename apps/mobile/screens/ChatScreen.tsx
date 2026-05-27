@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ChatFooterNotice } from '../components/ChatFooterNotice';
 import { LegalDocumentModal } from '../components/LegalDocumentModal';
 import { supabase } from '../lib/supabase';
 import type { MainTabParamList } from '../navigation/types';
@@ -432,6 +433,8 @@ export default function ChatScreen() {
             <Ionicons name="chevron-forward" size={18} color={C.text1} />
           </Pressable>
         )}
+
+        <ChatFooterNotice />
 
         <View style={styles.inputRow}>
           <TextInput
