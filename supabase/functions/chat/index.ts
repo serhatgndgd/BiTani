@@ -248,13 +248,79 @@ async function checkAndIncrementRateLimit(
   return { allowed: true, requestCount: nextCount, windowStart: currentWindowStart }
 }
 
+// Yaygın Türk ilaç etkin maddeleri ve marka isimleri
+// (TİTCK veritabanında sık geçen, prospektüs dışı öneri riskli olanlar)
+const COMMON_DRUG_NAMES: string[] = [
+  // Ağrı / Ateş
+  'parol', 'parasetamol', 'asetaminofen',
+  'aspirin', 'asetilsalisilik',
+  'ibuprofen', 'advil', 'nurofen', 'brufen',
+  'naproksen', 'apranax', 'naprosyn',
+  'diklofenak', 'voltaren', 'cataflam',
+  'majezik', 'flurbiprofen',
+  'arveles', 'deksketoprofen',
+  'dolorex',
+  // Antibiyotik
+  'amoksisilin', 'amoxil', 'largopen',
+  'amoksisilin-klavulanat', 'augmentin',
+  'azitromisin', 'azitro', 'zithromax',
+  'klaritromisin', 'klacid', 'klaritro',
+  'sefalosporin', 'sefuroksim', 'zinnat',
+  'siprofloksasin', 'cipro', 'siproks',
+  'doksisiklin',
+  // Kardiyovasküler
+  'metoprolol', 'beloc', 'lopressor',
+  'bisoprolol', 'concor',
+  'amlodipin', 'norvasc', 'amlopin',
+  'kaptopril', 'kapril',
+  'enalapril', 'renitec',
+  'lisinopril',
+  'losartan', 'cozaar', 'tozaar',
+  'atorvastatin', 'lipitor', 'torvast',
+  'rosuvastatin', 'crestor',
+  // Diyabet
+  'metformin', 'glucophage', 'glifor',
+  'insülin', 'insulin', 'lantus', 'novorapid', 'humalog',
+  'glipizit', 'minidiab',
+  'sitagliptin', 'januvia',
+  // Psikiyatri
+  'lustral', 'sertralin',
+  'cipralex', 'essitalopram', 'essitalopram',
+  'prozac', 'fluoksetin',
+  'seroxat', 'paroksetin',
+  'venlafaksin', 'efexor',
+  'alprazolam', 'xanax',
+  'diazepam', 'valium',
+  // Mide / GİS
+  'omeprazol', 'losec', 'prilosec',
+  'pantoprazol', 'pantpas', 'controloc',
+  'lansoprazol', 'lansor',
+  'ranitidin', 'zantac',
+  // Biyolojik / Romatizma
+  'humira', 'adalimumab',
+  'enbrel', 'etanersept',
+  'remicade', 'infliksimab',
+  'metotrexat', 'metotreksat',
+]
+
+// LLM çıktısında aktif ilaç önerisi içerdiğini gösteren Türkçe kalıplar
+const RECOMMENDATION_PATTERNS: RegExp[] = [
+  /\b(kullan(?:abilir|ın|abilirsin|manızı öneririm))/i,
+  /\b(alabilirsiniz|alın|almayı deneyin)/i,
+  /\b(iç(?:ebilirsiniz|in|ebilirsin))/i,
+  /\b(öneri(?:rim|yorum)|tavsiye\s+ederim|tavsiye\s+ediyorum)/i,
+  /\b(başvurabilirsiniz|deneyebilirsiniz|tercih\s+edebilirsiniz)/i,
+]
+
 function validateLLMOutput(
   reply: string,
   userMeds: string[],
 ): { safe: boolean; violations: string[]; sanitizedReply: string } {
   const trimmedReply = reply.trim()
   const violations: string[] = []
+  let sanitizedReply = trimmedReply
 
+  // ── 1. Forbidden pattern kontrolü (mevcut) ───────────────────────────────
   for (const pattern of FORBIDDEN_PATTERNS) {
     pattern.lastIndex = 0
     if (pattern.test(trimmedReply)) {
@@ -262,16 +328,46 @@ function validateLLMOutput(
     }
   }
 
-  const _ = userMeds
   if (violations.length > 0) {
-    return {
-      safe: false,
-      violations,
-      sanitizedReply: sanitizeReply(trimmedReply, violations),
+    sanitizedReply = sanitizeReply(sanitizedReply, violations)
+  }
+
+  // ── 2. Kullanıcı ilaçlarında olmayan ilaç önerisi tespiti ─────────────────
+  // Kullanıcının mevcut ilaçlarını normalize et (ilac_adi + dozaj içerebilir)
+  const userMedsNormalized = userMeds.map((m) => m.toLocaleLowerCase('tr'))
+
+  const replyLower = trimmedReply.toLocaleLowerCase('tr')
+  const hasRecommendation = RECOMMENDATION_PATTERNS.some((p) => p.test(replyLower))
+
+  if (hasRecommendation) {
+    for (const drug of COMMON_DRUG_NAMES) {
+      const drugLower = drug.toLocaleLowerCase('tr')
+      if (!replyLower.includes(drugLower)) continue
+
+      // Kullanıcının aktif ilaçlarından biri mi?
+      const userHasDrug = userMedsNormalized.some((userMed) =>
+        userMed.includes(drugLower) || drugLower.includes(userMed.split(' ')[0]),
+      )
+
+      if (!userHasDrug) {
+        const drugViolation = `unauthorized-drug-recommendation:${drug}`
+        violations.push(drugViolation)
+        // İlaç adını sansürle — kısmi eşleşmeleri de yakala
+        const escapedDrug = drug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const drugPattern = new RegExp(`\\b${escapedDrug}\\w*\\b`, 'gi')
+        sanitizedReply = sanitizedReply.replace(
+          drugPattern,
+          '[ilaç önerisi için eczacınıza danışın]',
+        )
+      }
     }
   }
 
-  return { safe: true, violations: [], sanitizedReply: trimmedReply }
+  return {
+    safe: violations.length === 0,
+    violations,
+    sanitizedReply,
+  }
 }
 
 function sanitizeReply(reply: string, violations: string[]): string {
