@@ -30,6 +30,17 @@ const ACIL_KELIMELER = [
   'alerji şoku', 'anafilaksi',
   'kendime zarar', 'intihar', 'yaşamak istemiyorum',
   'kan kaybı', 'kaza', 'bilinç kaybı', 'bayılıyorum',
+  'yutkunamıyorum', 'yutamıyorum',
+  'çok şiddetli baş ağrısı', 'en kötü baş ağrım',
+  'gözlerim çift görüyor',
+  'yüzüm düştü', 'yüzümde uyuşma',
+  'kol asılıyor', 'kolum çalışmıyor',
+  'şiddetli karın ağrısı',
+  'sırt ağrısı göğse yayılıyor',
+  'çok fazla ilaç içtim', 'ilaçları içtim',
+  'zehirlendim',
+  'çocuğum düştü', 'bebek nefes almıyor',
+  'çocuk ilaç içti',
 ];
 
 // ─── Tipler ───────────────────────────────────────────────────────────────────
