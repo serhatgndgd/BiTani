@@ -303,7 +303,19 @@ export default function RegisterScreen({ navigation }: Props) {
         return;
       }
       if (data.session?.user?.id) {
-        await saveConsentsForUser(data.session.user.id);
+        try {
+          await saveConsentsForUser(data.session.user.id);
+          // Başarılı — auth listener Onboarding'e yönlendirecek
+        } catch (consentError) {
+          console.error('signup-consent-save:', consentError);
+          // Rızasız hesap bırakmamak için oturumu kapat
+          try {
+            await supabase.auth.signOut();
+          } catch (signOutError) {
+            console.error('signup-consent-cleanup-signout:', signOutError);
+          }
+          setError('Rıza kayıtlarınız kaydedilemedi. Lütfen tekrar deneyin.');
+        }
         return;
       }
       if (data.user) {
@@ -311,6 +323,9 @@ export default function RegisterScreen({ navigation }: Props) {
         return;
       }
       setError('Kayıt tamamlanamadı. Tekrar dene.');
+    } catch (unexpectedError) {
+      console.error('signup-unexpected:', unexpectedError);
+      setError('Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.');
     } finally {
       setLoading(false);
     }
