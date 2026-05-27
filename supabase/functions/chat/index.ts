@@ -25,6 +25,33 @@ interface ChatHistoryRow {
   content: string
 }
 
+const INJECTION_PATTERNS: RegExp[] = [
+  /ignore\s+(previous|all|system|önceki)/i,
+  /you\s+are\s+now/i,
+  /pretend\s+you/i,
+  /önceki\s+talimat/i,
+  /sistem\s+prompt/i,
+  /\[system\]/i,
+  /<\|system\|>/i,
+  /unutma|unut/i,
+]
+
+function sanitizeUserInput(text: string, userId?: string): string {
+  const trimmed = text.trim()
+  const truncated = trimmed.slice(0, 500)
+
+  const matched = INJECTION_PATTERNS.find((pattern) => pattern.test(truncated))
+  if (matched) {
+    console.warn('injection-attempt:', {
+      userId: userId ?? 'unknown',
+      pattern: matched.source,
+      snippet: truncated.slice(0, 100),
+    })
+  }
+
+  return truncated
+}
+
 function computeAge(birthDate: string | null): string {
   if (!birthDate) return 'belirtilmemiş'
   const birth = new Date(birthDate)
@@ -188,7 +215,11 @@ Deno.serve(async (req) => {
 
     // ── Groq'a gönderilecek mesaj dizisi ──────────────────────────────────────
     // DB geçmişi + bu oturumun son (yeni) kullanıcı mesajı
-    const currentMessage = messages[messages.length - 1]
+    const latestMessage = messages[messages.length - 1]
+    const currentMessage: ApiMessage = {
+      role: 'user',
+      content: sanitizeUserInput(latestMessage.content ?? '', userId),
+    }
     const groqMessages: ApiMessage[] = [...historyMessages, currentMessage]
 
     const groqKey = Deno.env.get('GROQ_API_KEY')
