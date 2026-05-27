@@ -28,10 +28,10 @@ interface ChatHistoryRow {
   content: string
 }
 
-interface RateLimitRow {
-  user_id: string
-  request_count: number | null
-  window_start: string | null
+interface RateLimitRpcRow {
+  allowed: boolean
+  request_count: number
+  window_start: string
 }
 
 const FORBIDDEN_PATTERNS: RegExp[] = [
@@ -88,6 +88,29 @@ const ABSOLUTE_EMERGENCY = [
   'zehirlenme', 'çok fazla ilaç içti',
   'kaza',
   'bebek nefes almıyor', 'çocuk düştü',
+]
+
+// ChatScreen'deki ACIL_KELIMELER'in hayati tehlike taşımayan alt kümesi.
+// Server bu listeyi client'tan bağımsız olarak tespit eder → O-8 fix.
+const SOFT_EMERGENCY = [
+  'acil', 'hastane', '112', 'ambulans', 'bayıl', 'ambulan',
+  'göğüs ağrısı', 'çarpıntı',
+  'uyuşma', 'konuşamıyorum', 'görme kaybı',
+  'nefes alamıyorum', 'nefes darlığı', 'boğuluyorum',
+  'şeker düştü', 'hipoglisemi', 'insülin şoku',
+  'alerji şoku',
+  'bayılıyorum',
+  'yutkunamıyorum', 'yutamıyorum',
+  'en kötü baş ağrım', 'patlar gibi baş ağrısı',
+  'gözlerim çift görüyor',
+  'yüzüm düştü', 'yüzümde uyuşma',
+  'kol asılıyor', 'kolum çalışmıyor',
+  'göğüse vuran karın ağrısı',
+  'sırt ağrısı göğse yayılıyor',
+  'ilaçları içtim',
+  'zehirlendim',
+  'çocuğum düştü',
+  'çocuk ilaç içti',
 ]
 
 function sanitizeUserInput(
@@ -203,49 +226,29 @@ async function saveChatHistory(
   }
 }
 
-async function checkAndIncrementRateLimit(
+// increment_rate_limit RPC: tek atomik SQL → race condition yok
+async function checkRateLimit(
   supabaseAdmin: ReturnType<typeof createClient>,
   userId: string,
-): Promise<{ allowed: boolean; requestCount: number; windowStart: string }> {
-  const now = new Date()
-  const nowIso = now.toISOString()
-
-  const { data, error } = await supabaseAdmin
-    .from('rate_limits')
-    .select('user_id, request_count, window_start')
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if (error) {
-    console.error('chat-fn:', error)
-    return { allowed: true, requestCount: 0, windowStart: nowIso }
-  }
-
-  const row = data as RateLimitRow | null
-  const currentCount = row?.request_count ?? 0
-  const currentWindowStart = row?.window_start ?? nowIso
-  const elapsedSeconds = Math.floor((now.getTime() - new Date(currentWindowStart).getTime()) / 1000)
-
-  if (!row || elapsedSeconds > RATE_LIMIT_WINDOW_SECONDS) {
-    await supabaseAdmin.from('rate_limits').upsert({
-      user_id: userId,
-      request_count: 1,
-      window_start: nowIso,
+): Promise<{ allowed: boolean }> {
+  try {
+    const { data, error } = await supabaseAdmin.rpc('increment_rate_limit', {
+      p_user_id: userId,
+      p_window_seconds: RATE_LIMIT_WINDOW_SECONDS,
+      p_max_requests: RATE_LIMIT_MAX_REQUESTS,
     })
-    return { allowed: true, requestCount: 1, windowStart: nowIso }
-  }
 
-  if (currentCount >= RATE_LIMIT_MAX_REQUESTS) {
-    return { allowed: false, requestCount: currentCount, windowStart: currentWindowStart }
-  }
+    if (error) {
+      console.error('chat-fn: rate-limit-rpc:', error)
+      return { allowed: true } // fail open: RPC hatası bloklamaz
+    }
 
-  const nextCount = currentCount + 1
-  await supabaseAdmin.from('rate_limits').upsert({
-    user_id: userId,
-    request_count: nextCount,
-    window_start: currentWindowStart,
-  })
-  return { allowed: true, requestCount: nextCount, windowStart: currentWindowStart }
+    const row = (Array.isArray(data) ? data[0] : data) as RateLimitRpcRow | null
+    return { allowed: row?.allowed !== false }
+  } catch (e) {
+    console.error('chat-fn: rate-limit-rpc:', e)
+    return { allowed: true }
+  }
 }
 
 // Yaygın Türk ilaç etkin maddeleri ve marka isimleri
@@ -520,13 +523,9 @@ Deno.serve(async (req) => {
 
     const userId = user.id
 
-    const rateLimit = await checkAndIncrementRateLimit(supabaseAdmin, userId)
+    const rateLimit = await checkRateLimit(supabaseAdmin, userId)
     if (!rateLimit.allowed) {
-      console.warn('rate-limit-exceeded:', {
-        userId,
-        requestCount: rateLimit.requestCount,
-        windowStart: rateLimit.windowStart,
-      })
+      console.warn('rate-limit-exceeded:', { userId })
       return new Response(
         JSON.stringify({ error: RATE_LIMIT_ERROR }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -624,6 +623,10 @@ Deno.serve(async (req) => {
     }
     const isEmergencyFlagged = is_emergency_flagged === true
 
+    // Server-side soft emergency tespiti (client flag'den bağımsız — O-8)
+    const serverDetectedEmergency = matchesKeywordListFuzzy(currentMessage.content, SOFT_EMERGENCY)
+    const finalEmergencyFlag = isEmergencyFlagged || serverDetectedEmergency
+
     if (matchesKeywordListFuzzy(currentMessage.content, ABSOLUTE_EMERGENCY)) {
       const absoluteEmergencyReply = `🚨 ACİL DURUM
 
@@ -676,7 +679,7 @@ Ambulans yola çıktıktan sonra bana belirti detaylarını yazabilirsin.`
         messages: [
           {
             role: 'system',
-            content: buildSystemPrompt(profile, conditions, medications, isEmergencyFlagged),
+            content: buildSystemPrompt(profile, conditions, medications, finalEmergencyFlag),
           },
           ...groqMessages,
         ],
@@ -711,7 +714,7 @@ Ambulans yola çıktıktan sonra bana belirti detaylarını yazabilirsin.`
     await saveChatHistory(supabaseAdmin, userId, currentMessage.content, safeReply)
 
     return new Response(
-      JSON.stringify({ reply: safeReply, is_emergency: isEmergencyFlagged }),
+      JSON.stringify({ reply: safeReply, is_emergency: finalEmergencyFlag }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (e) {
