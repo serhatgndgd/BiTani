@@ -415,7 +415,7 @@ export default function HomeScreen() {
           <Ionicons name="chevron-forward" size={18} color={C.text3} />
         </Pressable>
 
-        {/* ── Asistan CTA ── */}
+        {/* ── Sohbet CTA ── */}
         <Pressable
           style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
           onPress={() => navigation.navigate('Chat')}
@@ -424,8 +424,8 @@ export default function HomeScreen() {
             <Ionicons name="chatbubble-ellipses" size={22} color={C.text1} />
           </View>
           <View style={styles.ctaText}>
-            <Text style={styles.ctaTitle}>Asistana Sor</Text>
-            <Text style={styles.ctaSub}>Sağlık sorularınız için yapay zeka asistanı</Text>
+            <Text style={styles.ctaTitle}>Bilgi Rehberine Sor</Text>
+            <Text style={styles.ctaSub}>Sağlık sorularınız için yapay zeka destekli rehber</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.45)" />
         </Pressable>

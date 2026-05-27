@@ -278,7 +278,7 @@ export default function ChatScreen() {
     if (!user?.id) {
       setMessages([{
         id: 'welcome', role: 'assistant', ts: Date.now(),
-        content: 'Merhaba! Ben BiTanı sağlık asistanınım. Sağlıkla ilgili sorularını yanıtlamaya hazırım.',
+        content: 'Merhaba! Ben BiTanı sağlık bilgi rehberiyim. Sağlıkla ilgili sorularında yardımcı olmaya hazırım.',
       }]);
       setLoadingProfile(false);
       return;
@@ -289,8 +289,8 @@ export default function ChatScreen() {
 
     const firstName = (profile?.full_name as string | null)?.split(' ')[0] ?? '';
     const greeting  = firstName
-      ? `Merhaba ${firstName}! Ben BiTanı sağlık asistanınım. Sağlıkla ilgili sorularını yanıtlamaya hazırım.`
-      : 'Merhaba! Ben BiTanı sağlık asistanınım. Sağlıkla ilgili sorularını yanıtlamaya hazırım.';
+      ? `Merhaba ${firstName}! Ben BiTanı sağlık bilgi rehberiyim. Sağlıkla ilgili sorularında yardımcı olmaya hazırım.`
+      : 'Merhaba! Ben BiTanı sağlık bilgi rehberiyim. Sağlıkla ilgili sorularında yardımcı olmaya hazırım.';
 
     setMessages([{ id: 'welcome', role: 'assistant', content: greeting, ts: Date.now() }]);
     setLoadingProfile(false);
