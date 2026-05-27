@@ -1,6 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const GENERIC_CHAT_ERROR = 'Asistan yanıtı alınamadı. Lütfen tekrar deneyin.'
+const RATE_LIMIT_ERROR = 'Çok fazla mesaj gönderdiniz. Lütfen 1 dakika bekleyin.'
+const RATE_LIMIT_WINDOW_SECONDS = 60
+const RATE_LIMIT_MAX_REQUESTS = 10
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,6 +26,12 @@ interface ApiMessage {
 interface ChatHistoryRow {
   role: string
   content: string
+}
+
+interface RateLimitRow {
+  user_id: string
+  request_count: number | null
+  window_start: string | null
 }
 
 const INJECTION_PATTERNS: RegExp[] = [
@@ -50,6 +59,51 @@ function sanitizeUserInput(text: string, userId?: string): string {
   }
 
   return truncated
+}
+
+async function checkAndIncrementRateLimit(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<{ allowed: boolean; requestCount: number; windowStart: string }> {
+  const now = new Date()
+  const nowIso = now.toISOString()
+
+  const { data, error } = await supabaseAdmin
+    .from('rate_limits')
+    .select('user_id, request_count, window_start')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('chat-fn:', error)
+    return { allowed: true, requestCount: 0, windowStart: nowIso }
+  }
+
+  const row = data as RateLimitRow | null
+  const currentCount = row?.request_count ?? 0
+  const currentWindowStart = row?.window_start ?? nowIso
+  const elapsedSeconds = Math.floor((now.getTime() - new Date(currentWindowStart).getTime()) / 1000)
+
+  if (!row || elapsedSeconds > RATE_LIMIT_WINDOW_SECONDS) {
+    await supabaseAdmin.from('rate_limits').upsert({
+      user_id: userId,
+      request_count: 1,
+      window_start: nowIso,
+    })
+    return { allowed: true, requestCount: 1, windowStart: nowIso }
+  }
+
+  if (currentCount >= RATE_LIMIT_MAX_REQUESTS) {
+    return { allowed: false, requestCount: currentCount, windowStart: currentWindowStart }
+  }
+
+  const nextCount = currentCount + 1
+  await supabaseAdmin.from('rate_limits').upsert({
+    user_id: userId,
+    request_count: nextCount,
+    window_start: currentWindowStart,
+  })
+  return { allowed: true, requestCount: nextCount, windowStart: currentWindowStart }
 }
 
 function computeAge(birthDate: string | null): string {
@@ -145,6 +199,19 @@ Deno.serve(async (req) => {
     }
 
     const userId = user.id
+
+    const rateLimit = await checkAndIncrementRateLimit(supabaseAdmin, userId)
+    if (!rateLimit.allowed) {
+      console.warn('rate-limit-exceeded:', {
+        userId,
+        requestCount: rateLimit.requestCount,
+        windowStart: rateLimit.windowStart,
+      })
+      return new Response(
+        JSON.stringify({ error: RATE_LIMIT_ERROR }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
 
     // ── Kullanıcı profili, hastalıklar, ilaçlar ──────────────────────────────
     let profile: Profile | null = null
