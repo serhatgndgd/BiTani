@@ -163,7 +163,7 @@ function parseMd(text: string): MdLine[] {
 
 // ─── Yardımcı ─────────────────────────────────────────────────────────────────
 
-function containsAcilKeyword(text: string): boolean {
+function detectEmergency(text: string): boolean {
   const normalized = normalizeForMatch(text);
   const words = normalized.split(/\s+/).filter(Boolean);
 
@@ -332,8 +332,12 @@ export default function ChatScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Oturum doğrulanamadı.');
 
+      const isEmergency = detectEmergency(text);
       const { data, error } = await supabase.functions.invoke('chat', {
-        body: { messages: nextApiMessages },
+        body: {
+          messages: nextApiMessages,
+          is_emergency_flagged: isEmergency,
+        },
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
@@ -341,13 +345,16 @@ export default function ChatScreen() {
       });
       if (error) throw error;
 
-      const reply = (data as { reply: string }).reply;
+      const payload = data as { reply: string; is_emergency?: boolean };
+      const reply = payload.reply;
       if (!reply) throw new Error('server-empty-reply');
 
       setMessages((prev) => [...prev, { id: `${msgId}-a`, role: 'assistant', content: reply, ts: Date.now() }]);
       setApiMessages([...nextApiMessages, { role: 'assistant', content: reply }]);
 
-      if (containsAcilKeyword(text) || containsAcilKeyword(reply)) setShowEmergency(true);
+      if (isEmergency || payload.is_emergency === true || detectEmergency(reply)) {
+        setShowEmergency(true);
+      }
     } catch (error) {
       console.error('chat-screen:', error);
       setSendError(mapChatError(error));

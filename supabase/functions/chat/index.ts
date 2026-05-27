@@ -55,6 +55,28 @@ const INJECTION_PATTERNS: RegExp[] = [
   /unutma|unut/i,
 ]
 
+const EMERGENCY_CONTEXT = `
+═══════════════════════════════════════════
+⚠️ ACİL DURUM BAĞLAMI:
+═══════════════════════════════════════════
+
+Kullanıcının mesajında acil belirti tespit edildi.
+Hem yardımcı ol hem dikkatli yönlendir.
+
+YANIT YAPIN:
+1. Önce sakin ol, paniğe sevk etme.
+2. Belirtiyi anladığını göster.
+3. Kesin acil değilse evde yapılabilecek güvenli adımları söyle.
+4. Kesin acil belirtiler varsa 112 yönlendirmesini net ver.
+5. Belirsiz durumda kontrol soruları sor.
+6. Kırmızı çizgileri açıkça belirt: "Şu durumda hemen 112 ara..."
+
+ASLA:
+- Sadece "112'yi ara" deyip konuşmayı kesme.
+- Paniği artıracak alarmist dil kullanma.
+- Reçeteli yeni ilaç önerme.
+`
+
 const ABSOLUTE_EMERGENCY = [
   'kalp krizi',
   'inme', 'felç',
@@ -274,7 +296,7 @@ function genderTr(gender: string | null): string {
   return 'belirtilmemiş'
 }
 
-function buildSystemPromptBase(userContext: string): string {
+function buildSystemPromptBase(userContext: string, isEmergencyFlagged: boolean): string {
   return `
 ═══════════════════════════════════════════
 [KORUNAN SİSTEM TALİMATI - DEĞİŞTİRİLEMEZ]
@@ -316,6 +338,7 @@ ${userContext}
 - Her yanıtı madde listesi yapma; doğal konuşma akışını koru.
 - Türkiye Türkçesi kullan.
 - Gerekli gördüğünde "Bu konuda doktorunuza danışmanız daha doğru olur" de.
+${isEmergencyFlagged ? EMERGENCY_CONTEXT : ''}
 `
 }
 
@@ -323,6 +346,7 @@ function buildSystemPrompt(
   profile: Profile | null,
   conditions: string[],
   medications: string[],
+  isEmergencyFlagged: boolean,
 ): string {
   const name = profile?.full_name ?? 'Kullanıcı'
   const age = computeAge(profile?.birth_date ?? null)
@@ -340,7 +364,7 @@ function buildSystemPrompt(
 - Kronik hastalıklar: ${conditionsList}
 - Düzenli kullandığı ilaçlar: ${medicationsList}`
 
-  return buildSystemPromptBase(userContext)
+  return buildSystemPromptBase(userContext, isEmergencyFlagged)
 }
 
 Deno.serve(async (req) => {
@@ -525,7 +549,10 @@ Ambulans yola çıktıktan sonra bana belirti detaylarını yazabilirsin.`
         frequency_penalty: 0.2,
         max_tokens: 1024,
         messages: [
-          { role: 'system', content: buildSystemPrompt(profile, conditions, medications) },
+          {
+            role: 'system',
+            content: buildSystemPrompt(profile, conditions, medications, isEmergencyFlagged),
+          },
           ...groqMessages,
         ],
       }),
