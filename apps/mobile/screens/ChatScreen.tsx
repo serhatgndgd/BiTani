@@ -88,6 +88,47 @@ function mapChatError(error: unknown): string {
   return CHAT_ERROR_GENERIC;
 }
 
+function normalizeForMatch(text: string): string {
+  return text
+    .toLocaleLowerCase('tr')
+    .replace(/[.,!?;:]/g, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+
+  const matrix = Array.from({ length: b.length + 1 }, () =>
+    Array<number>(a.length + 1).fill(0),
+  );
+
+  for (let i = 0; i <= a.length; i += 1) matrix[0][i] = i;
+  for (let j = 0; j <= b.length; j += 1) matrix[j][0] = j;
+
+  for (let j = 1; j <= b.length; j += 1) {
+    for (let i = 1; i <= a.length; i += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[j][i] = Math.min(
+        matrix[j][i - 1] + 1,
+        matrix[j - 1][i] + 1,
+        matrix[j - 1][i - 1] + cost,
+      );
+    }
+  }
+
+  return matrix[b.length][a.length];
+}
+
+function isWordSimilar(word: string, target: string): boolean {
+  if (target.length <= 4) return word === target;
+  const distance = levenshtein(word, target);
+  const tolerance = Math.floor(target.length / 4);
+  return distance <= tolerance;
+}
+
 // ─── Markdown parser ──────────────────────────────────────────────────────────
 
 type Segment  = { text: string; bold: boolean; italic: boolean };
@@ -123,8 +164,29 @@ function parseMd(text: string): MdLine[] {
 // ─── Yardımcı ─────────────────────────────────────────────────────────────────
 
 function containsAcilKeyword(text: string): boolean {
-  const lower = text.toLocaleLowerCase('tr');
-  return ACIL_KELIMELER.some((k) => lower.includes(k));
+  const normalized = normalizeForMatch(text);
+  const words = normalized.split(/\s+/).filter(Boolean);
+
+  for (const keyword of ACIL_KELIMELER) {
+    const normalizedKeyword = normalizeForMatch(keyword);
+
+    if (!normalizedKeyword.includes(' ')) {
+      for (const word of words) {
+        if (isWordSimilar(word, normalizedKeyword)) return true;
+      }
+      continue;
+    }
+
+    const keywordWords = normalizedKeyword.split(' ').filter(Boolean);
+    for (let i = 0; i <= words.length - keywordWords.length; i += 1) {
+      const allMatch = keywordWords.every((kw, idx) =>
+        isWordSimilar(words[i + idx] ?? '', kw),
+      );
+      if (allMatch) return true;
+    }
+  }
+
+  return false;
 }
 
 function fmtTime(ts: number): string {
