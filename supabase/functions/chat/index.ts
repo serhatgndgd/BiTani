@@ -208,6 +208,9 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
+        temperature: 0.1,
+        top_p: 0.85,
+        frequency_penalty: 0.3,
         max_tokens: 1024,
         messages: [
           { role: 'system', content: buildSystemPrompt(profile, conditions, medications) },
