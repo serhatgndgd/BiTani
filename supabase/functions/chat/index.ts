@@ -271,7 +271,7 @@ Deno.serve(async (req) => {
           .reverse()
           .map((r) => ({
             role: r.role as 'user' | 'assistant',
-            content: r.content,
+            content: sanitizeUserInput(r.content ?? '', userId),
           }))
       }
     } catch (e) {
