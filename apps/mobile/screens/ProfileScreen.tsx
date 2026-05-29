@@ -70,6 +70,9 @@ const UPDATE_ERROR_TEXT = 'Güncellenemedi. Tekrar deneyin';
 const DELETE_ACCOUNT_ERROR_TEXT = 'Hesabınız silinemedi. Tekrar deneyin';
 const MEDICATION_SEARCH_LIMIT = 50;
 const MEDICATION_BRAND_REGEX = /^([A-ZÇĞİÖŞÜ\s]+?)(\s+\d|\s+\d+\s*MG|\s+\d+\s*ML|$)/;
+// Hastalığa göre ilaç önerisi (condition_medications) parametreleri
+const CONDITION_MED_CONFIDENCE_MIN = 0.7;
+const CONDITION_MED_LIMIT = 100; // hastalık başına en yüksek güvenli öneri sayısı
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: 'male', label: 'Erkek' },
@@ -554,9 +557,52 @@ export default function ProfileScreen() {
     }
   }, [userId, clearChatHistory]);
 
+  // ── Hastalığa göre öneri yükleyici (condition_medications → medicationsV2) ─
+  const loadCondMeds = useCallback(async (conditionRows: ConditionCatalogRow[]) => {
+    if (conditionRows.length === 0) {
+      setCondMedRows([]);
+      setCondMedError(null);
+      setLoadingCondMeds(false);
+      return;
+    }
+    setLoadingCondMeds(true);
+    setCondMedError(null);
+    try {
+      type CondMedQueryRow = {
+        confidence_score: number;
+        medicationsV2: { id: string; ilac_adi: string; etkin_madde_adi: string | null } | null;
+      };
+      const perCondition = await Promise.all(
+        conditionRows.map(async (cond) => {
+          const { data, error } = await supabase
+            .from('condition_medications')
+            .select('confidence_score, medicationsV2(id, ilac_adi, etkin_madde_adi)')
+            .eq('condition_id', cond.id)
+            .gte('confidence_score', CONDITION_MED_CONFIDENCE_MIN)
+            .order('confidence_score', { ascending: false })
+            .limit(CONDITION_MED_LIMIT);
+          if (error) throw new Error(error.message);
+          return ((data ?? []) as unknown as CondMedQueryRow[])
+            .filter((r) => r.medicationsV2 !== null)
+            .map<CondMedRow>((r) => ({
+              condition_id: cond.id,
+              medication: r.medicationsV2 as NonNullable<CondMedQueryRow['medicationsV2']>,
+            }));
+        }),
+      );
+      setCondMedRows(perCondition.flat());
+    } catch (e) {
+      console.error('profile-screen:', e);
+      setCondMedRows([]);
+      setCondMedError('Öneriler yüklenemedi. Serbest arama sekmesini kullanabilirsin.');
+    } finally {
+      setLoadingCondMeds(false);
+    }
+  }, []);
+
   // ── İlaç modalı — aç / kapat ─────────────────────────────────────────────
   const openMedsModal = useCallback(async () => {
-    setMedModalTab('search');
+    setMedModalTab(userConditions.length > 0 ? 'conditions' : 'search');
     setModalSelectedMedIds(new Set());
     setModalMedDosages(new Map());
     setCondMedSearch('');
@@ -566,11 +612,9 @@ export default function ProfileScreen() {
     setDosageInput('');
     setExpandedMedBrands(new Set());
     setAddMedError(null);
-    setLoadingCondMeds(false);
-    setCondMedRows([]);
-    setCondMedError('Hastalığa göre öneriler geçici olarak kapalı. İlaç eklemek için serbest aramayı kullanın.');
     setMedsModal(true);
-  }, []);
+    void loadCondMeds(userConditions);
+  }, [userConditions, loadCondMeds]);
 
   const closeMedsModal = useCallback(() => {
     setMedsModal(false);
@@ -1088,11 +1132,26 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
-          {/* Hastalığa göre öneriler, yeni eşleştirme tablosu hazır olana kadar kapalı. */}
+          {/* Sekme seçici — sadece hastalık varsa göster */}
           {userConditions.length > 0 ? (
-            <Text style={[styles.emptyText, styles.modalPad]}>
-              Hastalığa göre öneriler geçici olarak kapalı. İlaç eklemek için serbest aramayı kullanın.
-            </Text>
+            <View style={styles.tabRow}>
+              <Pressable
+                style={[styles.tab, medModalTab === 'conditions' && styles.tabActive]}
+                onPress={() => { setMedModalTab('conditions'); setSelectedMed(null); }}
+              >
+                <Text style={[styles.tabText, medModalTab === 'conditions' && styles.tabTextActive]}>
+                  Hastalığa Göre
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.tab, medModalTab === 'search' && styles.tabActive]}
+                onPress={() => { setMedModalTab('search'); setModalSelectedMedIds(new Set()); setModalMedDosages(new Map()); }}
+              >
+                <Text style={[styles.tabText, medModalTab === 'search' && styles.tabTextActive]}>
+                  Serbest Arama
+                </Text>
+              </Pressable>
+            </View>
           ) : (
             <Text style={[styles.emptyText, styles.modalPad]}>
               İlaç eklemek için adını arayabilirsiniz.
