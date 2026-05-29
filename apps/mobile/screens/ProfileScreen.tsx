@@ -160,7 +160,7 @@ export default function ProfileScreen() {
 
   // ── İlaçlar — modal ─────────────────────────────────────────────────────
   const [medsModal, setMedsModal] = useState(false);
-  const [medModalTab, setMedModalTab] = useState<'conditions' | 'search'>('conditions');
+  const [medModalTab, setMedModalTab] = useState<'conditions' | 'search'>('search');
   const [addingMed, setAddingMed] = useState(false);
   const [addMedError, setAddMedError] = useState<string | null>(null);
 
@@ -280,7 +280,7 @@ export default function ProfileScreen() {
         .eq('user_id', user.id),
       supabase
         .from('user_medications')
-        .select('medication_id, dosage, is_active, medications(id, ilac_adi, etkin_madde_adi, firma_adi)')
+        .select('medication_id, dosage, is_active, medicationsV2(id, ilac_adi, etkin_madde_adi, firma_adi)')
         .eq('user_id', user.id),
     ]);
 
@@ -317,15 +317,15 @@ export default function ProfileScreen() {
         medication_id: string;
         dosage: string | null;
         is_active: boolean;
-        medications: MedicationRow | null;
+        medicationsV2: MedicationRow | null;
       };
       const rows: UserMedication[] = (medRes.data as unknown as MedQueryRow[])
-        .filter((r) => r.medications !== null)
+        .filter((r) => r.medicationsV2 !== null)
         .map((r) => ({
           medication_id: r.medication_id,
           dosage: r.dosage,
           is_active: r.is_active,
-          medications: r.medications as MedicationRow,
+          medications: r.medicationsV2 as MedicationRow,
         }));
       setUserMedications(rows);
     }
@@ -339,21 +339,21 @@ export default function ProfileScreen() {
     if (!userId) return;
     const { data } = await supabase
       .from('user_medications')
-      .select('medication_id, dosage, is_active, medications(id, ilac_adi, etkin_madde_adi, firma_adi)')
+      .select('medication_id, dosage, is_active, medicationsV2(id, ilac_adi, etkin_madde_adi, firma_adi)')
       .eq('user_id', userId);
     if (!data) return;
     type MedQueryRow = {
       medication_id: string; dosage: string | null;
-      is_active: boolean; medications: MedicationRow | null;
+      is_active: boolean; medicationsV2: MedicationRow | null;
     };
     setUserMedications(
       (data as unknown as MedQueryRow[])
-        .filter((r) => r.medications !== null)
+        .filter((r) => r.medicationsV2 !== null)
         .map((r) => ({
           medication_id: r.medication_id,
           dosage: r.dosage,
           is_active: r.is_active,
-          medications: r.medications as MedicationRow,
+          medications: r.medicationsV2 as MedicationRow,
         })),
     );
   }, [userId]);
@@ -523,8 +523,7 @@ export default function ProfileScreen() {
 
   // ── İlaç modalı — aç / kapat ─────────────────────────────────────────────
   const openMedsModal = useCallback(async () => {
-    const defaultTab = userConditions.length > 0 ? 'conditions' : 'search';
-    setMedModalTab(defaultTab);
+    setMedModalTab('search');
     setModalSelectedMedIds(new Set());
     setModalMedDosages(new Map());
     setCondMedSearch('');
@@ -533,28 +532,11 @@ export default function ProfileScreen() {
     setSelectedMed(null);
     setDosageInput('');
     setAddMedError(null);
-    setMedsModal(true);
-
-    if (userConditions.length === 0) return;
-    setLoadingCondMeds(true);
-    setCondMedError(null);
-    const { data, error } = await supabase
-      .from('condition_medications')
-      .select('condition_id, medications(id, ilac_adi, etkin_madde_adi)')
-      .in('condition_id', userConditions.map((c) => c.id))
-      .eq('is_contraindication', false)
-      .gte('confidence_score', 0.5);
     setLoadingCondMeds(false);
-    if (error) { setCondMedError('İlaçlar yüklenemedi.'); return; }
-    type RawRow = {
-      condition_id: string;
-      medications: { id: string; ilac_adi: string; etkin_madde_adi: string | null } | null;
-    };
-    const rows: CondMedRow[] = ((data ?? []) as unknown as RawRow[])
-      .filter((r) => r.medications != null)
-      .map((r) => ({ condition_id: r.condition_id, medication: r.medications! }));
-    setCondMedRows(rows);
-  }, [userConditions]);
+    setCondMedRows([]);
+    setCondMedError('Hastalığa göre öneriler geçici olarak kapalı. İlaç eklemek için serbest aramayı kullanın.');
+    setMedsModal(true);
+  }, []);
 
   const closeMedsModal = useCallback(() => {
     setMedsModal(false);
@@ -630,7 +612,7 @@ export default function ProfileScreen() {
     const timer = setTimeout(async () => {
       setSearchingMeds(true);
       const { data, error } = await supabase
-        .from('medications')
+        .from('medicationsV2')
         .select('id, ilac_adi, etkin_madde_adi, firma_adi')
         .ilike('ilac_adi', `%${q}%`)
         .limit(25);
@@ -1037,29 +1019,14 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
-          {/* Sekme seçici — sadece hastalık varsa göster */}
+          {/* Hastalığa göre öneriler, yeni eşleştirme tablosu hazır olana kadar kapalı. */}
           {userConditions.length > 0 ? (
-            <View style={styles.tabRow}>
-              <Pressable
-                style={[styles.tab, medModalTab === 'conditions' && styles.tabActive]}
-                onPress={() => { setMedModalTab('conditions'); setSelectedMed(null); }}
-              >
-                <Text style={[styles.tabText, medModalTab === 'conditions' && styles.tabTextActive]}>
-                  Hastalığa Göre
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.tab, medModalTab === 'search' && styles.tabActive]}
-                onPress={() => { setMedModalTab('search'); setModalSelectedMedIds(new Set()); setModalMedDosages(new Map()); }}
-              >
-                <Text style={[styles.tabText, medModalTab === 'search' && styles.tabTextActive]}>
-                  Serbest Arama
-                </Text>
-              </Pressable>
-            </View>
+            <Text style={[styles.emptyText, styles.modalPad]}>
+              Hastalığa göre öneriler geçici olarak kapalı. İlaç eklemek için serbest aramayı kullanın.
+            </Text>
           ) : (
             <Text style={[styles.emptyText, styles.modalPad]}>
-              Hastalık eklersen ilacını daha hızlı bulabilirsin.
+              İlaç eklemek için adını arayabilirsiniz.
             </Text>
           )}
 
