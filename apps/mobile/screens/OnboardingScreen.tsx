@@ -36,6 +36,10 @@ type Props = { onComplete: () => void };
 
 const TOTAL_STEPS = 4;
 
+// Hastalığa göre ilaç önerisi (condition_medications) parametreleri
+const CONDITION_MED_CONFIDENCE_MIN = 0.7;
+const CONDITION_MED_LIMIT = 100; // hastalık başına en yüksek güvenli öneri sayısı
+
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: 'male',        label: 'Erkek' },
   { value: 'female',      label: 'Kadın' },
@@ -135,6 +139,9 @@ export default function OnboardingScreen({ onComplete }: Props) {
   const [medRows, setMedRows]                   = useState<MedRow[]>([]);
   const [loadingMeds, setLoadingMeds]           = useState(false);
   const [medError, setMedError]                 = useState<string | null>(null);
+  const [condMedRows, setCondMedRows]           = useState<MedRow[]>([]);
+  const [loadingCondMeds, setLoadingCondMeds]   = useState(false);
+  const [condMedError, setCondMedError]         = useState<string | null>(null);
   const [medSearch, setMedSearch]               = useState('');
   const [selectedMedIds, setSelectedMedIds]     = useState<Set<string>>(new Set());
   const [medDosages, setMedDosages]             = useState<Map<string, string>>(new Map());
@@ -242,6 +249,56 @@ export default function OnboardingScreen({ onComplete }: Props) {
     };
   }, [step, medSearch]);
 
+  // Step 4: seçili hastalıklara göre condition_medications'tan öneri yükle
+  useEffect(() => {
+    if (step !== 4) return;
+    const condIds = [...selectedIds];
+    if (noChronic || condIds.length === 0) {
+      setCondMedRows([]);
+      setCondMedError(null);
+      setLoadingCondMeds(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoadingCondMeds(true); setCondMedError(null);
+      try {
+        type CondMedQueryRow = {
+          confidence_score: number;
+          medicationsV2: { id: string; ilac_adi: string; etkin_madde_adi: string | null } | null;
+        };
+        const perCondition = await Promise.all(
+          condIds.map(async (conditionId) => {
+            const { data, error } = await supabase
+              .from('condition_medications')
+              .select('confidence_score, medicationsV2(id, ilac_adi, etkin_madde_adi)')
+              .eq('condition_id', conditionId)
+              .gte('confidence_score', CONDITION_MED_CONFIDENCE_MIN)
+              .order('confidence_score', { ascending: false })
+              .limit(CONDITION_MED_LIMIT);
+            if (error) throw new Error(error.message);
+            return ((data ?? []) as unknown as CondMedQueryRow[])
+              .filter((r) => r.medicationsV2 !== null)
+              .map<MedRow>((r) => ({
+                condition_id: conditionId,
+                medication: r.medicationsV2 as NonNullable<CondMedQueryRow['medicationsV2']>,
+              }));
+          }),
+        );
+        if (cancelled) return;
+        setCondMedRows(perCondition.flat());
+      } catch (e) {
+        if (cancelled) return;
+        console.error('onboarding-screen:', e);
+        setCondMedRows([]);
+        setCondMedError('Öneriler yüklenemedi. İlacını adıyla arayabilirsin.');
+      } finally {
+        if (!cancelled) setLoadingCondMeds(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [step, selectedIds, noChronic]);
+
   const filteredConditions = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return conditions;
@@ -252,19 +309,16 @@ export default function OnboardingScreen({ onComplete }: Props) {
   const selectedRows = useMemo(() => conditions.filter((c) => selectedIds.has(c.id)), [conditions, selectedIds]);
   const conditionNameMap = useMemo(() => new Map(selectedRows.map((c) => [c.id, c.name])), [selectedRows]);
 
-  const medsGrouped = useMemo(() => {
-    const q = medSearch.trim().toLowerCase();
-    const filtered = q
-      ? medRows.filter((r) => r.medication.ilac_adi.toLowerCase().includes(q) || (r.medication.etkin_madde_adi?.toLowerCase().includes(q) ?? false))
-      : medRows;
+  // Hastalığa göre öneriler (arama boşken gösterilir) — condition_id ile gruplu
+  const condMedsGrouped = useMemo(() => {
     const map = new Map<string, MedRow[]>();
-    for (const row of filtered) {
+    for (const row of condMedRows) {
       const list = map.get(row.condition_id) ?? [];
       if (!list.some((r) => r.medication.id === row.medication.id)) list.push(row);
       map.set(row.condition_id, list);
     }
     return map;
-  }, [medRows, medSearch]);
+  }, [condMedRows]);
 
   // ─── SectionList veri dönüşümleri ────────────────────────────────────────────
 
@@ -275,12 +329,12 @@ export default function OnboardingScreen({ onComplete }: Props) {
 
   const medSections = useMemo<MedSection[]>(
     () =>
-      [...medsGrouped.entries()].map(([conditionId, meds]) => ({
+      [...condMedsGrouped.entries()].map(([conditionId, meds]) => ({
         conditionId,
         title: conditionNameMap.get(conditionId) ?? conditionId,
         data: noMedConditions.has(conditionId) ? [] : meds,
       })),
-    [medsGrouped, conditionNameMap, noMedConditions],
+    [condMedsGrouped, conditionNameMap, noMedConditions],
   );
 
   // Serbest arama: condition başvurusu olmaksızın, unique ilaçların düz listesi
@@ -343,12 +397,12 @@ export default function OnboardingScreen({ onComplete }: Props) {
         n.delete(conditionId);
       } else {
         n.add(conditionId);
-        const ids = medRows.filter((r) => r.condition_id === conditionId).map((r) => r.medication.id);
+        const ids = condMedRows.filter((r) => r.condition_id === conditionId).map((r) => r.medication.id);
         setSelectedMedIds((sm) => { const nsm = new Set(sm); ids.forEach((id) => nsm.delete(id)); return nsm; });
       }
       return n;
     });
-  }, [medRows]);
+  }, [condMedRows]);
 
   const setDosage = useCallback((medId: string, val: string) => {
     setMedDosages((prev) => { const n = new Map(prev); n.set(medId, val); return n; });
@@ -489,7 +543,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
       <>
         <Text style={styles.title}>Kullandığın İlaçlar</Text>
         <Text style={styles.infoText}>
-          Hastalığa göre öneriler geçici olarak kapalı. Kullandığın ilacı adıyla arayabilirsin.
+          Hastalıklarına göre önerilen ilaçlar aşağıda gruplanmıştır. İlacını seç ya da adıyla ara.
         </Text>
         <TextInput
           style={styles.input}
@@ -499,18 +553,20 @@ export default function OnboardingScreen({ onComplete }: Props) {
           placeholderTextColor={C.text3}
           editable={!saving}
         />
+        {medSearch.trim().length === 0 && loadingCondMeds && <ActivityIndicator style={{ marginVertical: 20 }} color={C.primary} />}
+        {medSearch.trim().length === 0 && condMedError && <Text style={styles.err}>{condMedError}</Text>}
         {loadingMeds && <ActivityIndicator style={{ marginVertical: 20 }} color={C.primary} />}
         {medError    && <Text style={styles.err}>{medError}</Text>}
       </>
     ),
-    [medSearch, saving, loadingMeds, medError],
+    [medSearch, saving, loadingMeds, medError, loadingCondMeds, condMedError],
   );
 
   const step4Footer = useMemo(() => {
     const isSearching = medSearch.trim().length > 0;
-    const showEmpty = !loadingMeds && !medError && (
-      isSearching ? flatMedResults.length === 0 : medsGrouped.size === 0
-    );
+    const showEmpty = isSearching
+      ? !loadingMeds && !medError && flatMedResults.length === 0
+      : !loadingCondMeds && !condMedError && condMedsGrouped.size === 0;
     return (
       <>
         {showEmpty && (
@@ -519,14 +575,14 @@ export default function OnboardingScreen({ onComplete }: Props) {
               ? 'İlaç aramak için en az 2 harf yazın.'
               : isSearching
               ? 'Aramanızla eşleşen ilaç bulunamadı.'
-              : 'İlaç eklemek için arama kutusuna en az 2 harf yazın.'}
+              : 'Hastalıklarınla eşleşen öneri bulunamadı. İlacını adıyla arayabilirsin.'}
           </Text>
         )}
         {stepError && <Text style={styles.err}>{stepError}</Text>}
         {saveError  && <Text style={styles.err}>{saveError}</Text>}
       </>
     );
-  }, [medSearch, loadingMeds, medError, flatMedResults, medsGrouped.size, stepError, saveError]);
+  }, [medSearch, loadingMeds, medError, flatMedResults, loadingCondMeds, condMedError, condMedsGrouped.size, stepError, saveError]);
 
   // ─── Validasyon ve navigasyon ─────────────────────────────────────────────────
 
