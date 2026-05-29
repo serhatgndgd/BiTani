@@ -38,6 +38,11 @@ type MedicationRow = {
   firma_adi: string | null;
 };
 
+type MedicationBrandGroup = {
+  brand: string;
+  variants: MedicationRow[];
+};
+
 type UserMedication = {
   medication_id: string;
   dosage: string | null;
@@ -63,6 +68,8 @@ const CONDITION_SAVE_ERROR_TEXT = 'Hastalık eklenemedi. Tekrar deneyin';
 const MED_ADD_ERROR_TEXT = 'İlaç eklenemedi. Tekrar deneyin';
 const UPDATE_ERROR_TEXT = 'Güncellenemedi. Tekrar deneyin';
 const DELETE_ACCOUNT_ERROR_TEXT = 'Hesabınız silinemedi. Tekrar deneyin';
+const MEDICATION_SEARCH_LIMIT = 50;
+const MEDICATION_BRAND_REGEX = /^([A-ZÇĞİÖŞÜ\s]+?)(\s+\d|\s+\d+\s*MG|\s+\d+\s*ML|$)/;
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: 'male', label: 'Erkek' },
@@ -77,6 +84,30 @@ const MONTH_LABELS = [
 
 function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
+}
+
+function normalizeMedicationName(value: string): string {
+  return value.toLocaleUpperCase('tr-TR').trim().replace(/\s+/g, ' ');
+}
+
+function extractMedicationBrand(name: string): string {
+  const normalized = normalizeMedicationName(name);
+  return (normalized.match(MEDICATION_BRAND_REGEX)?.[1] ?? normalized).trim().replace(/\s+/g, ' ');
+}
+
+function medicationVariantLabel(medication: MedicationRow, brand: string): string {
+  const normalized = normalizeMedicationName(medication.ilac_adi);
+  const variant = normalized.slice(brand.length).trim();
+  return variant.length > 0 ? variant : medication.ilac_adi;
+}
+
+function groupMedicationsByBrand(rows: MedicationRow[]): MedicationBrandGroup[] {
+  const groups = new Map<string, MedicationRow[]>();
+  for (const row of rows) {
+    const brand = extractMedicationBrand(row.ilac_adi);
+    groups.set(brand, [...(groups.get(brand) ?? []), row]);
+  }
+  return [...groups.entries()].map(([brand, variants]) => ({ brand, variants }));
 }
 
 function buildIsoDate(day: string, month: string, year: string): string | null {
@@ -178,12 +209,14 @@ export default function ProfileScreen() {
   const [searchingMeds, setSearchingMeds] = useState(false);
   const [selectedMed, setSelectedMed] = useState<MedicationRow | null>(null);
   const [dosageInput, setDosageInput] = useState('');
+  const [expandedMedBrands, setExpandedMedBrands] = useState<Set<string>>(new Set());
 
   // ── Hesaplanan değerler ──────────────────────────────────────────────────
   const activeMeds = useMemo(() => userMedications.filter((m) => m.is_active), [userMedications]);
   const pastMeds = useMemo(() => userMedications.filter((m) => !m.is_active), [userMedications]);
   const activeMedIds = useMemo(() => new Set(activeMeds.map((m) => m.medication_id)), [activeMeds]);
   const pastMedIds = useMemo(() => new Set(pastMeds.map((m) => m.medication_id)), [pastMeds]);
+  const groupedMedResults = useMemo(() => groupMedicationsByBrand(medResults), [medResults]);
 
   const years = useMemo(() => {
     const y = new Date().getFullYear();
@@ -531,6 +564,7 @@ export default function ProfileScreen() {
     setMedResults([]);
     setSelectedMed(null);
     setDosageInput('');
+    setExpandedMedBrands(new Set());
     setAddMedError(null);
     setLoadingCondMeds(false);
     setCondMedRows([]);
@@ -547,6 +581,7 @@ export default function ProfileScreen() {
     setMedResults([]);
     setSelectedMed(null);
     setDosageInput('');
+    setExpandedMedBrands(new Set());
     setAddMedError(null);
   }, []);
 
@@ -608,14 +643,16 @@ export default function ProfileScreen() {
   // ── Serbest arama debounce ───────────────────────────────────────────────
   useEffect(() => {
     const q = medSearch.trim();
+    setExpandedMedBrands(new Set());
     if (!q) { setMedResults([]); return; }
     const timer = setTimeout(async () => {
       setSearchingMeds(true);
       const { data, error } = await supabase
         .from('medicationsV2')
         .select('id, ilac_adi, etkin_madde_adi, firma_adi')
-        .ilike('ilac_adi', `%${q}%`)
-        .limit(25);
+        .or(`ilac_adi.ilike.%${q}%,etkin_madde_adi.ilike.%${q}%`)
+        .order('ilac_adi')
+        .limit(MEDICATION_SEARCH_LIMIT);
       setSearchingMeds(false);
       if (!error && data) setMedResults(data as MedicationRow[]);
     }, 350);
@@ -719,30 +756,62 @@ export default function ProfileScreen() {
   );
 
   // İlaç modalı — Serbest Arama sekmesi
-  const keyExtractorMedSearch = useCallback((item: MedicationRow) => item.id, []);
+  const keyExtractorMedSearch = useCallback((item: MedicationBrandGroup) => item.brand, []);
 
-  const renderSearchMedItem = useCallback(
-    ({ item: med }: { item: MedicationRow }) => {
-      const isActive = activeMedIds.has(med.id);
+  const toggleExpandedMedBrand = useCallback((brand: string) => {
+    setExpandedMedBrands((prev) => {
+      const next = new Set(prev);
+      if (next.has(brand)) next.delete(brand);
+      else next.add(brand);
+      return next;
+    });
+  }, []);
+
+  const renderSearchMedGroup = useCallback(
+    ({ item: group }: { item: MedicationBrandGroup }) => {
+      const expanded = expandedMedBrands.has(group.brand);
       return (
-        <Pressable
-          style={[styles.medSearchRow, isActive && styles.medSearchRowAdded]}
-          onPress={() => { if (!isActive) { setSelectedMed(med); setDosageInput(''); } }}
-          disabled={isActive}>
-          <View style={styles.medSearchInfo}>
-            <Text style={styles.medName}>{med.ilac_adi}</Text>
-            {med.etkin_madde_adi ? <Text style={styles.medSub}>{med.etkin_madde_adi}</Text> : null}
-            {med.firma_adi ? <Text style={styles.medSub}>{med.firma_adi}</Text> : null}
-          </View>
-          <Ionicons
-            name={isActive ? 'checkmark-circle' : 'add-circle-outline'}
-            size={22}
-            color={isActive ? C.primary : C.text2}
-          />
-        </Pressable>
+        <View>
+          <Pressable
+            style={styles.medBrandRow}
+            onPress={() => toggleExpandedMedBrand(group.brand)}
+          >
+            <View style={styles.medBrandInfo}>
+              <Text style={styles.medBrandName} numberOfLines={1}>{group.brand}</Text>
+              <Text style={styles.medBrandCount}>{group.variants.length} form</Text>
+            </View>
+            <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={C.text3} />
+          </Pressable>
+
+          {expanded
+            ? group.variants.map((med) => {
+                const isActive = activeMedIds.has(med.id);
+                return (
+                  <Pressable
+                    key={med.id}
+                    style={[styles.medVariantRow, isActive && styles.medSearchRowAdded]}
+                    onPress={() => { if (!isActive) { setSelectedMed(med); setDosageInput(''); } }}
+                    disabled={isActive}>
+                    <View style={styles.medSearchInfo}>
+                      <Text style={styles.medVariantName} numberOfLines={1}>
+                        {medicationVariantLabel(med, group.brand)}
+                      </Text>
+                      {med.etkin_madde_adi ? <Text style={styles.medSub}>{med.etkin_madde_adi}</Text> : null}
+                      {med.firma_adi ? <Text style={styles.medSub}>{med.firma_adi}</Text> : null}
+                    </View>
+                    <Ionicons
+                      name={isActive ? 'checkmark-circle' : 'add-circle-outline'}
+                      size={22}
+                      color={isActive ? C.primary : C.text2}
+                    />
+                  </Pressable>
+                );
+              })
+            : null}
+        </View>
       );
     },
-    [activeMedIds, setSelectedMed],
+    [activeMedIds, expandedMedBrands, toggleExpandedMedBrand],
   );
 
   // ── Loading / hata ───────────────────────────────────────────────────────
@@ -1126,10 +1195,10 @@ export default function ProfileScreen() {
                 ) : medSearch.trim().length > 0 && medResults.length === 0 ? (
                   <Text style={[styles.emptyText, styles.modalPad]}>Sonuç bulunamadı.</Text>
                 ) : (
-                  <FlatList<MedicationRow>
-                    data={medResults}
+                  <FlatList<MedicationBrandGroup>
+                    data={groupedMedResults}
                     keyExtractor={keyExtractorMedSearch}
-                    renderItem={renderSearchMedItem}
+                    renderItem={renderSearchMedGroup}
                     style={styles.modalScroll}
                     contentContainerStyle={styles.modalListContent}
                     keyboardShouldPersistTaps="handled"
@@ -1360,6 +1429,12 @@ const styles = StyleSheet.create({
   selectedMedName: { color: C.text1, fontSize: 18, fontWeight: '700' },
   selectedMedSub: { color: C.text2, fontSize: 13, marginTop: 4 },
 
+  medBrandRow: { flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: 1, borderBottomColor: C.surface },
+  medBrandInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  medBrandName: { color: C.text1, fontSize: 15, fontWeight: '800', flex: 1 },
+  medBrandCount: { color: C.text3, fontSize: 12, fontWeight: '600' },
+  medVariantRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingLeft: 28, paddingRight: 14, borderBottomWidth: 1, borderBottomColor: C.surface },
+  medVariantName: { color: C.text1, fontSize: 14, fontWeight: '500' },
   medSearchRow: { flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: 1, borderBottomColor: C.surface },
   medSearchRowAdded: { opacity: 0.45 },
   medSearchInfo: { flex: 1 },

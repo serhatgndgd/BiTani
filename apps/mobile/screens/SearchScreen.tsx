@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Linking,
@@ -28,11 +28,41 @@ type MedResult = {
   kt_url: string | null;
 };
 
+type MedicationBrandGroup = {
+  brand: string;
+  variants: MedResult[];
+};
+
 // ─── Sabitler ─────────────────────────────────────────────────────────────────
 
-const PAGE_SIZE    = 30;
+const PAGE_SIZE    = 50;
 const DEBOUNCE_MS  = 300;
 const MIN_QUERY    = 2;
+const BRAND_REGEX  = /^([A-ZÇĞİÖŞÜ\s]+?)(\s+\d|\s+\d+\s*MG|\s+\d+\s*ML|$)/;
+
+function normalizeDrugName(value: string): string {
+  return value.toLocaleUpperCase('tr-TR').trim().replace(/\s+/g, ' ');
+}
+
+function extractMedicationBrand(name: string): string {
+  const normalized = normalizeDrugName(name);
+  return (normalized.match(BRAND_REGEX)?.[1] ?? normalized).trim().replace(/\s+/g, ' ');
+}
+
+function medicationVariantLabel(medication: MedResult, brand: string): string {
+  const normalized = normalizeDrugName(medication.ilac_adi);
+  const variant = normalized.slice(brand.length).trim();
+  return variant.length > 0 ? variant : medication.ilac_adi;
+}
+
+function groupMedicationsByBrand(rows: MedResult[]): MedicationBrandGroup[] {
+  const groups = new Map<string, MedResult[]>();
+  for (const row of rows) {
+    const brand = extractMedicationBrand(row.ilac_adi);
+    groups.set(brand, [...(groups.get(brand) ?? []), row]);
+  }
+  return [...groups.entries()].map(([brand, variants]) => ({ brand, variants }));
+}
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
@@ -70,10 +100,13 @@ export default function SearchScreen() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [selected, setSelected]       = useState<MedResult | null>(null);
   const [userMedIds, setUserMedIds]   = useState<Set<string>>(new Set());
+  const [expandedBrands, setExpandedBrands] = useState<Set<string>>(new Set());
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const offsetRef   = useRef(0);
   const activeQuery = useRef('');
+
+  const groupedResults = useMemo(() => groupMedicationsByBrand(results), [results]);
 
   // Kullanıcının ilaç ID'lerini yükle (badge için)
   useEffect(() => {
@@ -96,7 +129,12 @@ export default function SearchScreen() {
 
   const doSearch = useCallback(async (q: string, offset: number, append: boolean) => {
     if (q.length < MIN_QUERY) {
-      if (!append) { setResults([]); setHasMore(false); setSearchError(null); }
+      if (!append) {
+        setResults([]);
+        setHasMore(false);
+        setSearchError(null);
+        setExpandedBrands(new Set());
+      }
       return;
     }
 
@@ -118,6 +156,7 @@ export default function SearchScreen() {
       const rows = (data ?? []) as MedResult[];
       setHasMore(rows.length === PAGE_SIZE);
       setResults((prev) => append ? [...prev, ...rows] : rows);
+      if (!append) setExpandedBrands(new Set());
       setSearchError(null);
     } catch (error) {
       console.error('search:', error);
@@ -139,6 +178,7 @@ export default function SearchScreen() {
   const onChangeText = useCallback((text: string) => {
     setQuery(text);
     setSearchError(null);
+    setExpandedBrands(new Set());
     activeQuery.current = text;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -167,33 +207,65 @@ export default function SearchScreen() {
 
   // ─── Liste öğesi ─────────────────────────────────────────────────────────────
 
-  const renderItem = useCallback(({ item }: { item: MedResult }) => {
-    const isMine = userMedIds.has(item.id);
+  const toggleBrand = useCallback((brand: string) => {
+    setExpandedBrands((prev) => {
+      const next = new Set(prev);
+      if (next.has(brand)) next.delete(brand);
+      else next.add(brand);
+      return next;
+    });
+  }, []);
+
+  const renderBrandGroup = useCallback(({ item }: { item: MedicationBrandGroup }) => {
+    const expanded = expandedBrands.has(item.brand);
     return (
-      <Pressable
-        style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
-        onPress={() => setSelected(item)}
-      >
-        <View style={styles.itemInfo}>
-          <View style={styles.itemTitleRow}>
-            <Text style={styles.itemName} numberOfLines={1}>{item.ilac_adi}</Text>
-            {isMine && (
-              <View style={styles.mineBadge}>
-                <Text style={styles.mineBadgeText}>Benim</Text>
-              </View>
-            )}
+      <View>
+        <Pressable
+          style={({ pressed }) => [styles.brandRow, pressed && styles.itemPressed]}
+          onPress={() => toggleBrand(item.brand)}
+        >
+          <View style={styles.brandInfo}>
+            <Text style={styles.brandName} numberOfLines={1}>{item.brand}</Text>
+            <Text style={styles.brandMeta}>{item.variants.length} form</Text>
           </View>
-          {item.etkin_madde_adi != null && (
-            <Text style={styles.itemSub} numberOfLines={1}>{item.etkin_madde_adi}</Text>
-          )}
-          {item.firma_adi != null && (
-            <Text style={styles.itemFirma} numberOfLines={1}>{item.firma_adi}</Text>
-          )}
-        </View>
-        <Ionicons name="chevron-forward" size={15} color={C.border} />
-      </Pressable>
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={17} color={C.text3} />
+        </Pressable>
+
+        {expanded
+          ? item.variants.map((variant) => {
+              const isMine = userMedIds.has(variant.id);
+              return (
+                <Pressable
+                  key={variant.id}
+                  style={({ pressed }) => [styles.variantRow, pressed && styles.itemPressed]}
+                  onPress={() => setSelected(variant)}
+                >
+                  <View style={styles.itemInfo}>
+                    <View style={styles.itemTitleRow}>
+                      <Text style={styles.variantName} numberOfLines={1}>
+                        {medicationVariantLabel(variant, item.brand)}
+                      </Text>
+                      {isMine && (
+                        <View style={styles.mineBadge}>
+                          <Text style={styles.mineBadgeText}>Benim</Text>
+                        </View>
+                      )}
+                    </View>
+                    {variant.etkin_madde_adi != null && (
+                      <Text style={styles.itemSub} numberOfLines={1}>{variant.etkin_madde_adi}</Text>
+                    )}
+                    {variant.firma_adi != null && (
+                      <Text style={styles.itemFirma} numberOfLines={1}>{variant.firma_adi}</Text>
+                    )}
+                  </View>
+                  <Ionicons name="chevron-forward" size={15} color={C.border} />
+                </Pressable>
+              );
+            })
+          : null}
+      </View>
     );
-  }, [userMedIds]);
+  }, [expandedBrands, toggleBrand, userMedIds]);
 
   const renderSeparator = () => <View style={styles.sep} />;
 
@@ -242,9 +314,9 @@ export default function SearchScreen() {
       {/* Sonuç listesi */}
       {query.length >= MIN_QUERY && !searching && (
         <FlatList
-          data={results}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
+          data={groupedResults}
+          keyExtractor={(item) => item.brand}
+          renderItem={renderBrandGroup}
           ItemSeparatorComponent={renderSeparator}
           onEndReached={loadMore}
           onEndReachedThreshold={0.35}
@@ -272,7 +344,7 @@ export default function SearchScreen() {
               </View>
             ) : null
           }
-          contentContainerStyle={results.length === 0 ? styles.listEmpty : undefined}
+          contentContainerStyle={groupedResults.length === 0 ? styles.listEmpty : undefined}
         />
       )}
 
@@ -405,6 +477,17 @@ const styles = StyleSheet.create({
   sep:       { height: 1, backgroundColor: C.surface, marginLeft: 16 },
   listEmpty: { flex: 1 },
 
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  brandInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  brandName: { color: C.text1, fontSize: 15, fontWeight: '800', flex: 1 },
+  brandMeta: { color: C.text3, fontSize: 12, fontWeight: '600' },
+
   item: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -414,9 +497,19 @@ const styles = StyleSheet.create({
   },
   itemPressed: { backgroundColor: C.surface },
   itemInfo:    { flex: 1 },
+  variantRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingLeft: 30,
+    paddingRight: 16,
+    gap: 10,
+    backgroundColor: C.bg,
+  },
 
   itemTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
   itemName:     { color: C.text1, fontSize: 14, fontWeight: '500', flex: 1 },
+  variantName:  { color: C.text1, fontSize: 14, fontWeight: '500', flex: 1 },
 
   mineBadge:     { backgroundColor: C.primaryDim, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
   mineBadgeText: { color: C.primary, fontSize: 11, fontWeight: '700' },
