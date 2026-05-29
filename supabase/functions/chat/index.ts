@@ -34,6 +34,39 @@ interface RateLimitRpcRow {
   window_start: string
 }
 
+interface MedicationV2Row {
+  id: string
+  ilac_adi: string | null
+  etkin_madde_adi: string | null
+}
+
+interface UserMedicationRow {
+  medication_id: string
+  dosage: string | null
+  medicationsV2: MedicationV2Row | MedicationV2Row[] | null
+}
+
+interface UserMedicationContext {
+  id: string
+  name: string
+  activeIngredient: string | null
+  dosage: string | null
+}
+
+interface MedicationKtRow {
+  medication_id: string
+  section_1_nedir: string | null
+  section_2_kullanmadan_once: string | null
+  section_3_nasil_kullanilir: string | null
+  section_4_yan_etkiler: string | null
+  section_5_saklanmasi: string | null
+  parse_quality_score: number | null
+}
+
+const KT_SECTION_CHAR_LIMIT = 1500
+const KT_CONTEXT_CHAR_LIMIT = 8000
+const MIN_KT_PARSE_QUALITY_SCORE = 3
+
 const FORBIDDEN_PATTERNS: RegExp[] = [
   /(teşhis|tanı)\s+(konuldu|edildi)/gi,
   /yeni\s+başla.*\d+\s*mg|\d+\s*mg\s+almaya\s+başla/gi,
@@ -111,6 +144,17 @@ const SOFT_EMERGENCY = [
   'zehirlendim',
   'çocuğum düştü',
   'çocuk ilaç içti',
+]
+
+const KT_USAGE_TRIGGERS = [
+  'kullan', 'doz', 'nasıl', 'ne zaman', 'aç karnına', 'ac karnina',
+  'tok', 'birlikte', 'etkileşim', 'etkilesim', 'alabilir miyim',
+]
+
+const KT_SIDE_EFFECT_TRIGGERS = [
+  'yan etki', 'zarar', 'bulantı', 'bulanti', 'baş dönmesi', 'bas donmesi',
+  'alerji', 'döküntü', 'dokuntu', 'kaşıntı', 'kasinti', 'kusma', 'ishal',
+  'uyku', 'sersemlik', 'çarpıntı', 'carpinti',
 ]
 
 function sanitizeUserInput(
@@ -409,6 +453,149 @@ function genderTr(gender: string | null): string {
   return 'belirtilmemiş'
 }
 
+function firstMedicationRelation(row: UserMedicationRow): MedicationV2Row | null {
+  if (Array.isArray(row.medicationsV2)) {
+    return row.medicationsV2[0] ?? null
+  }
+  return row.medicationsV2
+}
+
+function hasContextTrigger(message: string, triggers: string[]): boolean {
+  const normalizedMessage = normalizeForMatch(message)
+  return triggers.some((trigger) => normalizedMessage.includes(normalizeForMatch(trigger)))
+}
+
+function ktContextLayer(message: string): 0 | 1 | 2 {
+  if (hasContextTrigger(message, KT_SIDE_EFFECT_TRIGGERS)) return 2
+  if (hasContextTrigger(message, KT_USAGE_TRIGGERS)) return 1
+  return 0
+}
+
+function truncateSection(text: string | null): string | null {
+  const cleaned = (text ?? '').trim()
+  if (!cleaned) return null
+  return cleaned.slice(0, KT_SECTION_CHAR_LIMIT)
+}
+
+function medicationRelevanceScore(medication: UserMedicationContext, message: string): number {
+  const normalizedMessage = normalizeForMatch(message)
+  const normalizedName = normalizeForMatch(medication.name)
+  const normalizedIngredient = normalizeForMatch(medication.activeIngredient ?? '')
+  let score = 0
+
+  if (normalizedName && normalizedMessage.includes(normalizedName)) score += 4
+  const firstNameToken = normalizedName.split(/\s+/)[0]
+  if (firstNameToken && normalizedMessage.includes(firstNameToken)) score += 2
+  if (normalizedIngredient && normalizedMessage.includes(normalizedIngredient)) score += 3
+  return score
+}
+
+function sortMedicationsForContext(
+  medications: UserMedicationContext[],
+  message: string,
+): UserMedicationContext[] {
+  if (medications.length < 5) return medications
+  return [...medications].sort(
+    (a, b) => medicationRelevanceScore(b, message) - medicationRelevanceScore(a, message),
+  )
+}
+
+function formatMedicationKtBlock(
+  medication: UserMedicationContext,
+  kt: MedicationKtRow,
+  layer: 0 | 1 | 2,
+): string | null {
+  const title = medication.activeIngredient
+    ? `İlaç: ${medication.name} (${medication.activeIngredient})`
+    : `İlaç: ${medication.name}`
+  const lines = [title]
+  if (medication.dosage) lines.push(`Kullanıcı doz kaydı: ${medication.dosage}`)
+
+  if ((kt.parse_quality_score ?? 0) < MIN_KT_PARSE_QUALITY_SCORE) {
+    lines.push(
+      `${medication.name} için detaylı prospektüs bilgisi şu an mevcut değil, eczacınıza danışabilirsiniz.`,
+    )
+    return lines.join('\n')
+  }
+
+  const section1 = truncateSection(kt.section_1_nedir)
+  const section2 = truncateSection(kt.section_2_kullanmadan_once)
+  const section3 = truncateSection(kt.section_3_nasil_kullanilir)
+  const section4 = truncateSection(kt.section_4_yan_etkiler)
+  const section5 = truncateSection(kt.section_5_saklanmasi)
+
+  if (section1) lines.push(`Ne için: ${section1}`)
+  if (layer >= 1 && section2) lines.push(`Dikkat: ${section2}`)
+  if (layer >= 1 && section3) lines.push(`Kullanım: ${section3}`)
+  if (layer >= 2 && section4) lines.push(`Yan etkiler: ${section4}`)
+  if (section5) lines.push(`Saklama: ${section5}`)
+
+  return lines.length > (medication.dosage ? 2 : 1) ? lines.join('\n') : null
+}
+
+async function buildMedicationKtContext(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  medications: UserMedicationContext[],
+  message: string,
+): Promise<string> {
+  if (medications.length === 0) return ''
+
+  const medicationIds = medications.map((medication) => medication.id)
+  const { data, error } = await supabaseAdmin
+    .from('medication_kt')
+    .select(`
+      medication_id,
+      section_1_nedir,
+      section_2_kullanmadan_once,
+      section_3_nasil_kullanilir,
+      section_4_yan_etkiler,
+      section_5_saklanmasi,
+      parse_quality_score
+    `)
+    .in('medication_id', medicationIds)
+
+  if (error) {
+    console.error('chat-fn: medication-kt:', error)
+    return ''
+  }
+
+  const ktByMedicationId = new Map<string, MedicationKtRow>()
+  for (const row of (data ?? []) as MedicationKtRow[]) {
+    ktByMedicationId.set(row.medication_id, row)
+  }
+
+  const layer = ktContextLayer(message)
+  const blocks: string[] = []
+  let totalLength = 0
+
+  for (const medication of sortMedicationsForContext(medications, message)) {
+    const kt = ktByMedicationId.get(medication.id)
+    if (!kt) continue
+
+    const block = formatMedicationKtBlock(medication, kt, layer)
+    if (!block) continue
+
+    const nextLength = totalLength + block.length + 2
+    if (nextLength > KT_CONTEXT_CHAR_LIMIT) {
+      if (blocks.length === 0) {
+        blocks.push(block.slice(0, KT_CONTEXT_CHAR_LIMIT))
+      }
+      break
+    }
+
+    blocks.push(block)
+    totalLength = nextLength
+  }
+
+  if (blocks.length === 0) return ''
+
+  return `📋 KULLANICININ İLAÇLARI (TİTCK PROSPEKTÜS BİLGİSİ):
+
+${blocks.join('\n\n')}
+
+ÖNEMLİ: Bu bilgiyi prospektüsten aktar, yorumlama. Yanıta gerekiyorsa "Prospektüsüne göre..." diye başla. Doz değiştirme ve yeni ilaç önerme yasakları geçerlidir.`
+}
+
 function buildSystemPromptBase(userContext: string, isEmergencyFlagged: boolean): string {
   return `
 ═══════════════════════════════════════════
@@ -459,6 +646,7 @@ function buildSystemPrompt(
   profile: Profile | null,
   conditions: string[],
   medications: string[],
+  medicationKtContext: string,
   isEmergencyFlagged: boolean,
 ): string {
   const name = profile?.full_name ?? 'Kullanıcı'
@@ -475,7 +663,9 @@ function buildSystemPrompt(
 - Boy: ${height}
 - Kilo: ${weight}
 - Kronik hastalıklar: ${conditionsList}
-- Düzenli kullandığı ilaçlar: ${medicationsList}`
+- Düzenli kullandığı ilaçlar: ${medicationsList}${
+  medicationKtContext ? `\n\n${medicationKtContext}` : ''
+}`
 
   return buildSystemPromptBase(userContext, isEmergencyFlagged)
 }
@@ -536,6 +726,7 @@ Deno.serve(async (req) => {
     let profile: Profile | null = null
     let conditions: string[] = []
     let medications: string[] = []
+    let medicationContexts: UserMedicationContext[] = []
 
     const [profileRes, condRes, medRes] = await Promise.all([
       supabaseAdmin
@@ -549,7 +740,15 @@ Deno.serve(async (req) => {
         .eq('user_id', userId),
       supabaseAdmin
         .from('user_medications')
-        .select('dosage, medications(ilac_adi)')
+        .select(`
+          medication_id,
+          dosage,
+          medicationsV2 (
+            id,
+            ilac_adi,
+            etkin_madde_adi
+          )
+        `)
         .eq('user_id', userId)
         .eq('is_active', true),
     ])
@@ -561,14 +760,24 @@ Deno.serve(async (req) => {
       .map((r) => r.conditions_catalog?.name)
       .filter((n): n is string => !!n)
 
-    type MedRow = { dosage: string | null; medications: { ilac_adi: string } | null }
-    medications = ((medRes.data ?? []) as MedRow[])
+    medicationContexts = ((medRes.data ?? []) as UserMedicationRow[])
       .map((r) => {
-        const medName = r.medications?.ilac_adi
-        if (!medName) return null
-        return r.dosage ? `${medName} (${r.dosage})` : medName
+        const med = firstMedicationRelation(r)
+        if (!med?.id || !med.ilac_adi) return null
+        return {
+          id: med.id,
+          name: med.ilac_adi,
+          activeIngredient: med.etkin_madde_adi,
+          dosage: r.dosage,
+        }
       })
-      .filter((n): n is string => !!n)
+      .filter((med): med is UserMedicationContext => med !== null)
+
+    medications = medicationContexts
+      .map((r) => {
+        const activeIngredient = r.activeIngredient ? ` / ${r.activeIngredient}` : ''
+        return r.dosage ? `${r.name}${activeIngredient} (${r.dosage})` : `${r.name}${activeIngredient}`
+      })
 
     // ── chat_history: son 20 mesajı çek ──────────────────────────────────────
     // Strateji: DB geçmişi (önceki oturumlar) + client'ın son mesajı (bu oturum).
@@ -653,6 +862,12 @@ Ambulans yola çıktıktan sonra bana belirti detaylarını yazabilirsin.`
       )
     }
 
+    const medicationKtContext = await buildMedicationKtContext(
+      supabaseAdmin,
+      medicationContexts,
+      currentMessage.content,
+    )
+
     const groqMessages: ApiMessage[] = [...historyMessages, currentMessage]
 
     const groqKey = Deno.env.get('GROQ_API_KEY')
@@ -679,7 +894,13 @@ Ambulans yola çıktıktan sonra bana belirti detaylarını yazabilirsin.`
         messages: [
           {
             role: 'system',
-            content: buildSystemPrompt(profile, conditions, medications, finalEmergencyFlag),
+            content: buildSystemPrompt(
+              profile,
+              conditions,
+              medications,
+              medicationKtContext,
+              finalEmergencyFlag,
+            ),
           },
           ...groqMessages,
         ],
