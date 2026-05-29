@@ -28,7 +28,9 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
 type Strength = 'weak' | 'medium' | 'strong';
 type ConsentKey = 'kvkk_read' | 'saglik_veri' | 'ai_transfer' | 'chat_history' | 'age_18';
+type ReadableConsentKey = Exclude<ConsentKey, 'age_18'>;
 type ConsentState = Record<ConsentKey, boolean>;
+type ReadState = Record<ReadableConsentKey, boolean>;
 
 const INITIAL_CONSENTS: ConsentState = {
   kvkk_read: false,
@@ -36,6 +38,20 @@ const INITIAL_CONSENTS: ConsentState = {
   ai_transfer: false,
   chat_history: false,
   age_18: false,
+};
+
+const INITIAL_READ_STATE: ReadState = {
+  kvkk_read: false,
+  saglik_veri: false,
+  ai_transfer: false,
+  chat_history: false,
+};
+
+const CONSENT_DOCUMENTS: Record<ReadableConsentKey, LegalDocumentId> = {
+  kvkk_read: 'kvkk_aydinlatma',
+  saglik_veri: 'acik_riza',
+  ai_transfer: 'acik_riza',
+  chat_history: 'acik_riza',
 };
 
 function maxAdultBirthDate(): Date {
@@ -160,25 +176,43 @@ function FocusInput(props: FocusInputProps) {
 interface ConsentRowProps {
   checked: boolean;
   label: string;
-  onPress: () => void;
-  onDetail?: () => void;
+  onToggle: () => void;
+  onRead?: () => void;
+  hasRead?: boolean;
+  readRequired?: boolean;
   disabled?: boolean;
 }
 
-function ConsentRow({ checked, label, onPress, onDetail, disabled }: ConsentRowProps) {
+function ConsentRow({
+  checked,
+  label,
+  onToggle,
+  onRead,
+  hasRead = true,
+  readRequired = true,
+  disabled,
+}: ConsentRowProps) {
+  const checkboxDisabled = disabled || (readRequired && !hasRead);
+
   return (
     <View style={styles.consentRow}>
-      <Pressable style={styles.consentMain} onPress={onPress} disabled={disabled}>
+      <Pressable
+        style={[styles.consentMain, checkboxDisabled && styles.consentMainDisabled]}
+        onPress={onToggle}
+        disabled={checkboxDisabled}
+      >
         <Ionicons
           name={checked ? 'checkbox' : 'square-outline'}
           size={22}
-          color={checked ? C.primary : C.text3}
+          color={checkboxDisabled ? C.text3 : checked ? C.primary : C.text2}
         />
         <Text style={styles.consentText}>{label}</Text>
       </Pressable>
-      {onDetail ? (
-        <Pressable onPress={onDetail} disabled={disabled} hitSlop={8}>
-          <Text style={styles.detailText}>Detay</Text>
+      {onRead ? (
+        <Pressable onPress={onRead} disabled={disabled} hitSlop={8} style={styles.readBtn}>
+          <Text style={[styles.detailText, hasRead && styles.detailTextRead]}>
+            {hasRead ? '✓ Okundu' : '📄 Oku'}
+          </Text>
         </Pressable>
       ) : null}
     </View>
@@ -192,9 +226,10 @@ export default function RegisterScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm]   = useState('');
   const [consents, setConsents] = useState<ConsentState>(INITIAL_CONSENTS);
+  const [hasRead, setHasRead] = useState<ReadState>(INITIAL_READ_STATE);
   const [birthDate, setBirthDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [legalDetail, setLegalDetail] = useState<LegalDocumentId | null>(null);
+  const [readingConsent, setReadingConsent] = useState<ReadableConsentKey | null>(null);
   const [error, setError]       = useState<string | null>(null);
   const [loading, setLoading]   = useState(false);
 
@@ -220,14 +255,10 @@ export default function RegisterScreen({ navigation }: Props) {
     setConsents((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
-  function acceptAllConsents() {
-    setConsents({
-      kvkk_read: true,
-      saglik_veri: true,
-      ai_transfer: true,
-      chat_history: true,
-      age_18: true,
-    });
+  function confirmConsentRead() {
+    if (!readingConsent) return;
+    setHasRead((prev) => ({ ...prev, [readingConsent]: true }));
+    setConsents((prev) => ({ ...prev, [readingConsent]: true }));
   }
 
   function buildPendingConsents(): PendingConsent[] {
@@ -289,7 +320,7 @@ export default function RegisterScreen({ navigation }: Props) {
       return;
     }
     if (!requiredConsentsAccepted) {
-      setError('Devam etmek için zorunlu rıza kutularını işaretlemelisin.');
+      setError('Devam etmek için zorunlu metinleri okuyup onaylamalısın.');
       return;
     }
     setLoading(true);
@@ -445,40 +476,42 @@ export default function RegisterScreen({ navigation }: Props) {
               <ConsentRow
                 checked={consents.kvkk_read}
                 label="KVKK Aydınlatma Metni'ni okudum"
-                onPress={() => toggleConsent('kvkk_read')}
-                onDetail={() => setLegalDetail('kvkk_aydinlatma')}
+                onToggle={() => toggleConsent('kvkk_read')}
+                onRead={() => setReadingConsent('kvkk_read')}
+                hasRead={hasRead.kvkk_read}
                 disabled={loading}
               />
               <ConsentRow
                 checked={consents.saglik_veri}
                 label="Sağlık verilerimin işlenmesine açık rıza veriyorum"
-                onPress={() => toggleConsent('saglik_veri')}
-                onDetail={() => setLegalDetail('acik_riza')}
+                onToggle={() => toggleConsent('saglik_veri')}
+                onRead={() => setReadingConsent('saglik_veri')}
+                hasRead={hasRead.saglik_veri}
                 disabled={loading}
               />
               <ConsentRow
                 checked={consents.ai_transfer}
                 label="AI servisine veri aktarımına rıza veriyorum (opsiyonel)"
-                onPress={() => toggleConsent('ai_transfer')}
-                onDetail={() => setLegalDetail('acik_riza')}
+                onToggle={() => toggleConsent('ai_transfer')}
+                onRead={() => setReadingConsent('ai_transfer')}
+                hasRead={hasRead.ai_transfer}
                 disabled={loading}
               />
               <ConsentRow
                 checked={consents.chat_history}
                 label="Sohbet geçmişimin saklanmasına rıza veriyorum"
-                onPress={() => toggleConsent('chat_history')}
-                onDetail={() => setLegalDetail('acik_riza')}
+                onToggle={() => toggleConsent('chat_history')}
+                onRead={() => setReadingConsent('chat_history')}
+                hasRead={hasRead.chat_history}
                 disabled={loading}
               />
               <ConsentRow
                 checked={consents.age_18}
                 label="18 yaşından büyüğüm"
-                onPress={() => toggleConsent('age_18')}
+                onToggle={() => toggleConsent('age_18')}
+                readRequired={false}
                 disabled={loading}
               />
-              <Pressable style={styles.acceptAllBtn} onPress={acceptAllConsents} disabled={loading}>
-                <Text style={styles.acceptAllText}>Tümünü Kabul Ediyorum</Text>
-              </Pressable>
             </View>
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -498,9 +531,11 @@ export default function RegisterScreen({ navigation }: Props) {
         </ScrollView>
       </KeyboardAvoidingView>
       <LegalDocumentModal
-        visible={legalDetail !== null}
-        documentId={legalDetail}
-        onClose={() => setLegalDetail(null)}
+        visible={readingConsent !== null}
+        documentId={readingConsent ? CONSENT_DOCUMENTS[readingConsent] : null}
+        onClose={() => setReadingConsent(null)}
+        onConfirm={confirmConsentRead}
+        mode="consent"
       />
     </SafeAreaView>
   );
@@ -582,17 +617,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   consentMain: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  consentMainDisabled: { opacity: 0.48 },
   consentText: { flex: 1, color: C.text2, fontSize: 13, lineHeight: 19 },
+  readBtn: { paddingVertical: 2 },
   detailText: { color: C.primary, fontSize: 12, fontWeight: '700' },
-  acceptAllBtn: {
-    borderWidth: 1,
-    borderColor: C.primary,
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  acceptAllText: { color: C.primary, fontSize: 13, fontWeight: '700' },
+  detailTextRead: { color: C.success },
 
   error: { color: C.error, fontSize: 14, marginBottom: 12 },
 
