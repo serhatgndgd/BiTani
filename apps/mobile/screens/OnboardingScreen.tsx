@@ -204,32 +204,43 @@ export default function OnboardingScreen({ onComplete }: Props) {
   }, [step]);
 
   useEffect(() => {
-    if (step !== 4 || noChronic || selectedIds.size === 0) return;
+    if (step !== 4) return;
+    const q = medSearch.trim();
+    if (q.length < 2) {
+      setMedRows([]);
+      setLoadingMeds(false);
+      setMedError(null);
+      return;
+    }
     let cancelled = false;
-    setLoadingMeds(true); setMedError(null);
-    (async () => {
+    const timer = setTimeout(async () => {
+      setLoadingMeds(true); setMedError(null);
       const { data, error } = await supabase
-        .from('condition_medications')
-        .select('condition_id, medications(id, ilac_adi, etkin_madde_adi)')
-        .in('condition_id', Array.from(selectedIds));
+        .from('medicationsV2')
+        .select('id, ilac_adi, etkin_madde_adi')
+        .or(`ilac_adi.ilike.%${q}%,etkin_madde_adi.ilike.%${q}%`)
+        .order('ilac_adi')
+        .limit(40);
       if (cancelled) return;
       setLoadingMeds(false);
       if (error) {
         console.error('onboarding-screen:', error);
         setMedError('İlaçlar yüklenemedi. Bağlantını kontrol et.');
+        setMedRows([]);
         return;
       }
-      type RawRow = {
-        condition_id: string;
-        medications: { id: string; ilac_adi: string; etkin_madde_adi: string | null } | null;
-      };
-      const rows: MedRow[] = ((data ?? []) as unknown as RawRow[])
-        .filter((r) => r.medications != null)
-        .map((r) => ({ condition_id: r.condition_id, medication: r.medications! }));
+      type MedicationSearchRow = { id: string; ilac_adi: string; etkin_madde_adi: string | null };
+      const rows: MedRow[] = ((data ?? []) as MedicationSearchRow[]).map((medication) => ({
+        condition_id: '__search__',
+        medication,
+      }));
       setMedRows(rows);
-    })();
-    return () => { cancelled = true; };
-  }, [step, selectedIds, noChronic]);
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [step, medSearch]);
 
   const filteredConditions = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -477,6 +488,9 @@ export default function OnboardingScreen({ onComplete }: Props) {
     () => (
       <>
         <Text style={styles.title}>Kullandığın İlaçlar</Text>
+        <Text style={styles.infoText}>
+          Hastalığa göre öneriler geçici olarak kapalı. Kullandığın ilacı adıyla arayabilirsin.
+        </Text>
         <TextInput
           style={styles.input}
           value={medSearch}
@@ -501,9 +515,11 @@ export default function OnboardingScreen({ onComplete }: Props) {
       <>
         {showEmpty && (
           <Text style={styles.infoText}>
-            {isSearching
+            {medSearch.trim().length === 1
+              ? 'İlaç aramak için en az 2 harf yazın.'
+              : isSearching
               ? 'Aramanızla eşleşen ilaç bulunamadı.'
-              : 'Seçilen hastalıklar için veritabanında ilaç kaydı bulunamadı.'}
+              : 'İlaç eklemek için arama kutusuna en az 2 harf yazın.'}
           </Text>
         )}
         {stepError && <Text style={styles.err}>{stepError}</Text>}
