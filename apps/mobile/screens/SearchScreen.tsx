@@ -106,7 +106,7 @@ export default function SearchScreen() {
 
     try {
       const { data, error } = await supabase
-        .from('medications')
+        .from('medicationsV2')
         .select('id, ilac_adi, etkin_madde_adi, firma_adi, kub_url, kt_url')
         .or(`ilac_adi.ilike.%${q}%,etkin_madde_adi.ilike.%${q}%`)
         .order('ilac_adi')
