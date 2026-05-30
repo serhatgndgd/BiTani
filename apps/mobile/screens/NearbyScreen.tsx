@@ -259,6 +259,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 function NearbySkeletonList() {
+  const { colors: C } = useTheme();
   return (
     <View style={{ paddingHorizontal: 14, paddingTop: 4, gap: 10 }}>
       {[0, 1, 2, 3].map((i) => (
@@ -294,6 +295,8 @@ interface EczaneCardProps {
 }
 
 function EczaneCard({ item, userCoords }: EczaneCardProps) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   const hasPhone  = item.telefon.trim().length > 0;
   const hasCoords = item.lat !== null && item.lng !== null;
 
@@ -350,6 +353,8 @@ interface PlaceCardProps {
 }
 
 function PlaceCard({ item, userCoords, isPharmacy = false }: PlaceCardProps) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && { opacity: 0.72 }]}

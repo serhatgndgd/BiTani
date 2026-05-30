@@ -886,7 +886,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
                     <Pressable key={value} style={[styles.chip, on && styles.chipSelected]}
                       onPress={() => setGender(value)} disabled={saving}>
                       <Text style={[styles.chipText, on && styles.chipTextSelected]}>{label}</Text>
-                      {on && <Ionicons name={ICON_ON} size={18} color={C.text1} />}
+                      {on && <Ionicons name={ICON_ON} size={18} color={C.onPrimary} />}
                     </Pressable>
                   );
                 })}
@@ -991,7 +991,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
                 </Pressable>
               )
             : <Pressable style={[styles.primaryBtn, saving && styles.primaryBtnDisabled]} onPress={handleSave} disabled={saving}>
-                {saving ? <ActivityIndicator color={C.text1} /> : <Text style={styles.primaryBtnText}>Tamamla</Text>}
+                {saving ? <ActivityIndicator color={C.onPrimary} /> : <Text style={styles.primaryBtnText}>Tamamla</Text>}
               </Pressable>}
         </View>
         {step === 1 ? (
@@ -1045,7 +1045,7 @@ function createStyles(C: ThemeColors) {
   },
   chipSelected:     { borderColor: C.primary, backgroundColor: C.primary },
   chipText:         { color: C.text1, fontSize: 15 },
-  chipTextSelected: { color: C.text1, fontWeight: '600' },
+  chipTextSelected: { color: C.onPrimary, fontWeight: '600' },
 
   bmiWarn: { color: C.warning, fontSize: 14, marginTop: 4, marginBottom: 8 },
   ageWarning: { color: C.warning, fontSize: 13, marginTop: -8, marginBottom: 14 },
@@ -1123,7 +1123,7 @@ function createStyles(C: ThemeColors) {
   secondaryBtnText:   { color: C.text1, fontSize: 16, fontWeight: '600' },
   primaryBtn:         { flex: 1, paddingVertical: 14, borderRadius: 10, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
   primaryBtnDisabled: { opacity: 0.7 },
-  primaryBtnText:     { color: C.text1, fontSize: 16, fontWeight: '700' },
+  primaryBtnText:     { color: C.onPrimary, fontSize: 16, fontWeight: '700' },
   signOutLink:        { alignItems: 'center', marginTop: 14, paddingVertical: 4 },
   signOutLinkText:    { color: C.text3, fontSize: 13 },
 

@@ -116,6 +116,8 @@ interface FocusInputProps {
 }
 
 function FocusInput(props: FocusInputProps) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   const anim = useRef(new Animated.Value(0)).current;
 
   function handleFocus() {
@@ -184,6 +186,8 @@ function ConsentRow({
   readRequired = true,
   disabled,
 }: ConsentRowProps) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   const checkboxDisabled = disabled || (readRequired && !hasRead);
 
   return (

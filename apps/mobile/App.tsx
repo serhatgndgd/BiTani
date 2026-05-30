@@ -181,7 +181,7 @@ function BiometricGate({ onRetry, C, styles }: BiometricGateProps) {
         style={({ pressed }) => [styles.biometricBtn, pressed && { opacity: 0.8 }]}
         onPress={onRetry}
       >
-        <Ionicons name="finger-print-outline" size={18} color={C.text1} />
+        <Ionicons name="finger-print-outline" size={18} color={C.onPrimary} />
         <Text style={styles.biometricBtnText}>Tekrar Dene</Text>
       </Pressable>
     </View>
@@ -429,7 +429,7 @@ function createStyles(C: ThemeColors) {
     borderColor: C.primaryDim,
   },
   biometricTitle: {
-    color: C.text1,
+    color: C.onPrimary,
     fontSize: 26,
     fontWeight: '700',
     letterSpacing: -0.3,

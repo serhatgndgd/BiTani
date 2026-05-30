@@ -183,6 +183,8 @@ function buildWelcomeMessage(profile: ProfileRow | null, conditions: string[]): 
 // ─── Alt bileşenler ───────────────────────────────────────────────────────────
 
 function MessageBubble({ message }: { message: Message }) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   const isUser = message.role === 'user';
 
   // Kullanıcı: düz metin; asistan: markdown
@@ -230,6 +232,8 @@ function MessageBubble({ message }: { message: Message }) {
 }
 
 function TypingIndicator() {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   return (
     <View style={styles.bubbleRow}>
       <View style={[styles.bubble, styles.bubbleAssistant, styles.typingBubble]}>
@@ -248,6 +252,8 @@ function ChatHistoryRowItem({
   onPress: (sessionId: string) => void;
   onLongPress: (session: ChatSessionSummary) => void;
 }) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   return (
     <Pressable
       style={({ pressed }) => [styles.historyRow, pressed && { opacity: 0.72 }]}
@@ -735,7 +741,7 @@ function createStyles(C: ThemeColors) {
   bubbleAssistant: { backgroundColor: C.surface, borderBottomLeftRadius: 4 },
   bubbleUser:      { backgroundColor: C.primary,  borderBottomRightRadius: 4 },
   bubbleText:      { color: C.text1, fontSize: 15, lineHeight: 22 },
-  bubbleTextUser:  { color: C.text1 },
+  bubbleTextUser:  { color: C.onPrimary },
 
   /* Timestamp — sağ alta hizalı (WhatsApp/Telegram standardı) */
   bubbleTs: { fontSize: 10, color: C.text3, marginTop: 5, textAlign: 'right' },

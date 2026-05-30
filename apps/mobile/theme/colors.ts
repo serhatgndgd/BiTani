@@ -9,6 +9,9 @@ export const darkTheme = {
   primary:     '#2563eb',
   primaryLight:'rgba(37,99,235,0.18)',
   primaryDim:  'rgba(37,99,235,0.12)',
+  onPrimary:   '#FFFFFF',
+  onPrimaryMuted: 'rgba(255,255,255,0.72)',
+  onPrimaryDim: 'rgba(255,255,255,0.18)',
 
   text1:       '#f5f5f5',
   text2:       '#a1a1aa',
@@ -28,18 +31,21 @@ export const darkTheme = {
 export const lightTheme = {
   bg:          '#FFFFFF',
   card:        '#FFFFFF',
-  surface:     '#F5F5F5',
+  surface:     '#F3F4F6',
   surfaceAlt:  '#FFFFFF',
-  border:      '#E0E0E0',
+  border:      '#D1D5DB',
   overlay:     'rgba(0,0,0,0.42)',
 
   primary:     darkTheme.primary,
   primaryLight:'rgba(37,99,235,0.10)',
   primaryDim:  'rgba(37,99,235,0.12)',
+  onPrimary:   '#FFFFFF',
+  onPrimaryMuted: 'rgba(255,255,255,0.72)',
+  onPrimaryDim: 'rgba(255,255,255,0.18)',
 
   text1:       '#1A1A1A',
   text2:       '#4A4A4A',
-  text3:       '#8A8A8A',
+  text3:       '#6B7280',
 
   success:     darkTheme.success,
   successDim:  'rgba(34,197,94,0.12)',

@@ -1031,7 +1031,7 @@ export default function ProfileScreen() {
                   <Text style={styles.cancelBtnText}>İptal</Text>
                 </Pressable>
                 <Pressable style={[styles.saveBtn, savingProfile && styles.saveBtnDisabled]} onPress={() => void saveProfile()} disabled={savingProfile}>
-                  {savingProfile ? <ActivityIndicator color={C.text1} /> : <Text style={styles.saveBtnText}>Kaydet</Text>}
+                  {savingProfile ? <ActivityIndicator color={C.onPrimary} /> : <Text style={styles.saveBtnText}>Kaydet</Text>}
                 </Pressable>
               </View>
             </View>
@@ -1281,7 +1281,7 @@ export default function ProfileScreen() {
                     disabled={addingMed}
                   >
                     {addingMed
-                      ? <ActivityIndicator color={C.text1} />
+                      ? <ActivityIndicator color={C.onPrimary} />
                       : <Text style={styles.modalPrimaryBtnText}>İlaçları Kaydet ({modalSelectedMedIds.size})</Text>}
                   </Pressable>
                 </View>
@@ -1311,7 +1311,7 @@ export default function ProfileScreen() {
                     <Text style={styles.cancelBtnText}>Geri</Text>
                   </Pressable>
                   <Pressable style={[styles.saveBtn, addingMed && styles.saveBtnDisabled]} onPress={() => void addSingleMedication()} disabled={addingMed}>
-                    {addingMed ? <ActivityIndicator color={C.text1} /> : <Text style={styles.saveBtnText}>Ekle</Text>}
+                    {addingMed ? <ActivityIndicator color={C.onPrimary} /> : <Text style={styles.saveBtnText}>Ekle</Text>}
                   </Pressable>
                 </View>
               </View>
@@ -1397,6 +1397,8 @@ export default function ProfileScreen() {
 }
 
 function LegalRow({ title, onPress }: { title: string; onPress: () => void }) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   return (
     <Pressable style={styles.legalRow} onPress={onPress}>
       <Text style={styles.legalRowText}>{title}</Text>
@@ -1406,6 +1408,8 @@ function LegalRow({ title, onPress }: { title: string; onPress: () => void }) {
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   return (
     <View style={styles.infoRow}>
       <Text style={styles.infoLabel}>{label}</Text>
@@ -1452,7 +1456,7 @@ function createStyles(C: ThemeColors) {
   cancelBtnText: { color: C.text1, fontSize: 15, fontWeight: '600' },
   saveBtn: { flex: 1, paddingVertical: 13, borderRadius: 10, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
   saveBtnDisabled: { opacity: 0.6 },
-  saveBtnText: { color: C.text1, fontSize: 15, fontWeight: '700' },
+  saveBtnText: { color: C.onPrimary, fontSize: 15, fontWeight: '700' },
 
   emptyText: { color: C.text3, fontSize: 14 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -1544,7 +1548,7 @@ function createStyles(C: ThemeColors) {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  modalPrimaryBtnText: { color: C.text1, fontSize: 15, fontWeight: '800' },
+  modalPrimaryBtnText: { color: C.onPrimary, fontSize: 15, fontWeight: '800' },
 
   confirmBackdrop: {
     flex: 1,

@@ -134,6 +134,7 @@ const BMI_MIN = 10;
 const BMI_MAX = 40;
 
 function BmiRing({ bmi, color }: { bmi: number; color: string }) {
+  const { colors: C } = useTheme();
   const progress = Math.min(1, Math.max(0, (bmi - BMI_MIN) / (BMI_MAX - BMI_MIN)));
   const fillLen  = RING_ARC_LEN * progress;
 
@@ -429,13 +430,13 @@ export default function HomeScreen() {
           onPress={() => navigation.navigate('Chat')}
         >
           <View style={styles.ctaIcon}>
-            <Ionicons name="chatbubble-ellipses" size={22} color={C.text1} />
+            <Ionicons name="chatbubble-ellipses" size={22} color={C.onPrimary} />
           </View>
           <View style={styles.ctaText}>
-            <Text style={styles.ctaTitle}>Bilgi Rehberine Sor</Text>
-            <Text style={styles.ctaSub}>Sağlık sorularınız için yapay zeka destekli rehber</Text>
+            <Text style={styles.ctaPrimaryTitle}>Bilgi Rehberine Sor</Text>
+            <Text style={styles.ctaPrimarySub}>Sağlık sorularınız için yapay zeka destekli rehber</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.45)" />
+          <Ionicons name="chevron-forward" size={18} color={C.onPrimaryMuted} />
         </Pressable>
 
       </ScrollView>
@@ -596,13 +597,15 @@ function createStyles(C: ThemeColors) {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: C.onPrimaryDim,
     justifyContent: 'center',
     alignItems: 'center',
   },
   ctaText:       { flex: 1 },
   ctaTitle:      { color: C.text1, fontSize: 15, fontWeight: '700' },
-  ctaSub:        { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 2 },
+  ctaSub:        { color: C.text3, fontSize: 12, marginTop: 2 },
+  ctaPrimaryTitle: { color: C.onPrimary, fontSize: 15, fontWeight: '700' },
+  ctaPrimarySub: { color: C.onPrimaryMuted, fontSize: 12, marginTop: 2 },
 
   ctaNearby:     { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border },
   ctaNearbyIcon: { backgroundColor: C.errorDim },

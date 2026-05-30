@@ -201,7 +201,7 @@ function createStyles(C: ThemeColors) {
     elevation: 6,
   },
   pressed:     { opacity: 0.88 },
-  primaryText: { color: C.text1, fontSize: 17, fontWeight: '700' },
+  primaryText: { color: C.onPrimary, fontSize: 17, fontWeight: '700' },
 
   linkWrap: { marginTop: 24, paddingVertical: 10, paddingHorizontal: 16 },
   linkText: { color: C.primary, fontSize: 15, fontWeight: '400' },

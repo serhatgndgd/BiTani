@@ -268,7 +268,7 @@ function createStyles(C: ThemeColors) {
     alignItems: 'center',
   },
   consentButtonText: {
-    color: C.text1,
+    color: C.onPrimary,
     fontSize: 15,
     fontWeight: '700',
   },
