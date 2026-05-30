@@ -22,6 +22,7 @@ import { C } from '../theme';
 const NOBETECZA_KEY   = (process.env.EXPO_PUBLIC_NOBETECZA_API_KEY ?? '') as string;
 const HOSPITAL_RADIUS = 5000; // 5 km
 const PHARMACY_RADIUS = 3000; // 3 km
+const CLIENT_FETCH_TIMEOUT_MS = 10000;
 
 // ─── Tipler ───────────────────────────────────────────────────────────────────
 
@@ -227,13 +228,29 @@ function buildEczaneOsmQuery(lat: number, lng: number): string {
 }
 
 async function fetchOverpass(query: string): Promise<OverpassResponse> {
-  const res = await fetch('https://overpass-api.de/api/interpreter', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `data=${encodeURIComponent(query)}`,
-  });
+  const res = await withTimeout(
+    fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `data=${encodeURIComponent(query)}`,
+    }),
+    CLIENT_FETCH_TIMEOUT_MS,
+  );
   if (!res.ok) throw new Error(`Overpass API hatası: ${res.status}`);
   return (await res.json()) as OverpassResponse;
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('timeout')), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -664,7 +681,7 @@ export default function NearbyScreen() {
           <View style={styles.center}>
             <EmptyState
               icon="business-outline"
-              title="Hastane bulunamadı"
+              title="Yakın hastane bulunamadı"
               subtitle={`${HOSPITAL_RADIUS / 1000} km içinde hastane yok.`}
               paddingTop={0}
             />
