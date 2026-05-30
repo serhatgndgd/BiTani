@@ -155,6 +155,14 @@ function genderLabel(g: Gender | null): string {
   return '—';
 }
 
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return '-';
+  const [year, month, day] = dateStr.split('-');
+  const monthName = MONTH_LABELS[parseInt(month, 10) - 1];
+  if (!year || !monthName || !day) return '-';
+  return `${parseInt(day, 10)} ${monthName} ${year}`;
+}
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const [userId, setUserId] = useState<string | null>(null);
@@ -904,7 +912,7 @@ export default function ProfileScreen() {
           {!editingProfile ? (
             <View style={styles.infoBlock}>
               <InfoRow label="Ad Soyad" value={profile?.full_name || '—'} />
-              <InfoRow label="Doğum Tarihi" value={profile?.birth_date || '—'} />
+              <InfoRow label="Doğum Tarihi" value={formatDate(profile?.birth_date ?? null)} />
               <InfoRow label="Cinsiyet" value={genderLabel(profile?.gender ?? null)} />
               <InfoRow label="Boy" value={profile?.height_cm != null ? `${profile.height_cm} cm` : '—'} />
               <InfoRow label="Kilo" value={profile?.weight_kg != null ? `${profile.weight_kg} kg` : '—'} />
