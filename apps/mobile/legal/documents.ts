@@ -18,7 +18,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentId, LegalDocument> = {
 
 ## 1. Veri Sorumlusu
 
-BiTanı, bir üniversite bitirme projesi olarak geliştirilmiş bir mobil sağlık bilgi rehberi uygulamasıdır. Bu uygulama Yetkin Ersinörün ve Serhat Gündoğdu tarafından akademik amaçlarla geliştirilmektedir. Ticari bir hizmet değildir.
+BiTanı, bir üniversite bitirme projesi olarak geliştirilmiş bir mobil sağlık bilgi rehberi uygulamasıdır. Bu uygulama Yetkin Ersin Örün ve Serhat Gündoğdu tarafından akademik amaçlarla geliştirilmektedir. Ticari bir hizmet değildir.
 
 İletişim: bitani.proje@gmail.com
 
