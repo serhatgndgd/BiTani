@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, {
   Circle,
@@ -10,7 +10,8 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 
-import { C } from '../theme';
+import { useTheme } from '../context/ThemeContext';
+import type { ThemeColors } from '../theme';
 
 // ---------- Icon Mark ----------
 
@@ -21,7 +22,10 @@ interface IconMarkProps {
   radius?: number;
 }
 
-export function IconMark({ size = 1024, bg = C.primary, stroke = C.text1, radius = 0.225 }: IconMarkProps) {
+export function IconMark({ size = 1024, bg, stroke, radius = 0.225 }: IconMarkProps) {
+  const { colors: C } = useTheme();
+  const fillColor = bg ?? C.primary;
+  const strokeColor = stroke ?? C.text1;
   const r = size * radius;
   const pad = size * 0.16;
   const cy = size * 0.52;
@@ -53,8 +57,8 @@ export function IconMark({ size = 1024, bg = C.primary, stroke = C.text1, radius
     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
       <Defs>
         <LinearGradient id={bgId} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={bg} stopOpacity="1" />
-          <Stop offset="1" stopColor={bg} stopOpacity="0.92" />
+          <Stop offset="0" stopColor={fillColor} stopOpacity="1" />
+          <Stop offset="1" stopColor={fillColor} stopOpacity="0.92" />
         </LinearGradient>
         <RadialGradient id={sheenId} cx="0.3" cy="0.15" r="0.9">
           <Stop offset="0" stopColor="#ffffff" stopOpacity="0.10" />
@@ -66,12 +70,12 @@ export function IconMark({ size = 1024, bg = C.primary, stroke = C.text1, radius
       <Path
         d={ekgPath}
         fill="none"
-        stroke={stroke}
+        stroke={strokeColor}
         strokeWidth={sw}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <Circle cx={x1} cy={cy} r={size * 0.022} fill={stroke} />
+      <Circle cx={x1} cy={cy} r={size * 0.022} fill={strokeColor} />
     </Svg>
   );
 }
@@ -85,6 +89,8 @@ interface WordmarkProps {
 }
 
 export function Wordmark({ height = 48, onDark = true, showIcon = true }: WordmarkProps) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   const iconSize = height;
   const fontSize = height * 0.7;
   const color = onDark ? C.text1 : C.bg;
@@ -108,6 +114,8 @@ export function Wordmark({ height = 48, onDark = true, showIcon = true }: Wordma
 // ---------- Splash Screen ----------
 
 export function SplashBrand() {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   return (
     <View style={styles.splashCenter}>
       <View style={styles.splashIconWrap}>
@@ -122,7 +130,8 @@ export function SplashBrand() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(C: ThemeColors) {
+  return StyleSheet.create({
   wordmarkRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -162,3 +171,4 @@ const styles = StyleSheet.create({
     maxWidth: 280,
   },
 });
+}

@@ -21,7 +21,10 @@ import { LegalDocumentModal } from '../components/LegalDocumentModal';
 import type { LegalDocumentId } from '../legal/documents';
 import { supabase } from '../lib/supabase';
 import type { AuthStackParamList, ConsentType, PendingConsent } from '../navigation/types';
-import { C } from '../theme';
+import { useTheme } from '../context/ThemeContext';
+import { darkTheme as defaultThemeColors, type ThemeColors } from '../theme';
+
+const C = defaultThemeColors;
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -211,6 +214,8 @@ function ConsentRow({
 // ─── Ana ekran ────────────────────────────────────────────────────────────────
 
 export default function RegisterScreen({ navigation }: Props) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm]   = useState('');
@@ -507,7 +512,10 @@ export default function RegisterScreen({ navigation }: Props) {
 
 // ─── Stiller ─────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const styles = createStyles(C);
+
+function createStyles(C: ThemeColors) {
+  return StyleSheet.create({
   safe:   { flex: 1, backgroundColor: C.bg },
   flex:   { flex: 1, backgroundColor: C.bg },
   scroll: { flexGrow: 1, padding: 24, paddingBottom: 40 },
@@ -578,3 +586,4 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.7 },
   buttonText:     { color: C.bg, fontSize: 16, fontWeight: '700' },
 });
+}

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -22,7 +22,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LegalDocumentModal } from '../components/LegalDocumentModal';
 import { supabase } from '../lib/supabase';
 import type { MainTabParamList } from '../navigation/types';
-import { C } from '../theme';
+import { useTheme } from '../context/ThemeContext';
+import { darkTheme as defaultThemeColors, type ThemeColors } from '../theme';
+
+const C = defaultThemeColors;
 
 // ─── Tipler ───────────────────────────────────────────────────────────────────
 
@@ -263,6 +266,8 @@ function ChatHistoryRowItem({
 // ─── Ana bileşen ──────────────────────────────────────────────────────────────
 
 export default function ChatScreen() {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   const navigation = useNavigation<ChatNavProp>();
 
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -708,7 +713,10 @@ export default function ChatScreen() {
 
 // ─── Stiller ─────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const styles = createStyles(C);
+
+function createStyles(C: ThemeColors) {
+  return StyleSheet.create({
   safe:   { flex: 1, backgroundColor: C.bg },
   flex:   { flex: 1 },
   center: { flex: 1, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center' },
@@ -822,3 +830,4 @@ const styles = StyleSheet.create({
   historyEmptyTitle: { color: C.text1, fontSize: 16, fontWeight: '700' },
   historyEmptyText: { color: C.text3, fontSize: 14, textAlign: 'center' },
 });
+}

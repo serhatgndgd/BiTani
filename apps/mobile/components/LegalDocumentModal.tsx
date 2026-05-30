@@ -13,8 +13,9 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useTheme } from '../context/ThemeContext';
 import { LEGAL_DOCUMENTS, type LegalDocumentId } from '../legal/documents';
-import { C } from '../theme';
+import type { ThemeColors } from '../theme';
 
 interface Props {
   visible: boolean;
@@ -35,6 +36,9 @@ export function LegalDocumentModal({
   primaryActionLabel,
   onPrimaryAction,
 }: Props) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
+  const markdownStyles = useMemo(() => createMarkdownStyles(C), [C]);
   const insets = useSafeAreaInsets();
   const document = documentId ? LEGAL_DOCUMENTS[documentId] : null;
   const isConsentMode = mode === 'consent';
@@ -146,7 +150,8 @@ export function LegalDocumentModal({
   );
 }
 
-const markdownStyles = StyleSheet.create({
+function createMarkdownStyles(C: ThemeColors) {
+  return StyleSheet.create({
   body: {
     color: C.text2,
     fontSize: 15,
@@ -189,8 +194,10 @@ const markdownStyles = StyleSheet.create({
     marginBottom: 10,
   },
 });
+}
 
-const styles = StyleSheet.create({
+function createStyles(C: ThemeColors) {
+  return StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: C.bg,
@@ -266,3 +273,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+}

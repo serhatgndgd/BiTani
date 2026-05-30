@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AuthError } from '@supabase/supabase-js';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -18,7 +18,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Wordmark } from '../components/Brand';
 import { supabase } from '../lib/supabase';
 import type { AuthStackParamList } from '../navigation/types';
-import { C } from '../theme';
+import { useTheme } from '../context/ThemeContext';
+import { darkTheme as defaultThemeColors, type ThemeColors } from '../theme';
+
+const C = defaultThemeColors;
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -103,6 +106,8 @@ function FocusInput(props: FocusInputProps) {
 // ─── Ana ekran ────────────────────────────────────────────────────────────────
 
 export default function LoginScreen({ navigation }: Props) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [error, setError]       = useState<string | null>(null);
@@ -209,7 +214,10 @@ export default function LoginScreen({ navigation }: Props) {
 
 // ─── Stiller ─────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const styles = createStyles(C);
+
+function createStyles(C: ThemeColors) {
+  return StyleSheet.create({
   safe:   { flex: 1, backgroundColor: C.bg },
   flex:   { flex: 1, backgroundColor: C.bg },
   scroll: { flexGrow: 1, padding: 24, paddingBottom: 40 },
@@ -254,3 +262,4 @@ const styles = StyleSheet.create({
   backWelcome:     { marginTop: 20, alignItems: 'center', paddingVertical: 8 },
   backWelcomeText: { color: C.text3, fontSize: 14 },
 });
+}

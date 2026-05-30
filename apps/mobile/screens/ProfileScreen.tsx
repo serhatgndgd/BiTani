@@ -10,6 +10,7 @@ import {
   ScrollView,
   SectionList,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -23,9 +24,12 @@ import {
   medicationVariantLabel,
   type MedicationBrandGroup,
 } from '../lib/medicationBranding';
+import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../lib/supabase';
 import type { ConditionCatalogRow } from '../navigation/types';
-import { C } from '../theme';
+import { darkTheme as defaultThemeColors, type ThemeColors } from '../theme';
+
+const C = defaultThemeColors;
 
 type Gender = 'male' | 'female' | 'unspecified';
 
@@ -143,6 +147,9 @@ function formatDate(dateStr: string | null): string {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const { mode, toggleTheme, colors: themeColors } = useTheme();
+  const C = themeColors;
+  const styles = useMemo(() => createStyles(themeColors), [themeColors]);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -1135,6 +1142,23 @@ export default function ProfileScreen() {
         </View>
 
         {/* ── Çıkış ── */}
+        <View style={styles.themeRow}>
+          <View style={styles.themeInfo}>
+            <Ionicons name={mode === 'dark' ? 'moon-outline' : 'sunny-outline'} size={18} color={C.text2} />
+            <View>
+              <Text style={styles.themeTitle}>Tema</Text>
+              <Text style={styles.themeSubtitle}>{mode === 'dark' ? 'Koyu' : 'Açık'}</Text>
+            </View>
+          </View>
+          <Switch
+            value={mode === 'dark'}
+            onValueChange={toggleTheme}
+            trackColor={{ false: themeColors.border, true: themeColors.primaryDim }}
+            thumbColor={mode === 'dark' ? themeColors.primary : themeColors.text3}
+            ios_backgroundColor={themeColors.border}
+          />
+        </View>
+
         <Pressable style={styles.signOutBtn} onPress={confirmSignOut}>
           <Ionicons name="log-out-outline" size={20} color={C.error} />
           <Text style={styles.signOutText}>Çıkış Yap</Text>
@@ -1390,7 +1414,10 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(C);
+
+function createStyles(C: ThemeColors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   center: { flex: 1, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', padding: 24 },
   scroll: { flex: 1 },
@@ -1452,6 +1479,23 @@ const styles = StyleSheet.create({
 
   signOutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 6, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.errorDim },
   signOutText: { color: C.error, fontSize: 16, fontWeight: '600' },
+  themeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 6,
+    marginBottom: 10,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+  },
+  themeInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  themeTitle: { color: C.text1, fontSize: 15, fontWeight: '700' },
+  themeSubtitle: { color: C.text3, fontSize: 12, marginTop: 2 },
 
   legalList: { marginTop: 14, borderTopWidth: 1, borderTopColor: C.surfaceAlt },
   legalRow: {
@@ -1559,3 +1603,4 @@ const styles = StyleSheet.create({
   medSearchRowAdded: { opacity: 0.45 },
   medSearchInfo: { flex: 1 },
 });
+}

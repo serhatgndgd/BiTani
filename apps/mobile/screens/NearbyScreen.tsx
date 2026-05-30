@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Linking,
@@ -15,7 +15,10 @@ import { EmptyState } from '../components/EmptyState';
 import { HospitalIcon } from '../components/HospitalIcon';
 import { PharmacyIcon } from '../components/PharmacyIcon';
 import { SkeletonBox } from '../components/SkeletonBox';
-import { C } from '../theme';
+import { useTheme } from '../context/ThemeContext';
+import { darkTheme as defaultThemeColors, type ThemeColors } from '../theme';
+
+const C = defaultThemeColors;
 
 // ─── Env sabitleri ────────────────────────────────────────────────────────────
 
@@ -382,6 +385,8 @@ function PlaceCard({ item, userCoords, isPharmacy = false }: PlaceCardProps) {
 // ─── Ana bileşen ──────────────────────────────────────────────────────────────
 
 export default function NearbyScreen() {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   const [tab, setTab] = useState<Tab>('pharmacy');
   const [coords, setCoords] = useState<Coords | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -705,7 +710,10 @@ export default function NearbyScreen() {
 
 // ─── Stiller ─────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const styles = createStyles(C);
+
+function createStyles(C: ThemeColors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   center: {
     flex: 1,
@@ -779,3 +787,4 @@ const styles = StyleSheet.create({
   infoLink: { color: C.primary },
   infoCall: { color: C.pharmacy, fontWeight: '500' },
 });
+}

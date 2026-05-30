@@ -22,7 +22,10 @@ import {
 } from '../lib/medicationBranding';
 import { supabase } from '../lib/supabase';
 import type { ConditionCatalogRow } from '../navigation/types';
-import { C } from '../theme';
+import { useTheme } from '../context/ThemeContext';
+import { darkTheme as defaultThemeColors, type ThemeColors } from '../theme';
+
+const C = defaultThemeColors;
 
 type Gender = 'male' | 'female' | 'unspecified';
 
@@ -136,6 +139,8 @@ function isNetworkError(error: unknown): boolean {
 }
 
 export default function OnboardingScreen({ onComplete }: Props) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   const [resolvedUserId, setResolvedUserId]     = useState<string | null>(null);
   const [userResolveError, setUserResolveError] = useState<string | null>(null);
   const [resolveKey, setResolveKey]             = useState(0);
@@ -999,7 +1004,10 @@ export default function OnboardingScreen({ onComplete }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(C);
+
+function createStyles(C: ThemeColors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
 
   center:     { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 16 },
@@ -1122,3 +1130,4 @@ const styles = StyleSheet.create({
   retryBtn:     { backgroundColor: C.text1, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 10 },
   retryBtnText: { color: C.bg, fontSize: 16, fontWeight: '700' },
 });
+}

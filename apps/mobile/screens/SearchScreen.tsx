@@ -20,7 +20,10 @@ import {
   type MedicationBrandGroup,
 } from '../lib/medicationBranding';
 import { supabase } from '../lib/supabase';
-import { C } from '../theme';
+import { useTheme } from '../context/ThemeContext';
+import { darkTheme as defaultThemeColors, type ThemeColors } from '../theme';
+
+const C = defaultThemeColors;
 
 // ─── Tipler ──────────────────────────────────────────────────────────────────
 
@@ -67,6 +70,8 @@ function SearchSkeletonList() {
 // ─── Ana bileşen ──────────────────────────────────────────────────────────────
 
 export default function SearchScreen() {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   const [query, setQuery]             = useState('');
   const [results, setResults]         = useState<MedResult[]>([]);
   const [searching, setSearching]     = useState(false);
@@ -422,7 +427,10 @@ function DrugDetail({ drug, onClose }: DrugDetailProps) {
 
 // ─── Stiller ─────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const styles = createStyles(C);
+
+function createStyles(C: ThemeColors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
 
   /* Arama */
@@ -564,3 +572,4 @@ const styles = StyleSheet.create({
   },
   noLinkText: { color: C.text3, fontSize: 13 },
 });
+}

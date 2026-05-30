@@ -2,12 +2,12 @@ import 'react-native-gesture-handler';
 
 import type { Session } from '@supabase/supabase-js';
 import { Ionicons } from '@expo/vector-icons';
-import { NavigationContainer, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -23,26 +23,15 @@ import ProfileScreen from './screens/ProfileScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import SearchScreen from './screens/SearchScreen';
 import { OtpFlowContext } from './context/OtpFlowContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { supabase } from './lib/supabase';
-import { C } from './theme';
+import type { ThemeColors } from './theme';
 import type { AuthStackParamList } from './navigation/types';
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const MainTabs = createBottomTabNavigator();
 
-const navigationTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    background: C.bg,
-    card:       C.bg,
-    primary:    C.text1,
-    text:       C.text1,
-    border:     C.border,
-  },
-};
-
-function SignOutButton() {
+function SignOutButton({ C, styles }: { C: ThemeColors; styles: ReturnType<typeof createStyles> }) {
   return (
     <Pressable onPress={() => supabase.auth.signOut()} style={styles.signOutBtn}>
       <Text style={styles.signOutText}>Çıkış</Text>
@@ -50,7 +39,7 @@ function SignOutButton() {
   );
 }
 
-function AuthNavigator() {
+function AuthNavigator({ C }: { C: ThemeColors }) {
   return (
     <AuthStack.Navigator
       id="AuthStack"
@@ -93,7 +82,7 @@ function AuthNavigator() {
   );
 }
 
-function MainNavigator() {
+function MainNavigator({ C, styles }: { C: ThemeColors; styles: ReturnType<typeof createStyles> }) {
   return (
     <MainTabs.Navigator
       id="MainTabs"
@@ -160,7 +149,7 @@ function MainNavigator() {
         options={{
           title: 'Profil',
           tabBarLabel: 'Profil',
-          headerRight: () => <SignOutButton />,
+          headerRight: () => <SignOutButton C={C} styles={styles} />,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),
@@ -174,9 +163,11 @@ function MainNavigator() {
 
 interface BiometricGateProps {
   onRetry: () => void;
+  C: ThemeColors;
+  styles: ReturnType<typeof createStyles>;
 }
 
-function BiometricGate({ onRetry }: BiometricGateProps) {
+function BiometricGate({ onRetry, C, styles }: BiometricGateProps) {
   return (
     <View style={styles.biometricGate}>
       <View style={styles.biometricIcon}>
@@ -210,7 +201,24 @@ function BiometricGate({ onRetry }: BiometricGateProps) {
  * - Face ID / Touch ID başarılı → MainTabs
  * - İptal/başarısız → BiometricGate (tekrar dene)
  */
-export default function App() {
+function AppContent() {
+  const { colors: C, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
+  const navigationTheme = useMemo(() => {
+    const baseTheme = isDark ? DarkTheme : DefaultTheme;
+    return {
+      ...baseTheme,
+      colors: {
+        ...baseTheme.colors,
+        background: C.bg,
+        card:       C.bg,
+        primary:    C.primary,
+        text:       C.text1,
+        border:     C.border,
+      },
+    };
+  }, [C, isDark]);
+
   const [session, setSession] = useState<Session | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
@@ -335,7 +343,7 @@ export default function App() {
           <View style={styles.boot}>
             <ActivityIndicator size="large" color={C.text1} />
           </View>
-          <StatusBar style="light" />
+          <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor={C.bg} />
         </SafeAreaProvider>
       </GestureHandlerRootView>
     );
@@ -346,8 +354,8 @@ export default function App() {
     return (
       <GestureHandlerRootView style={styles.flex}>
         <SafeAreaProvider>
-          <BiometricGate onRetry={() => void promptBiometric()} />
-          <StatusBar style="light" />
+          <BiometricGate C={C} styles={styles} onRetry={() => void promptBiometric()} />
+          <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor={C.bg} />
         </SafeAreaProvider>
       </GestureHandlerRootView>
     );
@@ -368,17 +376,26 @@ export default function App() {
             />
           ) : (
             <NavigationContainer theme={navigationTheme}>
-              {showMain ? <MainNavigator /> : <AuthNavigator />}
+              {showMain ? <MainNavigator C={C} styles={styles} /> : <AuthNavigator C={C} />}
             </NavigationContainer>
           )}
         </OtpFlowContext.Provider>
-        <StatusBar style="light" />
+        <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor={C.bg} />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
 
-const styles = StyleSheet.create({
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  );
+}
+
+function createStyles(C: ThemeColors) {
+  return StyleSheet.create({
   flex: { flex: 1 },
 
   boot: {
@@ -440,3 +457,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+}

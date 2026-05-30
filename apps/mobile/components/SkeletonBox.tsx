@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Animated, StyleSheet, type ViewStyle } from 'react-native';
 
-import { C } from '../theme';
+import { useTheme } from '../context/ThemeContext';
+import type { ThemeColors } from '../theme';
 
 interface SkeletonBoxProps {
   width?: ViewStyle['width'];
@@ -16,6 +17,8 @@ export function SkeletonBox({
   borderRadius = 6,
   style,
 }: SkeletonBoxProps) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   const anim = useRef(new Animated.Value(0.25)).current;
 
   useEffect(() => {
@@ -41,6 +44,8 @@ export function SkeletonBox({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(C: ThemeColors) {
+  return StyleSheet.create({
   base: { backgroundColor: C.border },
 });
+}

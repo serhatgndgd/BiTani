@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   Animated,
   Dimensions,
@@ -13,7 +13,10 @@ import Svg, { Defs, Ellipse, Path, RadialGradient, Stop } from 'react-native-svg
 
 import { Wordmark } from '../components/Brand';
 import type { AuthStackParamList } from '../navigation/types';
-import { C } from '../theme';
+import { useTheme } from '../context/ThemeContext';
+import { darkTheme as defaultThemeColors, type ThemeColors } from '../theme';
+
+const C = defaultThemeColors;
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
 
@@ -34,6 +37,8 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 // ─── Ekran ────────────────────────────────────────────────────────────────────
 
 export default function WelcomeScreen({ navigation }: Props) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   // Giriş animasyonları (native driver)
   const wordmarkAnim = useRef(new Animated.Value(0)).current;
   const sloganAnim   = useRef(new Animated.Value(0)).current;
@@ -152,7 +157,10 @@ export default function WelcomeScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(C);
+
+function createStyles(C: ThemeColors) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
 
   glowContainer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
@@ -198,3 +206,4 @@ const styles = StyleSheet.create({
   linkWrap: { marginTop: 24, paddingVertical: 10, paddingHorizontal: 16 },
   linkText: { color: C.primary, fontSize: 15, fontWeight: '400' },
 });
+}

@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AuthError, Session } from '@supabase/supabase-js';
 import * as Clipboard from 'expo-clipboard';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -17,7 +17,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useOtpFlow } from '../context/OtpFlowContext';
 import { supabase } from '../lib/supabase';
 import type { AuthStackParamList, PendingConsent } from '../navigation/types';
-import { C } from '../theme';
+import { useTheme } from '../context/ThemeContext';
+import { darkTheme as defaultThemeColors, type ThemeColors } from '../theme';
+
+const C = defaultThemeColors;
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Otp'>;
 
@@ -64,6 +67,8 @@ async function savePendingConsents(userId: string, pendingConsents?: PendingCons
 }
 
 export default function OtpScreen({ route }: Props) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   const { email, pendingConsents } = route.params;
   const otpFlow = useOtpFlow();
   const [digits, setDigits] = useState<string[]>(() => Array(CELL_COUNT).fill(''));
@@ -261,7 +266,10 @@ export default function OtpScreen({ route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(C);
+
+function createStyles(C: ThemeColors) {
+  return StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: C.bg,
@@ -361,3 +369,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+}
