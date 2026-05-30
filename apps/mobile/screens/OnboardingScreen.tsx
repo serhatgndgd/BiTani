@@ -74,6 +74,15 @@ function buildIsoDate(day: string, month: string, year: string): string | null {
   return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
+function isAtLeast18(isoDate: string | null): boolean {
+  if (!isoDate) return false;
+  const birthDate = new Date(isoDate);
+  if (Number.isNaN(birthDate.getTime())) return false;
+  const adultDate = new Date();
+  adultDate.setFullYear(adultDate.getFullYear() - 18);
+  return birthDate.getTime() <= adultDate.getTime();
+}
+
 function groupByCategory(rows: ConditionCatalogRow[]): Map<string, ConditionCatalogRow[]> {
   const map = new Map<string, ConditionCatalogRow[]>();
   for (const row of rows) {
@@ -653,7 +662,9 @@ export default function OnboardingScreen({ onComplete }: Props) {
 
   const validateStep1 = (): boolean => {
     if (!fullName.trim())                { setStepError('Ad soyad gerekli.'); return false; }
-    if (!buildIsoDate(day, month, year)) { setStepError('Geçerli bir doğum tarihi seç.'); return false; }
+    const birthIso = buildIsoDate(day, month, year);
+    if (!birthIso)                       { setStepError('Geçerli bir doğum tarihi seç.'); return false; }
+    if (!isAtLeast18(birthIso))          { setStepError('18 yaşından büyük olmanız gerekiyor.'); return false; }
     if (!gender)                         { setStepError('Cinsiyet seçimi gerekli.'); return false; }
     return true;
   };
@@ -667,9 +678,39 @@ export default function OnboardingScreen({ onComplete }: Props) {
     return true;
   };
 
-  const goNext = () => {
+  const saveStep1Profile = async (): Promise<boolean> => {
+    if (!resolvedUserId) {
+      setStepError('Kullanıcı doğrulanamadı.');
+      return false;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('profiles').upsert(
+        { id: resolvedUserId, full_name: fullName.trim() },
+        { onConflict: 'id' },
+      );
+      if (error) {
+        console.error('onboarding-screen:', error);
+        setStepError(isNetworkError(error) ? NETWORK_ERROR_TEXT : ONBOARDING_SAVE_ERROR_TEXT);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('onboarding-screen:', error);
+      setStepError(isNetworkError(error) ? NETWORK_ERROR_TEXT : ONBOARDING_SAVE_ERROR_TEXT);
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const goNext = async () => {
     setStepError(null);
-    if (step === 1 && !validateStep1()) return;
+    if (step === 1) {
+      if (!validateStep1()) return;
+      const saved = await saveStep1Profile();
+      if (!saved) return;
+    }
     if (step === 2 && !validateStep2()) return;
     if (step < TOTAL_STEPS) setStep((s) => s + 1);
   };
@@ -743,6 +784,8 @@ export default function OnboardingScreen({ onComplete }: Props) {
   };
 
   const progress = step / TOTAL_STEPS;
+  const selectedBirthIso = buildIsoDate(day, month, year);
+  const isStep1Adult = isAtLeast18(selectedBirthIso);
 
   if (userResolveError) {
     return (
@@ -824,6 +867,9 @@ export default function OnboardingScreen({ onComplete }: Props) {
                   </View>
                 </View>
               </View>
+              {!isStep1Adult ? (
+                <Text style={styles.ageWarning}>18 yaşından büyük olmanız gerekiyor.</Text>
+              ) : null}
 
               <Text style={styles.fieldLabel}>Cinsiyet</Text>
               <View style={styles.genderRow}>
@@ -924,7 +970,18 @@ export default function OnboardingScreen({ onComplete }: Props) {
           ? <Pressable style={styles.secondaryBtn} onPress={goBack} disabled={saving}><Text style={styles.secondaryBtnText}>Geri</Text></Pressable>
           : <View style={{ flex: 1 }} />}
         {step < TOTAL_STEPS
-          ? <Pressable style={styles.primaryBtn} onPress={goNext} disabled={saving}><Text style={styles.primaryBtnText}>İleri</Text></Pressable>
+          ? (
+              <Pressable
+                style={[
+                  styles.primaryBtn,
+                  (saving || (step === 1 && !isStep1Adult)) && styles.primaryBtnDisabled,
+                ]}
+                onPress={() => void goNext()}
+                disabled={saving || (step === 1 && !isStep1Adult)}
+              >
+                <Text style={styles.primaryBtnText}>İleri</Text>
+              </Pressable>
+            )
           : <Pressable style={[styles.primaryBtn, saving && styles.primaryBtnDisabled]} onPress={handleSave} disabled={saving}>
               {saving ? <ActivityIndicator color={C.bg} /> : <Text style={styles.primaryBtnText}>Tamamla</Text>}
             </Pressable>}
@@ -974,6 +1031,7 @@ const styles = StyleSheet.create({
   chipTextSelected: { color: C.text1, fontWeight: '600' },
 
   bmiWarn: { color: C.warning, fontSize: 14, marginTop: 4, marginBottom: 8 },
+  ageWarning: { color: C.warning, fontSize: 13, marginTop: -8, marginBottom: 14 },
 
   chipScroll:      { maxHeight: 44, marginBottom: 12 },
   chipScrollInner: { gap: 8, alignItems: 'center', paddingRight: 8 },
