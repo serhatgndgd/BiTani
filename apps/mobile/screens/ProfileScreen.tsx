@@ -1024,7 +1024,7 @@ export default function ProfileScreen() {
                   <Text style={styles.cancelBtnText}>İptal</Text>
                 </Pressable>
                 <Pressable style={[styles.saveBtn, savingProfile && styles.saveBtnDisabled]} onPress={() => void saveProfile()} disabled={savingProfile}>
-                  {savingProfile ? <ActivityIndicator color="#0a0a0a" /> : <Text style={styles.saveBtnText}>Kaydet</Text>}
+                  {savingProfile ? <ActivityIndicator color={C.text1} /> : <Text style={styles.saveBtnText}>Kaydet</Text>}
                 </Pressable>
               </View>
             </View>
@@ -1252,13 +1252,13 @@ export default function ProfileScreen() {
                 <View style={[styles.modalFooter, { paddingBottom: insets.bottom + 14 }]}>
                   {addMedError ? <Text style={[styles.err, { marginBottom: 8 }]}>{addMedError}</Text> : null}
                   <Pressable
-                    style={[styles.saveBtn, addingMed && styles.saveBtnDisabled]}
+                    style={[styles.modalPrimaryBtn, addingMed && styles.saveBtnDisabled]}
                     onPress={() => void addSelectedMedications()}
                     disabled={addingMed}
                   >
                     {addingMed
-                      ? <ActivityIndicator color={C.bg} />
-                      : <Text style={styles.saveBtnText}>Ekle ({modalSelectedMedIds.size})</Text>}
+                      ? <ActivityIndicator color={C.text1} />
+                      : <Text style={styles.modalPrimaryBtnText}>İlaçları Kaydet ({modalSelectedMedIds.size})</Text>}
                   </Pressable>
                 </View>
               ) : null}
@@ -1287,7 +1287,7 @@ export default function ProfileScreen() {
                     <Text style={styles.cancelBtnText}>Geri</Text>
                   </Pressable>
                   <Pressable style={[styles.saveBtn, addingMed && styles.saveBtnDisabled]} onPress={() => void addSingleMedication()} disabled={addingMed}>
-                    {addingMed ? <ActivityIndicator color="#0a0a0a" /> : <Text style={styles.saveBtnText}>Ekle</Text>}
+                    {addingMed ? <ActivityIndicator color={C.text1} /> : <Text style={styles.saveBtnText}>Ekle</Text>}
                   </Pressable>
                 </View>
               </View>
@@ -1423,9 +1423,9 @@ const styles = StyleSheet.create({
   editActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
   cancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 10, borderWidth: 1, borderColor: C.border, alignItems: 'center' },
   cancelBtnText: { color: C.text1, fontSize: 15, fontWeight: '600' },
-  saveBtn: { flex: 1, paddingVertical: 13, borderRadius: 10, backgroundColor: C.text1, alignItems: 'center', justifyContent: 'center' },
+  saveBtn: { flex: 1, paddingVertical: 13, borderRadius: 10, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
   saveBtnDisabled: { opacity: 0.6 },
-  saveBtnText: { color: C.bg, fontSize: 15, fontWeight: '700' },
+  saveBtnText: { color: C.text1, fontSize: 15, fontWeight: '700' },
 
   emptyText: { color: C.text3, fontSize: 14 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -1492,6 +1492,15 @@ const styles = StyleSheet.create({
   modalLoader: { marginTop: 32 },
   modalPad: { padding: 16 },
   modalFooter: { padding: 14, borderTopWidth: 1, borderTopColor: C.border },
+  modalPrimaryBtn: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: C.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalPrimaryBtnText: { color: C.text1, fontSize: 15, fontWeight: '800' },
 
   confirmBackdrop: {
     flex: 1,

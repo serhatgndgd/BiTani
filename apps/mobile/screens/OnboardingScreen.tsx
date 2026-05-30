@@ -986,7 +986,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
                 </Pressable>
               )
             : <Pressable style={[styles.primaryBtn, saving && styles.primaryBtnDisabled]} onPress={handleSave} disabled={saving}>
-                {saving ? <ActivityIndicator color={C.bg} /> : <Text style={styles.primaryBtnText}>Tamamla</Text>}
+                {saving ? <ActivityIndicator color={C.text1} /> : <Text style={styles.primaryBtnText}>Tamamla</Text>}
               </Pressable>}
         </View>
         {step === 1 ? (
@@ -1113,9 +1113,9 @@ const styles = StyleSheet.create({
   footerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   secondaryBtn:       { flex: 1, paddingVertical: 14, borderRadius: 10, borderWidth: 1, borderColor: C.border, alignItems: 'center' },
   secondaryBtnText:   { color: C.text1, fontSize: 16, fontWeight: '600' },
-  primaryBtn:         { flex: 1, paddingVertical: 14, borderRadius: 10, backgroundColor: C.text1, alignItems: 'center', justifyContent: 'center' },
+  primaryBtn:         { flex: 1, paddingVertical: 14, borderRadius: 10, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
   primaryBtnDisabled: { opacity: 0.7 },
-  primaryBtnText:     { color: C.bg, fontSize: 16, fontWeight: '700' },
+  primaryBtnText:     { color: C.text1, fontSize: 16, fontWeight: '700' },
   signOutLink:        { alignItems: 'center', marginTop: 14, paddingVertical: 4 },
   signOutLinkText:    { color: C.text3, fontSize: 13 },
 
