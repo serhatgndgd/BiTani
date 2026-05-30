@@ -48,6 +48,7 @@ const INITIAL_READ_STATE: ReadState = {
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const FULL_NAME_PATTERN = /^[A-Za-zÇĞİÖŞÜçğıöşü\s]+$/;
 
 const CONSENT_DOCUMENTS: Record<ReadableConsentKey, LegalDocumentId> = {
   kvkk_read: 'kvkk_aydinlatma',
@@ -227,6 +228,7 @@ function ConsentRow({
 // ─── Ana ekran ────────────────────────────────────────────────────────────────
 
 export default function RegisterScreen({ navigation }: Props) {
+  const [fullName, setFullName] = useState('');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm]   = useState('');
@@ -257,6 +259,7 @@ export default function RegisterScreen({ navigation }: Props) {
   const submitDisabled =
     loading ||
     !requiredConsentsAccepted ||
+    fullName.trim().length < 2 ||
     !email.trim() ||
     !rules.minLen ||
     !rules.upper ||
@@ -316,7 +319,12 @@ export default function RegisterScreen({ navigation }: Props) {
 
   async function handleSignUp() {
     setError(null);
+    const trimmedFullName = fullName.trim();
     const trimmed = email.trim();
+    if (trimmedFullName.length < 2 || !FULL_NAME_PATTERN.test(trimmedFullName)) {
+      setError('Ad soyad en az 2 karakter olmalı ve sadece harf ile boşluk içermeli.');
+      return;
+    }
     if (!trimmed) {
       setError('E-posta gerekli.');
       return;
@@ -354,6 +362,7 @@ export default function RegisterScreen({ navigation }: Props) {
       const { data, error: signError } = await supabase.auth.signUp({
         email: trimmed,
         password,
+        options: { data: { full_name: trimmedFullName } },
       });
       if (signError) {
         setError(mapAuthError(signError));
@@ -404,6 +413,16 @@ export default function RegisterScreen({ navigation }: Props) {
             </View>
 
             <Text style={styles.heading}>Hesap oluştur</Text>
+
+            <Text style={styles.label}>Ad Soyad</Text>
+            <FocusInput
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="Adın ve soyadın"
+              autoCorrect={false}
+              editable={!loading}
+              style={styles.inputGap}
+            />
 
             <Text style={styles.label}>E-posta</Text>
             <FocusInput

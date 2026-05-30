@@ -76,7 +76,10 @@ function AuthNavigator() {
       <AuthStack.Screen
         name="Register"
         component={RegisterScreen}
-        options={{ title: 'Kayıt' }}
+        options={{
+          title: 'Kayıt Ol',
+          headerBackTitle: '',
+        }}
       />
       <AuthStack.Screen
         name="Otp"
