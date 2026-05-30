@@ -19,35 +19,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ChatFooterNotice } from '../components/ChatFooterNotice';
 import { LegalDocumentModal } from '../components/LegalDocumentModal';
 import { supabase } from '../lib/supabase';
 import type { MainTabParamList } from '../navigation/types';
 import { C } from '../theme';
-
-// ─── Acil anahtar kelimeler ───────────────────────────────────────────────────
-
-const ACIL_KELIMELER = [
-  'acil', 'hastane', '112', 'ambulans', 'bayıl', 'ambulan',
-  'göğüs ağrısı', 'kalp krizi', 'çarpıntı',
-  'felç', 'inme', 'uyuşma', 'konuşamıyorum', 'görme kaybı',
-  'nefes alamıyorum', 'nefes darlığı', 'boğuluyorum',
-  'şeker düştü', 'hipoglisemi', 'insülin şoku',
-  'alerji şoku', 'anafilaksi',
-  'kendime zarar', 'intihar', 'yaşamak istemiyorum',
-  'kan kaybı', 'kaza', 'bilinç kaybı', 'bayılıyorum',
-  'yutkunamıyorum', 'yutamıyorum',
-  'en kötü baş ağrım', 'patlar gibi baş ağrısı',
-  'gözlerim çift görüyor',
-  'yüzüm düştü', 'yüzümde uyuşma',
-  'kol asılıyor', 'kolum çalışmıyor',
-  'göğüse vuran karın ağrısı',
-  'sırt ağrısı göğse yayılıyor',
-  'çok fazla ilaç içtim', 'ilaçları içtim',
-  'zehirlendim',
-  'çocuğum düştü', 'bebek nefes almıyor',
-  'çocuk ilaç içti',
-];
 
 // ─── Tipler ───────────────────────────────────────────────────────────────────
 
@@ -117,47 +92,6 @@ function mapChatError(error: unknown): string {
   return CHAT_ERROR_GENERIC;
 }
 
-function normalizeForMatch(text: string): string {
-  return text
-    .toLocaleLowerCase('tr')
-    .replace(/[.,!?;:]/g, '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim();
-}
-
-function levenshtein(a: string, b: string): number {
-  if (a.length === 0) return b.length;
-  if (b.length === 0) return a.length;
-
-  const matrix = Array.from({ length: b.length + 1 }, () =>
-    Array<number>(a.length + 1).fill(0),
-  );
-
-  for (let i = 0; i <= a.length; i += 1) matrix[0][i] = i;
-  for (let j = 0; j <= b.length; j += 1) matrix[j][0] = j;
-
-  for (let j = 1; j <= b.length; j += 1) {
-    for (let i = 1; i <= a.length; i += 1) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      matrix[j][i] = Math.min(
-        matrix[j][i - 1] + 1,
-        matrix[j - 1][i] + 1,
-        matrix[j - 1][i - 1] + cost,
-      );
-    }
-  }
-
-  return matrix[b.length][a.length];
-}
-
-function isWordSimilar(word: string, target: string): boolean {
-  if (target.length <= 4) return word === target;
-  const distance = levenshtein(word, target);
-  const tolerance = Math.floor(target.length / 4);
-  return distance <= tolerance;
-}
-
 // ─── Markdown parser ──────────────────────────────────────────────────────────
 
 type Segment  = { text: string; bold: boolean; italic: boolean };
@@ -191,32 +125,6 @@ function parseMd(text: string): MdLine[] {
 }
 
 // ─── Yardımcı ─────────────────────────────────────────────────────────────────
-
-function detectEmergency(text: string): boolean {
-  const normalized = normalizeForMatch(text);
-  const words = normalized.split(/\s+/).filter(Boolean);
-
-  for (const keyword of ACIL_KELIMELER) {
-    const normalizedKeyword = normalizeForMatch(keyword);
-
-    if (!normalizedKeyword.includes(' ')) {
-      for (const word of words) {
-        if (isWordSimilar(word, normalizedKeyword)) return true;
-      }
-      continue;
-    }
-
-    const keywordWords = normalizedKeyword.split(' ').filter(Boolean);
-    for (let i = 0; i <= words.length - keywordWords.length; i += 1) {
-      const allMatch = keywordWords.every((kw, idx) =>
-        isWordSimilar(words[i + idx] ?? '', kw),
-      );
-      if (allMatch) return true;
-    }
-  }
-
-  return false;
-}
 
 function fmtTime(ts: number): string {
   return new Date(ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
@@ -368,6 +276,7 @@ export default function ChatScreen() {
   const [sending, setSending]               = useState(false);
   const [sendError, setSendError]           = useState<string | null>(null);
   const [showEmergency, setShowEmergency]   = useState(false);
+  const [dismissedEmergencySessionIds, setDismissedEmergencySessionIds] = useState<Set<string>>(new Set());
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const listRef = useRef<FlatList<Message>>(null);
 
@@ -532,6 +441,17 @@ export default function ChatScreen() {
     setHistoryVisible(false);
   }, [welcomeText]);
 
+  const dismissEmergency = useCallback(() => {
+    if (activeSessionId) {
+      setDismissedEmergencySessionIds((prev) => {
+        const next = new Set(prev);
+        next.add(activeSessionId);
+        return next;
+      });
+    }
+    setShowEmergency(false);
+  }, [activeSessionId]);
+
   const openHistory = useCallback(() => {
     setHistoryVisible(true);
     setHistoryLoading(true);
@@ -624,13 +544,11 @@ export default function ChatScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Oturum doğrulanamadı.');
 
-      const isEmergency = detectEmergency(text);
       // Edge function sadece son mesajı kullanıyor; geçmiş DB'den çekiliyor.
       // Büyüyen apiMessages array'i yerine tek elemanlı array gönder.
       const { data, error } = await supabase.functions.invoke('chat', {
         body: {
           messages: [{ role: 'user', content: text }],
-          is_emergency_flagged: isEmergency,
           session_id: sessionId,
           title,
         },
@@ -648,9 +566,8 @@ export default function ChatScreen() {
       setMessages((prev) => [...prev, { id: `${msgId}-a`, role: 'assistant', content: reply, ts: Date.now() }]);
       void refreshSessions();
 
-      if (isEmergency || payload.is_emergency === true || detectEmergency(reply)) {
-        setShowEmergency(true);
-      }
+      const dismissedForSession = dismissedEmergencySessionIds.has(sessionId);
+      setShowEmergency(payload.is_emergency === true && !dismissedForSession);
     } catch (error) {
       console.error('chat-screen:', error);
       setSendError(mapChatError(error));
@@ -659,7 +576,16 @@ export default function ChatScreen() {
     } finally {
       setSending(false);
     }
-  }, [activeSessionId, input, loadingProfile, messages, refreshSessions, sending, sessions]);
+  }, [
+    activeSessionId,
+    dismissedEmergencySessionIds,
+    input,
+    loadingProfile,
+    messages,
+    refreshSessions,
+    sending,
+    sessions,
+  ]);
 
   if (loadingProfile) {
     return (
@@ -690,17 +616,24 @@ export default function ChatScreen() {
         />
 
         {showEmergency && (
-          <Pressable
-            style={({ pressed }) => [styles.emergencyBtn, pressed && { opacity: 0.82 }]}
-            onPress={() => navigation.navigate('Nearby')}
-          >
-            <Text style={styles.emergencyBtnIcon}>🚨</Text>
-            <Text style={styles.emergencyBtnText}>Nöbetçi Eczane / Hastane Bul</Text>
-            <Ionicons name="chevron-forward" size={18} color={C.text1} />
-          </Pressable>
+          <View style={styles.emergencyCard}>
+            <Ionicons name="medical-outline" size={18} color={C.error} />
+            <Text style={styles.emergencyCardText}>Yakında destek gerekebilir.</Text>
+            <Pressable
+              style={({ pressed }) => [styles.emergencyAction, pressed && { opacity: 0.75 }]}
+              onPress={() => navigation.navigate('Nearby')}
+            >
+              <Text style={styles.emergencyActionText}>Eczane / Hastane</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.emergencyDismiss, pressed && { opacity: 0.6 }]}
+              onPress={dismissEmergency}
+              hitSlop={8}
+            >
+              <Ionicons name="close" size={16} color={C.text3} />
+            </Pressable>
+          </View>
         )}
-
-        <ChatFooterNotice />
 
         <View style={styles.inputRow}>
           <TextInput
@@ -814,13 +747,34 @@ const styles = StyleSheet.create({
     marginVertical: 6, marginHorizontal: 16,
   },
 
-  emergencyBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    marginHorizontal: 12, marginBottom: 8, paddingVertical: 14,
-    borderRadius: 14, backgroundColor: C.error,
+  emergencyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
   },
-  emergencyBtnIcon: { fontSize: 18 },
-  emergencyBtnText: { color: C.text1, fontSize: 15, fontWeight: '700', flex: 1, textAlign: 'center' },
+  emergencyCardText: { color: C.text2, fontSize: 12, flex: 1 },
+  emergencyAction: {
+    borderRadius: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    backgroundColor: C.errorDim,
+  },
+  emergencyActionText: { color: C.error, fontSize: 12, fontWeight: '700' },
+  emergencyDismiss: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end',

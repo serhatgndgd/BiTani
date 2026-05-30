@@ -1,0 +1,327 @@
+============================================================================
+BiTani DB — 4 UZMAN ANALİZİ
+============================================================================
+Tarih : 2026-05-29 18:52:24  |  SADECE OKUMA
+
+╔══════════════════════════════════════════════════════════════════╗
+║  PERSPEKTIF A — VERİ BİLİMCİ                                    ║
+║  Tablo sağlığı, FK bütünlüğü, schema özeti                      ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Tablo                             Kayıt
+------------------------------------------
+  chat_history                        0
+  conditions_catalog                 71
+  consent_records                     5
+  medication_kt                  15,473
+  medication_kub                 15,503
+  medicationsV2                  15,624
+  profiles                            1
+  user_conditions                     1
+  user_medications                    1
+
+── FK Bütünlüğü (orphan tespiti) ──────────────────────────────────
+  user_conditions.user_id → profiles  orphan: 0
+  user_medications.user_id → profiles orphan: 0
+  user_medications.medication_id → medicationsV2 orphan: 1
+  medication_kt.medication_id → medicationsV2 orphan: 11
+  medication_kub.medication_id → medicationsV2 orphan: 10
+
+  V2 ilaçlarında KT olmayan  :    11  / 1000
+  V2 ilaçlarında KÜB olmayan :    10  / 1000
+  V2 ilaçlarında ikisi de yok:     2  / 1000
+
+── Kullanıcı & Kullanım Özeti ──────────────────────────────────────
+  Profil örneği (1): onboarding tamamlayan=1/1
+  Cinsiyet dağılımı: {'male': 1}
+
+  user_conditions: 1 kayıt, 1 farklı hastalık seçilmiş
+  user_medications: 1 kayıt
+
+╔══════════════════════════════════════════════════════════════════╗
+║  PERSPEKTIF B — MİMAR (İlaç-Hastalık Eşleştirme Stratejisi)     ║
+╚══════════════════════════════════════════════════════════════════╝
+
+conditions_catalog: 71 hastalık, 16 kategori
+
+  [Ağrı] (2): Kronik Ağrı, Nöropatik Ağrı
+  [Dermatoloji] (4): Egzama, Akne, Ürtiker, Sedef Hastalığı
+  [Enfeksiyon] (7): Tüberküloz, HIV/AIDS, Bakteriyel Enfeksiyon, Viral Enfeksiyon, Üriner Sistem Enfeksiyonu, Pnömoni, Mantar Enfeksiyonu
+  [Gastroenteroloji] (4): Hepatit B, Peptik Ülser, Karaciğer Yetmezliği, Hepatit C
+  [Göz] (4): Katarakt, Konjunktivit, Maküler Dejenerasyon, Glokom
+  [Hematoloji] (1): Demir Eksikliği Anemisi
+  [KBB] (3): Tonsillit, Sinüzit, Orta Kulak Enfeksiyonu
+  [Kardiyovasküler] (7): Kalp Yetmezliği, Derin Ven Trombozu, Atriyal Fibrilasyon, Koroner Arter Hastalığı, Hipertansiyon, Tromboemboli, Koroner Bypass
+  [Metabolik] (6): Hiperkolesterolemi, Obezite, Hipertrigliseridemi, Diyabet Tip 1, Metabolik Sendrom, Diyabet Tip 2
+  [Nöroloji] (6): Parkinson Hastalığı, Multipl Skleroz, Vertigo, Migren, Alzheimer Hastalığı, Epilepsi
+  [Onkoloji] (7): Kolon Kanseri, Akciğer Kanseri, Meme Kanseri, Prostat Kanseri, Lösemi, Lenfoma, Tiroid Kanseri
+  [Psikiyatri] (6): Bipolar Bozukluk, Şizofreni, DEHB, Depresyon, Anksiyete Bozukluğu, Psikoz
+  [Romatoloji] (4): Romatoid Artrit, Gut Hastalığı, Osteoporoz, Ankilozan Spondilit
+  [Sindirim] (4): Reflü (GÖRH), İrritabl Bağırsak Sendromu, Ülseratif Kolit, Crohn Hastalığı
+  [Solunum] (3): Astım, KOAH, Alerjik Rinit
+  [Üroloji] (3): Böbrek Taşı, Kronik Böbrek Hastalığı, Prostat Hiperplazisi
+
+── Mevcut condition_medications durumu ─────────────────────────────
+  condition_medications YOK veya erişilemiyor: {'message': "Could not find the table 'public.condition_medications' in the schema cache", 'code': 'PGRST205', 'hint': "Perhaps you meant the table 'public.user_medications'", 'details': None}
+
+── Eşleştirme Yaklaşımları Karşılaştırması ─────────────────────────
+
+  Yaklaşım A — KURAL BAZLI (keyword matching)
+  ─────────────────────────────────────────────
+  Nasıl: conditions_catalog.name → therapeutic_indications/section_1 içinde ara
+  Artıları: Hızlı, deterministic, sıfır model maliyeti, açıklanabilir
+  Eksileri: Türkçe varyantlar kaçar (HT=hipertansiyon), eşanlamlı kaçar
+  Tahmini kapsam: ~%40-55 (katalog adı birebir geçen ilaçlar)
+  Süre: ~2-4 saat (15.503 ilaç × 71 hastalık, regex)
+  Risk: Düşük — yanlış pozitif kontrol edilebilir
+
+  Yaklaşım B — EMBEDDING / SEMANTİK
+  ─────────────────────────────────────────────
+  Nasıl: Her ilaç endikasyonu + her hastalık → vektör benzerliği
+  Artıları: Türkçe varyantları yakalar, sözdizimine bağımlı değil
+  Eksileri: Model gerektirir (text-embedding-3 veya Türkçe BERT),
+            yanlış pozitif riski yüksek, maliyet/süre: günler
+  Tahmini kapsam: ~%70-80
+  Risk: Yüksek — validasyon olmadan yanlış eşleşme
+
+  Yaklaşım C — HİBRİT (kural + LLM onay) ← ÖNERİLEN
+  ─────────────────────────────────────────────────────
+  Adım 1: Kural bazlı ile başla (geniş eşleşme, yüksek recall)
+    - Hastalık adı + Türkçe sinonimler (15-20 per hastalık)
+    - Endikasyon metninde geç → aday listesi
+  Adım 2: Groq/Claude ile batch doğrulama
+    - "Bu endikasyon metni [Diyabet] için mi?" sorusu
+    - Düşük confidence_score olanları filtrele
+  Adım 3: condition_medications tablosuna yaz (confidence_score ile)
+  Artıları: Hız + doğruluk dengesi, mevcut Groq altyapısını kullanır
+  Süre: ~8-16 saat (batch)
+  Risk: Orta — 2 katmanlı filtre hata yapar ama kabul edilebilir
+
+
+╔══════════════════════════════════════════════════════════════════╗
+║  PERSPEKTIF C — ECZACI (Endikasyon Kapsam Analizi)              ║
+║  KÜB therapeutic_indications + KT section_1_nedir (400 örnek)   ║
+╚══════════════════════════════════════════════════════════════════╝
+
+KÜB therapeutic_indications (400 örnek) + KT section_1_nedir (100) çekiliyor…
+  KÜB: 400 kayıt  |  KT: 100 kayıt  (1.1s)
+
+── Koşul → Endikasyon Eşleşme Sayıları (400+100 örnek) ────────────
+
+Hastalık                              KÜB    KT  Toplam     %
+--------------------------------------------------------------
+  Tromboemboli                        201    45     246  49.2% ████████████████████
+  Atriyal Fibrilasyon                  96    45     141  28.2% ████████████████████
+  Bakteriyel Enfeksiyon                48    17      65  13.0% ████████████████████
+  Multipl Skleroz                      21    25      46   9.2% ██████████████████
+  Hipertansiyon                        35    10      45   9.0% ██████████████████
+  Lösemi                               34    11      45   9.0% ██████████████████
+  Pnömoni                              35     5      40   8.0% ████████████████
+  Üriner Sistem Enfeksiyonu            30     8      38   7.6% ███████████████
+  Reflü (GÖRH)                         30     7      37   7.4% ██████████████
+  KOAH                                 30     6      36   7.2% ██████████████
+  Diyabet Tip 2                        27     8      35   7.0% ██████████████
+  Sinüzit                              25     8      33   6.6% █████████████
+  Orta Kulak Enfeksiyonu               24     6      30   6.0% ████████████
+  Romatoid Artrit                      23     7      30   6.0% ████████████
+  Tonsillit                            22     7      29   5.8% ███████████
+  Astım                                19     9      28   5.6% ███████████
+  Koroner Arter Hastalığı              22     4      26   5.2% ██████████
+  Alerjik Rinit                        17     8      25   5.0% ██████████
+  Epilepsi                             18     6      24   4.8% █████████
+  Şizofreni                            16     8      24   4.8% █████████
+  Hiperkolesterolemi                   17     4      21   4.2% ████████
+  Depresyon                            11     9      20   4.0% ████████
+  Kronik Böbrek Hastalığı              16     4      20   4.0% ████████
+  Bipolar Bozukluk                     14     5      19   3.8% ███████
+  Psikoz                                8     7      15   3.0% ██████
+  Viral Enfeksiyon                     10     4      14   2.8% █████
+  Mantar Enfeksiyonu                    7     7      14   2.8% █████
+  Alzheimer Hastalığı                  10     4      14   2.8% █████
+  Ankilozan Spondilit                  13     1      14   2.8% █████
+  Karaciğer Yetmezliği                 12     1      13   2.6% █████
+  Prostat Kanseri                       9     4      13   2.6% █████
+  Ürtiker                               9     3      12   2.4% ████
+  Gut Hastalığı                        10     2      12   2.4% ████
+  Kronik Ağrı                           8     3      11   2.2% ████
+  HIV/AIDS                              9     2      11   2.2% ████
+  Demir Eksikliği Anemisi              10     1      11   2.2% ████
+  Kalp Yetmezliği                       9     2      11   2.2% ████
+  Hipertrigliseridemi                  10     1      11   2.2% ████
+  Anksiyete Bozukluğu                   6     4      10   2.0% ████
+  Sedef Hastalığı                       7     2       9   1.8% ███
+  Tüberküloz                            8     1       9   1.8% ███
+  Peptik Ülser                          9     0       9   1.8% ███
+  Egzama                                7     1       8   1.6% ███
+  Obezite                               8     0       8   1.6% ███
+  Parkinson Hastalığı                   6     2       8   1.6% ███
+  Ülseratif Kolit                       5     2       7   1.4% ██
+  Konjunktivit                          3     3       6   1.2% ██
+  Maküler Dejenerasyon                  6     0       6   1.2% ██
+  Derin Ven Trombozu                    4     2       6   1.2% ██
+  Migren                                5     1       6   1.2% ██
+  Meme Kanseri                          6     0       6   1.2% ██
+  Akne                                  5     0       5   1.0% ██
+  Glokom                                3     2       5   1.0% ██
+  Lenfoma                               4     1       5   1.0% ██
+  Tiroid Kanseri                        4     1       5   1.0% ██
+  Osteoporoz                            5     0       5   1.0% ██
+  Nöropatik Ağrı                        3     1       4   0.8% █
+  Kolon Kanseri                         4     0       4   0.8% █
+  Akciğer Kanseri                       4     0       4   0.8% █
+  Prostat Hiperplazisi                  4     0       4   0.8% █
+  Hepatit C                             2     1       3   0.6% █
+  DEHB                                  3     0       3   0.6% █
+  Crohn Hastalığı                       2     1       3   0.6% █
+  Hepatit B                             2     0       2   0.4% 
+  Vertigo                               1     1       2   0.4% 
+  Katarakt                              0     1       1   0.2% 
+  İrritabl Bağırsak Sendromu            1     0       1   0.2% 
+  Koroner Bypass                        0     0       0   0.0% 
+  Diyabet Tip 1                         0     0       0   0.0% 
+  Metabolik Sendrom                     0     0       0   0.0% 
+  Böbrek Taşı                           0     0       0   0.0% 
+
+Eşleşen hastalık sayısı : 67 / 71
+Hiç eşleşmeyen          : 4
+  → Koroner Bypass, Diyabet Tip 1, Metabolik Sendrom, Böbrek Taşı
+
+── İlaç Tarafı: En Az 1 Koşul Eşleşme Oranı ──────────────────────
+  449 / 500 ilaç endikasyonu (89.8%)
+  → Tam tablo için tahmini: ilaçların ~%60-75'i en az 1 katalog hastalığıyla eşleşir
+
+── Endikasyonlarda Sık Geçen Ama Katalogda OLMAYAN Kavramlar ──────
+Kavram                                KÜB    KT  Toplam
+-------------------------------------------------------
+  Osteoartrit                          15     2      17  ← katalogda YOK
+  Fibromiyalji                          1     1       2  ← katalogda YOK
+  Uyku Bozukluğu                        1     0       1  ← katalogda YOK
+  BPH / Prostat Hiperpl.                4     0       4  ← katalogda YOK
+  Menopoz                               6     0       6  ← katalogda YOK
+  Çölyak                                2     0       2  ← katalogda YOK
+  Trombositopeni                        9     0       9  ← katalogda YOK
+  Hemofili                              5     0       5  ← katalogda YOK
+  Wilson Hastalığı                      3     0       3  ← katalogda YOK
+  Sistemik Lupus                       20    10      30  ← katalogda YOK
+  Böbrek Nakli                         11     2      13  ← katalogda YOK
+  Vitamin/Mineral Eks.                 10     1      11  ← katalogda YOK
+  Göz Hipertansiyonu                    3     1       4  ← katalogda YOK
+  Hiponatremi                           2     0       2  ← katalogda YOK
+
+╔══════════════════════════════════════════════════════════════════╗
+║  PERSPEKTIF D — DOKTOR (Klinik Güvenlik + Katalog Yeterliliği)  ║
+╚══════════════════════════════════════════════════════════════════╝
+
+
+── D1) Güvenli "Hastalığa Göre İlaç" Sunumu ──────────────────────────
+
+  YAPILMAMASI GEREKENLER:
+  ✗ "Bu hastalık için şu ilaçlar kullanılır" → doğrudan listeleme
+    Neden: Kişi zaten başka ilaç kullanıyor olabilir (etkileşim riski)
+    Neden: Reçetesiz uyarısı olmadan "bu ilacı kullan" mesajı yasadışı
+    Neden: Kontrendikasyon kontrolü yapılmadan öneri yapılamaz
+
+  YAPILMASI GEREKENLER:
+  ✓ "Bu hastalıkta kullanılan ilaç sınıfları şunlardır" (genel bilgi)
+  ✓ "Doktorunuzun önerdiği ilaçla ilgili bilgi almak ister misiniz?"
+  ✓ Kullanıcı zaten ilacını girilmişse → o ilacın endikasyonunu göster
+  ✓ "Bu ilacın sizin hastalığınızla ilgili kullanımı: ..."
+  ✓ Kontrendikasyon varsa: "Bu iki ilaç birlikte dikkatli kullanılmalı"
+
+── D2) Kontrendikasyon Çakışması Kontrolü ─────────────────────────────
+
+  Mevcut veri tabanında kontrendikasyon bilgisi:
+  • medication_kub.contraindications: %90.8 dolu
+  • medication_kt.section_2_kullanmadan_once: %88.5 dolu
+    (hasta dili, "şu durumlarda kullanmayınız" formatı)
+
+  Önerilen kontrol mantığı:
+  1. Kullanıcının tüm ilaçları → drug_interactions'ı çek
+  2. İlaç A'nın drug_interactions içinde İlaç B adı geçiyor mu?
+  3. Kullanıcı profili (yaş/cinsiyet/hamilelik) ile:
+     - pregnancy_and_lactation kontrol: hamilelik bayrağı aktifse
+     - Yaş < 18: pediatrik uyarı ara (special_warnings'ta)
+     - Yaş > 75: geriatri uyarısı ara
+
+  Kişiselleştirme veri kaynakları (mevcut profil kolonları):
+  • birth_date  → yaş hesapla
+  • gender      → cinsiyet bazlı uyarılar
+  • Hamilelik bilgisi → YOK (profilde yok, sorulabilir)
+
+── D3) 71 Hastalık Kapsam Değerlendirmesi ─────────────────────────────
+
+  Yaygın kronik hastalık yükü (Türkiye istatistikleri baz alınarak):
+  ✅ Hipertansiyon                    TR'de %30+ yetişkin — kritik, iyi kapsanmış
+  ✅ Diyabet Tip 2                    TR'de %15+ — kritik, iyi kapsanmış
+  ✅ Hiperkolesterolemi               Yaygın, iyi kapsanmış
+  ✅ Astım                            Yaygın, iyi kapsanmış
+  ✅ KOAH                             Yaygın, iyi kapsanmış
+  ✅ Depresyon                        Yüksek prevalans, iyi kapsanmış
+  ✅ Romatoid Artrit                  İyi kapsanmış
+  ✅ Epilepsi                         İyi kapsanmış
+  ⚠️ Osteoporoz                       Kadın ağırlıklı, katalogda var ama yetersiz
+  ⚠️ Obezite                          İlaç seçenekleri sınırlı, katalogda var
+  ⚠️ Metabolik Sendrom                Spesifik ilaç az, hipertansiyon/diyabet altında ele alınabilir
+  ⚠️ Koroner Bypass                   Hastalık değil prosedür — operasyon sonrası ilaç için OK
+  ⚠️ Diyabet Tip 1                    Özelleşmiş, insülin reçeteli — chat kısıtlı fayda
+  ⚠️ Tüberküloz                       Reçeteli rejim, chat scope'u dar
+  ⚠️ HIV/AIDS                         ARV reçeteli, chat scope'u dar
+  ❌ Hematoloji eksik                 Lösemi/lenfoma/hemofili: onkoloji/hematoloji uzman gerekli
+  ❌ Osteoartrit eksik                Çok yaygın (>50 yaş) — katalogda YOK, eklenmeli
+  ❌ Menopoz eksik                    Yaygın, HRT soruları — katalogda YOK
+  ❌ Uyku Bozukluğu eksik             Yaygın şikayet — katalogda YOK
+  ❌ Böbrek Nakli eksik               İmmunosüpresif ilaç yüklü hasta grubu — katalogda YOK
+
+  Genel Değerlendirme:
+  • 71 hastalık temel kronik hastalıkları kapsıyor — sağlam başlangıç
+  • Onkoloji (7 kanser) agresif kapsam: chat için risk yüksek,
+    sadece 'kullanıcı bu ilacı kullanıyor' modunda güvenli
+  • Eksik: Osteoartrit, Menopoz, Uyku Bozukluğu, Sedef/Egzama dışı deri
+  • Fazla spesifik: Koroner Bypass (prosedür), Viral/Bakteriyel Enfeksiyon
+    (çok geniş kategori — pratik değer düşük)
+
+╔══════════════════════════════════════════════════════════════════╗
+║  ORTAK EYLEM PLANI                                               ║
+╚══════════════════════════════════════════════════════════════════╝
+
+
+1) VERİTABANI YAPISI
+   • FK bütünlüğü: kontrol edildi, orphan varsa yukarıda listelendi
+   • condition_medications tablosu VARSA: içeriği zaten kullanılabilir
+   • medication_kub.drug_interactions (%80.3): chat bağlantısına hazır
+   • Eksik: profiles'da hamilelik kolonu yok — kişiselleştirme için eklenebilir
+
+2) 71 HASTALIL KAPSAM DEĞERLENDİRMESİ
+   • 94% hastalık (400+100 örnek) endikasyon metinlerinde eşleşti
+   • Sıfır eşleşme: 4 hastalık (yukarıda listelendi)
+   • ÖNERİ EKLENMESİ: Osteoartrit, Menopoz, Uyku Bozukluğu (yüksek frekans)
+   • ÖNERİ ÇIKARILMASI: Viral/Bakteriyel Enfeksiyon → çok geniş, pratik değil
+
+3) ÖNERİLEN EŞLEŞTİRME YAKLAŞIMI: HİBRİT (C)
+   Adım 1 — Kural bazlı (bu script'in eşleştirme kodu temel alınır)
+     → conditions_catalog × medicationsV2 tam tarama
+     → Her ilaç: therapeutic_indications + section_1_nedir
+     → Sinonim sözlüğü genişletilerek (yukarıdaki SYNONYMS dict)
+   Adım 2 — Groq batch doğrulama
+     → Eşleşen her çift için: "Bu endikasyon [Hastalık] için mi?" (1/0)
+     → confidence_score ataması
+   Adım 3 — condition_medications tablosuna upsert
+     → is_contraindication: contraindications kolonundan
+     → extraction_method: 'hybrid_v1'
+
+4) TAHMİNİ EŞLEŞTİRME KAPSAMI
+   • Kural bazlı (sadece): ~%55-65 hastalık × ~%45-60 ilaç = ~35.000-55.000 çift
+   • Hibrit (doğrulamadan sonra): ~%70-80 hastalık × ~%60-75 ilaç
+   • Mevcut condition_medications varsa: önce onu incele, üzerine yaz
+
+5) SOMUT SONRAKI ADIMLAR (öncelik sırasıyla)
+   Öncelik 1: condition_medications tablosunu incele (mevcut + doluluk)
+   Öncelik 2: medication_kub → chat bağlantısı (buildMedicationKubContext)
+   Öncelik 3: Güvenli DROP migration çalıştır (10 kolon)
+   Öncelik 4: Hibrit eşleştirme scripti yaz (SYNONYMS dict'i genişlet)
+   Öncelik 5: Yeni katalog hastalıkları ekle (Osteoartrit, Menopoz, Uyku)
+
+============================================================================
+Analiz tamamlandı  (5.5s)
+DB'ye HİÇBİR yazma yapılmadı.
+============================================================================

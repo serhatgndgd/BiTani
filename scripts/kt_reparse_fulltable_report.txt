@@ -1,0 +1,80 @@
+========================================================================
+KT RE-PARSE TAM-TABLO DRY-RUN RAPORU
+========================================================================
+Tarih               : 2026-05-29 15:47:52
+Hedef tablo         : medication_kt (tüm satırlar)
+Toplam işlenen kayıt: 15473
+Beklenen satır sayısı: 15473
+Toplam süre         : 91.4s (169 kayıt/s)
+Batch timeout sayısı: 0
+DB yazma            : HİÇBİRİ. Salt-okuma SELECT'leri.
+
+========================================================================
+1) BAŞARI ORANI
+========================================================================
+  5/5 bölüm bulundu (tam başarı)      : 13057 / 15473  (84.4%)
+  Kısmi (1-4 bölüm)                   :  1144 / 15473  (7.4%)
+  Hiçbir bölüm yok (0/5)              :  1272 / 15473  (8.2%)
+  Birleşik başlık kullanılan kayıt    :     1 (0.0%)
+
+========================================================================
+2) parse_quality_score DAĞILIMI
+========================================================================
+  score=5  →  13057 kayıt  ( 84.4%)  ██████████████████████████████████████████
+  score=4  →    520 kayıt  (  3.4%)  █
+  score=3  →    339 kayıt  (  2.2%)  █
+  score=2  →    130 kayıt  (  0.8%)  
+  score=1  →    155 kayıt  (  1.0%)  
+  score=0  →   1272 kayıt  (  8.2%)  ████
+
+========================================================================
+3) HANGİ BÖLÜMLER EKSİK?
+========================================================================
+  Bölüm 1 (nedir_ne_icin_kullanilir      ) eksik:  2053  ( 13.3%)  ██████
+  Bölüm 2 (kullanmadan_once_dikkat       ) eksik:  1745  ( 11.3%)  █████
+  Bölüm 3 (nasil_kullanilir              ) eksik:  1767  ( 11.4%)  █████
+  Bölüm 4 (olasi_yan_etkiler             ) eksik:  1490  (  9.6%)  ████
+  Bölüm 5 (saklanmasi                    ) eksik:  1513  (  9.8%)  ████
+
+========================================================================
+4) SIĞ-İÇERİK ŞÜPHELİ KAYITLAR (bölüm < 30 char)
+========================================================================
+  Toplam şüpheli bölüm vakası : 330
+    Bölüm 1 (nedir_ne_icin_kullanilir      ) :    3 (o bölümden çıkarılanların %0.0'i)
+    Bölüm 2 (kullanmadan_once_dikkat       ) :   11 (o bölümden çıkarılanların %0.1'i)
+    Bölüm 3 (nasil_kullanilir              ) :    4 (o bölümden çıkarılanların %0.0'i)
+    Bölüm 4 (olasi_yan_etkiler             ) :    0 (o bölümden çıkarılanların %0.0'i)
+    Bölüm 5 (saklanmasi                    ) :  312 (o bölümden çıkarılanların %2.2'i)
+
+========================================================================
+5) BÖLÜM UZUNLUKLARI (karakter)
+========================================================================
+  Bölüm 1 (nedir_ne_icin_kullanilir      ) n=13420  ort=  1410  min=   24  max= 45828
+  Bölüm 2 (kullanmadan_once_dikkat       ) n=13728  ort=  6290  min=   10  max= 37251
+  Bölüm 3 (nasil_kullanilir              ) n=13706  ort=  3344  min=   20  max= 22331
+  Bölüm 4 (olasi_yan_etkiler             ) n=13983  ort=  4509  min=   47  max= 34684
+  Bölüm 5 (saklanmasi                    ) n=13960  ort=  1729  min=   23  max= 28925
+
+========================================================================
+6) SALT-GÖRSEL PDF ADAYI
+========================================================================
+  0/5 bölüm çıkarılan kayıt sayısı   : 1272
+  Bu kayıtların ID'leri ileri inceleme için ayrı bir lookup
+  gerektirir (id sıralı offset'lerde dağılıyor).
+  Pratik aksiyon: bu 1272 kayıt için PDF'yi
+  yeniden OCR'lamak veya manuel atlamak gerekebilir.
+
+========================================================================
+ÖZET
+========================================================================
+  Tam başarı (5/5)               :  84.4%
+  Yakın başarı (4/5 veya 5/5)    :  87.7%
+  Başarısız (0/5)                :   8.2%  (1272 kayıt)
+  Birleşik başlık kullanan       :   0.0%  (1 kayıt)
+
+  Sıradaki karar: tam başarı oranı (84.4%) production için yeterli mi?
+  Eşik %95+ ise: parser yeterli, ayrı UPDATE script'i yazılabilir.
+  Eşik altında ise: 0/5 vakalarını incele, birleşik başlık varyantı
+  veya alternatif anchor stratejisi gerek.
+
+DB durumu: değişmedi. Sadece SELECT sorguları çalıştırıldı.

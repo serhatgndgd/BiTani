@@ -96,7 +96,8 @@ function formatTurkishDate(): string {
 function getTimeGreeting(): string {
   const hour = new Date().getHours();
   if (hour < 12) return 'Günaydın';
-  if (hour < 17) return 'İyi öğlenler';
+  if (hour < 14) return 'İyi öğlenler';
+  if (hour < 18) return 'İyi günler';
   return 'İyi akşamlar';
 }
 
@@ -259,7 +260,7 @@ export default function HomeScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Ionicons name="body-outline" size={17} color={C.text3} />
-              <Text style={styles.cardTitle}>Vücut Kitle İndeksi</Text>
+              <Text style={styles.cardTitle}>VÜCUT KİTLE İNDEKSİ</Text>
             </View>
 
             <View style={styles.bmiContent}>
@@ -302,7 +303,7 @@ export default function HomeScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Ionicons name="alarm-outline" size={17} color={C.text3} />
-              <Text style={styles.cardTitle}>Günlük İlaç Hatırlatıcısı</Text>
+              <Text style={styles.cardTitle}>GÜNLÜK İLAÇ HATIRLATICISI</Text>
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{medications.length}</Text>
               </View>
@@ -316,7 +317,9 @@ export default function HomeScreen() {
                   {/* Zaman başlığı */}
                   <View style={styles.doseGroupHeader}>
                     <Ionicons name={DOSE_TIME_ICONS[time]} size={12} color={C.text3} />
-                    <Text style={styles.doseGroupLabel}>{DOSE_TIME_LABELS[time]}</Text>
+                    <Text style={styles.doseGroupLabel}>
+                      {DOSE_TIME_LABELS[time].toLocaleUpperCase('tr-TR')}
+                    </Text>
                   </View>
                   {/* İlaçlar */}
                   {items.map((m, idx) => (
@@ -346,7 +349,7 @@ export default function HomeScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Ionicons name="medical-outline" size={17} color={C.text3} />
-              <Text style={styles.cardTitle}>Kronik Hastalıklarınız</Text>
+              <Text style={styles.cardTitle}>KRONİK HASTALIKLARINIZ</Text>
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{conditions.length}</Text>
               </View>
@@ -366,7 +369,7 @@ export default function HomeScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Ionicons name="medkit-outline" size={17} color={C.text3} />
-              <Text style={styles.cardTitle}>Kullandığınız İlaçlar</Text>
+              <Text style={styles.cardTitle}>KULLANDIĞINIZ İLAÇLAR</Text>
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{medications.length}</Text>
               </View>
@@ -468,7 +471,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
     flex: 1,
-    textTransform: 'uppercase',
   },
 
   badge:     { backgroundColor: C.surfaceAlt, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
@@ -538,7 +540,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.4,
-    textTransform: 'uppercase',
   },
   doseRow: {
     flexDirection: 'row',

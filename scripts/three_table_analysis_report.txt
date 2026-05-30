@@ -1,0 +1,362 @@
+============================================================================
+3 TABLO ANALİZİ — medicationsV2 / medication_kt / medication_kub
+============================================================================
+Tarih: 2026-05-29 18:30:32  |  SADECE OKUMA
+
+Kayıt sayıları:
+  medicationsV2  :  15624
+  medication_kt  :  15473
+  medication_kub :  15503
+
+V2 ∩ KT  (aynı ilaçlar) :    989
+V2 ∩ KÜB (aynı ilaçlar) :    990
+KT ∩ KÜB (aynı ilaçlar) :    991
+V2 ∩ KT ∩ KÜB (üçü de)  :    981
+
+============================================================================
+BÖLÜM 1 — TÜM KOLONLAR + DOLULUK
+============================================================================
+
+── medicationsV2 ──────────────────────────────────────────────────
+  id                                  100.0%
+  ilac_adi                            100.0%
+  etkin_madde_adi                     100.0%
+  firma_adi                            96.0%
+  kub_onay_tarihi                     100.0%
+  kt_onay_tarihi                      100.0%
+  kub_url                             100.0%
+  kt_url                              100.0%
+  created_at                          100.0%
+
+── medication_kt ──────────────────────────────────────────────────
+  id                                  100.0%
+  medication_id                       100.0%
+  drug_interactions                    77.6%
+  raw_text                            100.0%
+  source_url                          100.0%
+  parsed_at                           100.0%
+  created_at                          100.0%
+  section_1_nedir                      86.7%
+  section_2_kullanmadan_once           88.5%
+  section_3_nasil_kullanilir           88.6%
+  section_4_yan_etkiler                90.0%
+  section_5_saklanmasi                 89.9%
+  parse_quality_score                 100.0%
+  parse_version                       100.0%
+
+── medication_kub ─────────────────────────────────────────────────
+  id                                  100.0%
+  medication_id                       100.0%
+  product_name                         79.6%
+  composition                          79.6%
+  pharmaceutical_form                  80.5%
+  therapeutic_indications              87.8%
+  dosage_and_administration            86.3%
+  contraindications                    90.8%
+  special_warnings                     84.6%
+  drug_interactions                    80.3%
+  pregnancy_and_lactation              90.1%
+  driving_and_machine_use              83.3%
+  side_effects                         88.9%
+  overdose                             82.3%
+  pharmacodynamic_properties           87.1%
+  pharmacokinetic_properties           88.0%
+  shelf_life                           88.3%
+  storage_conditions                   76.0%
+  license_holder                       83.7%
+  raw_text                            100.0%
+  source_url                          100.0%
+  parsed_at                           100.0%
+  created_at                          100.0%
+
+============================================================================
+BÖLÜM 2 — V2 ↔ KT / KÜB ÖRTÜŞMESİ (içerik kalitesi karşılaştırması)
+============================================================================
+
+── 2a) KT.source_url vs V2.kt_url ────────────────────────────────
+  mid=e5f4340a…  KT: https://titck.gov.tr/storage/kubKtAttachments/56d1095e10416.pdf
+               V2: https://titck.gov.tr/storage/kubKtAttachments/56d1095e10416.pdf  → ✅ AYNI
+  mid=5baa8c12…  KT: https://titck.gov.tr/storage/Archive/2025/kubKtAttachments/yaynlanacak
+               V2: https://titck.gov.tr/storage/Archive/2025/kubKtAttachments/yaynlanacak  → ✅ AYNI
+  mid=9b209842…  KT: https://titck.gov.tr/storage/Archive/2021/kubKtAttachments/TELMODPkt_4
+               V2: https://titck.gov.tr/storage/Archive/2021/kubKtAttachments/TELMODPkt_4  → ✅ AYNI
+  mid=db47ba23…  KT: https://titck.gov.tr/storage/kubKtAttachments/ff8c00e874766.pdf
+               V2: https://titck.gov.tr/storage/kubKtAttachments/ff8c00e874766.pdf  → ✅ AYNI
+  mid=51608f89…  KT: https://titck.gov.tr/storage/kubKtAttachments/1e7b3a5e68476.pdf
+               V2: https://titck.gov.tr/storage/kubKtAttachments/1e7b3a5e68476.pdf  → ✅ AYNI
+
+── 2b) KÜB.product_name vs V2.ilac_adi ───────────────────────────
+  KÜB: 'LİNEDOR 600 mg/300 ml I.V. infüzyon için çözelti içeren flak'
+  V2 : 'LİNEDOR 600 MG/300 ML I.V. INFüZYON IçIN çöZELTI IçEREN FLAK'  → ✅ AYNI
+
+  KÜB: 'LİNEJECT® 600 mg/300 ml İV İnfüzyonluk Çözelti'
+  V2 : 'LİNEJECT 600 MG/300 ML IV İNFÜZYON İÇİN ÇÖZELTİ İÇEREN FLAKO'  → ⚠️ FARKLI
+
+  KÜB: 'AIRPUFF® 25 mcg /125 mcg aerosol inhalasyonu, süspansiyon'
+  V2 : 'AIRPUFF 25 MCG /125 MCG AEROSOL İNHALASYONU, SüSPANSIYON'  → ⚠️ FARKLI
+
+  KÜB: 'AIRPUFF® 25 mcg/250 mcg aerosol inhalasyonu, süspansiyon'
+  V2 : 'AIRPUFF 25 MCG /250 MCG AEROSOL İNHALASYONU, SüSPANSIYON'  → ⚠️ FARKLI
+
+  KÜB: 'DOLASET 10 mg/ml I.V. İnfüzyonluk Çözelti 
+Steril'
+  V2 : 'DOLASET 10 MG/ML I.V. İNFüZYONLUK ÇöZELTI'  → ⚠️ FARKLI
+
+
+── 2c) KÜB.source_url vs V2.kub_url ──────────────────────────────
+  mid=ef9f7dcf…  ✅ AYNI
+    KÜB: https://titck.gov.tr/storage/kubKtAttachments/lIuHIb0hrWwWX.pdf
+    V2 : https://titck.gov.tr/storage/kubKtAttachments/lIuHIb0hrWwWX.pdf
+  mid=e5f4340a…  ✅ AYNI
+    KÜB: https://titck.gov.tr/storage/kubKtAttachments/f4a4b9a825991.pdf
+    V2 : https://titck.gov.tr/storage/kubKtAttachments/f4a4b9a825991.pdf
+  mid=56526ea7…  ✅ AYNI
+    KÜB: https://titck.gov.tr/storage/kubKtAttachments/Eyv3GvSC78TyG.pdf
+    V2 : https://titck.gov.tr/storage/kubKtAttachments/Eyv3GvSC78TyG.pdf
+  mid=8f96b0fb…  ✅ AYNI
+    KÜB: https://titck.gov.tr/storage/Archive/2019/kubKtAttachments/LİNEDOR 600
+    V2 : https://titck.gov.tr/storage/Archive/2019/kubKtAttachments/LİNEDOR 600
+  mid=eda15833…  ✅ AYNI
+    KÜB: https://titck.gov.tr/storage/Archive/2019/kubKtAttachments/küb.pdf_07b
+    V2 : https://titck.gov.tr/storage/Archive/2019/kubKtAttachments/küb.pdf_07b
+  Bu 5 örnekte: 5 aynı, 0 farklı
+
+============================================================================
+BÖLÜM 3 — KT ↔ KÜB ÖRTÜŞMESİ (aynı ilaç, hangi kaynak daha iyi?)
+============================================================================
+
+── KT section_5_saklanmasi  vs  KÜB shelf_life
+  Ortalama uzunluk (3 örnek): KT=772 ch  |  KÜB=5 ch
+  Örnek mid=1019fdb3…
+    KT  (1119 ch): 'SUNUBİS’i çocukların göremeyeceği, erişemeyeceği yerlerde ve ambalajında saklayınız.    25°C’nin altındaki oda sıcaklığında saklayınız.    Son kullanm'
+    KÜB (5 ch): '24 ay'
+
+── KT section_5_saklanmasi  vs  KÜB storage_conditions
+  Ortalama uzunluk (3 örnek): KT=772 ch  |  KÜB=71 ch
+  Örnek mid=1019fdb3…
+    KT  (1119 ch): 'SUNUBİS’i çocukların göremeyeceği, erişemeyeceği yerlerde ve ambalajında saklayınız.    25°C’nin altındaki oda sıcaklığında saklayınız.    Son kullanm'
+    KÜB (50 ch): '25°C’nin altındaki oda sıcaklığında saklanmalıdır.'
+
+── KT section_3_nasil  vs  KÜB dosage_and_admin
+  Ortalama uzunluk (3 örnek): KT=3458 ch  |  KÜB=5509 ch
+  Örnek mid=1019fdb3…
+    KT  (2057 ch): 'Uygun kullanım ve doz/uygulama sıklığı için talimatlar:    SUNUBİS’i her zaman doktorunuzun tam olarak size belirttiği şekilde kullanınız. Emin  değil'
+    KÜB (3135 ch): 'Pozoloji/uygulama sıklığı ve süresi:  Tedavi kanser ilaçlarını uygulama konusunda tecrübeli bir hekim tarafından başlatılmalıdır.    GİST ve mRHK için'
+
+── KT section_2_kullanmadan  vs  KÜB special_warnings
+  Ortalama uzunluk (3 örnek): KT=7288 ch  |  KÜB=17593 ch
+  Örnek mid=1019fdb3…
+    KT  (8523 ch): 'Bu kullanma talimatından farklı olsa da doktorunuzun talimatlarına dikkatle uyunuz.    SUNUBİS’i aşağıdaki durumlarda KULLANMAYINIZ    Eğer,  • Suniti'
+    KÜB (15504 ch): 'Potent CYP3A4 indükleyicileri sunitinibin plazma konsantrasyonunu azaltabileceğinden  birlikte kullanımından kaçınılmalıdır (bkz. Bölüm 4.2 ve 4.5).  '
+
+── KT section_2_kullanmadan  vs  KÜB contraindications
+  Ortalama uzunluk (3 örnek): KT=7288 ch  |  KÜB=373 ch
+  Örnek mid=1019fdb3…
+    KT  (8523 ch): 'Bu kullanma talimatından farklı olsa da doktorunuzun talimatlarına dikkatle uyunuz.    SUNUBİS’i aşağıdaki durumlarda KULLANMAYINIZ    Eğer,  • Suniti'
+    KÜB (145 ch): 'Sunitinib malat veya SUNUBİS sert kapsüllerin bileşenlerinden herhangi birine aşırı  duyarlılığı olan hastalarda kontrendikedir (bkz. Bölüm 6.1).'
+
+============================================================================
+BÖLÜM 4 — CHAT İÇİN ANLAMSIZ KOLONLAR (3 uzman değerlendirmesi)
+============================================================================
+
+  [medication_kub.pharmacodynamic_properties]  doluluk=87.1%
+    → Reseptör mekanizması, IC50, EC50 gibi farmakoloji teknik verisi. Hasta/kullanıcı sorusu hiçbir zaman 'bu ilacın farmakodinamiği nedir' olmaz.
+
+  [medication_kub.pharmacokinetic_properties]  doluluk=88.0%
+    → Yarı-ömür, biyoyararlanım, dağılım hacmi. Klinisyen sorusu ama chat scope'u dışı. Yan etki/doz sorularında LLM context'e gürültü ekler.
+
+  [medication_kub.overdose]  doluluk=82.3%
+    → Aşırı doz acil protokolü. Chat asistanı 112/acil yönlendirir, bu metni okumaz. Ayrıca ACIL_KELIMELER ile zaten yönlendiriliyor.
+
+  [medication_kub.driving_and_machine_use]  doluluk=83.3%
+    → Araç/makine kullanımına etkisi. Faydalı ama çok nadir sorgulanır. special_warnings zaten içerebilir.
+
+  [medication_kub.pharmaceutical_form]  doluluk=80.5%
+    → 'Film kaplı tablet', 'enjeksiyonluk çözelti' gibi. medicationsV2.ilac_adi zaten içeriyor (XARELTO 20 mg film kaplı tablet).
+
+  [medication_kub.license_holder]  doluluk=83.7%
+    → Ruhsat sahibi firma adı. Kullanıcı/chat için hiçbir değeri yok.
+
+  [medication_kub.shelf_life]  doluluk=88.3%
+    → KT section_5_saklanmasi zaten saklama bilgisini içeriyor ve daha kullanıcı odaklı dil.
+
+  [medication_kub.storage_conditions]  doluluk=76.0%
+    → Aynı gerekçe. KT section_5 ile redundant, KÜB formatı teknik.
+
+  [medication_kub.product_name]  doluluk=79.6%
+    → medicationsV2.ilac_adi ile redundant (5 örnekte aynı içerik).
+
+  [medication_kub.source_url]  doluluk=100.0%
+    → medicationsV2.kub_url ile redundant (5 örnekte aynı URL).
+
+  [medication_kt.drug_interactions]  doluluk=77.6%
+    → KT formatında ilaç etkileşim bölümü yok (5 bölümlü yapı). Kodda kullanılmıyor. medication_kub.drug_interactions doldu (%80.3).
+
+  [medication_kt.source_url]  doluluk=100.0%
+    → medicationsV2.kt_url ile redundant (5 örnekte aynı URL).
+
+============================================================================
+BÖLÜM 5 — 3 UZMAN ORTAK KARARI
+============================================================================
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ UZMAN 1 — ECZACI (klinik fayda, hasta güvenliği)                    │
+├─────────────────────────────────────────────────────────────────────┤
+│ Hasta bir ilaç sorduğunda gerçekten önemli olan bilgiler:           │
+│   ✅ therapeutic_indications  — ne için kullanılır                  │
+│   ✅ contraindications        — kimler kullanmamalı (güvenlik)      │
+│   ✅ drug_interactions        — etkileşimler (polifarmasi riski)    │
+│   ✅ side_effects             — yan etkiler                         │
+│   ✅ special_warnings         — özel uyarılar (böbrek, karaciğer)  │
+│   ✅ pregnancy_and_lactation  — gebelik/emzirme (kritik!)           │
+│   ✅ KT section_1-5           — kullanıcı dili, doğrudan faydalı   │
+│                                                                     │
+│ Gereksiz (eczanede bile hasta sormuyor):                            │
+│   ❌ pharmacodynamic/kinetic  — klinisyen sorusu, chat scope dışı  │
+│   ❌ shelf_life / storage     — KT'de zaten var, daha iyi dil      │
+│   ❌ license_holder           — hiç ilgisi yok                     │
+│   ❌ overdose                 — 112 yönlendir, metin okuma          │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ UZMAN 2 — DOKTOR (klinik karar desteği, hata önleme)                │
+├─────────────────────────────────────────────────────────────────────┤
+│ Chat'te klinik hata yapılmaması için zorunlu:                       │
+│   ✅ contraindications        — hata en çok buradan çıkar           │
+│   ✅ drug_interactions        — polifarmasi hastası = kritik        │
+│   ✅ special_warnings         — organ yetmezliği, yaş grupları      │
+│   ✅ pregnancy_and_lactation  — teratojenite bilgisi                │
+│                                                                     │
+│ KT vs KÜB örtüşme görüşü:                                          │
+│   • KT section_2 (kullanmadan önce): hasta dili, pratik            │
+│   • KÜB contraindications: tıbbi/resmi, daha kapsamlı              │
+│   → İKİSİ FARKLI katman. KT = kullanıcı, KÜB = klinik.             │
+│   → KT section_2'yi KÜB contraindications yerine SAYMA.            │
+│                                                                     │
+│   • KT section_3 (nasıl kullanılır) vs KÜB dosage_and_admin:       │
+│   → KÜB daha uzun ve teknik. KT daha sade.                         │
+│   → Chat için KT yeterli. KÜB'ü context'e EKLEYEBİLİRSİN          │
+│     ama öncelik KT.                                                 │
+│                                                                     │
+│   • KT section_5 (saklama) vs KÜB shelf_life/storage:              │
+│   → KT yeterli, KÜB redundant.                                     │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ UZMAN 3 — VERİ BİLİMCİ (storage, pipeline, LLM context)            │
+├─────────────────────────────────────────────────────────────────────┤
+│ Depolama / pipeline açısından:                                      │
+│   • raw_text (%100 dolu): Reparse için zorunlu, TUTULMALI           │
+│   • product_name = medicationsV2.ilac_adi → JOIN ile alınır, DROP  │
+│   • source_url (KT+KÜB) = V2.kt_url / V2.kub_url → DROP           │
+│                                                                     │
+│ LLM context verimliliği:                                            │
+│   • pharmacodynamic/kinetic: ortalama ~800-1500 char/kayıt         │
+│     15.503 ilaç × ~1200 ch = 18 MB sadece bu iki kolon             │
+│     → Hiç kullanılmayacak veri, context'e girince token israfı     │
+│   • shelf_life + storage_conditions + license_holder: ~150 ch/kayıt│
+│     Temiz drop, KT zaten kapsamakta                                 │
+│                                                                     │
+│ Drop riski sınıflandırması:                                         │
+│   GÜVENLİ DROP (raw_text'ten reparse gerekmiyor):                  │
+│     product_name, source_url (ikisi redundant, V2'de var)          │
+│     license_holder, pharmaceutical_form (değersiz)                 │
+│     shelf_life, storage_conditions (KT'de var)                     │
+│     pharmacodynamic, pharmacokinetic (teknik, kimse okumaz)        │
+│     KT.drug_interactions (kodda yok, KÜB'de var)                  │
+│     KT.source_url (V2.kt_url ile aynı)                             │
+│                                                                     │
+│   RİSKLİ DROP (silince geri alınamaz, alternatif var):             │
+│     overdose (acil bilgi, raw_text'ten reparse gerekir)            │
+│     driving_and_machine_use (special_warnings'ta örtüşebilir)      │
+│     composition (fill rate %79.6, kısmi doluluk)                   │
+│     dosage_and_administration (KT ile örtüşüyor ama KÜB daha uzun) │
+│                                                                     │
+│   TUTULMALI (chat bağlantısı için değerli):                        │
+│     therapeutic_indications, contraindications, drug_interactions  │
+│     side_effects, special_warnings, pregnancy_and_lactation        │
+│     KT section_1-5, parse_quality_score, raw_text                  │
+└─────────────────────────────────────────────────────────────────────┘
+
+============================================================================
+BÖLÜM 6 — NİHAİ TEMİZ YAPI ÖNERİSİ
+============================================================================
+
+────────────────────────────────────────
+medicationsV2  (DEĞİŞMEZ — meta tablo)
+────────────────────────────────────────
+KAL (tümü):
+  id, ilac_adi, etkin_madde_adi, firma_adi
+  kub_onay_tarihi, kt_onay_tarihi
+  kub_url, kt_url
+  created_at
+
+────────────────────────────────────────
+medication_kt  (kullanıcı dili bölümler)
+────────────────────────────────────────
+KAL:
+  id, medication_id
+  section_1_nedir              ← ne için, ana endikasyon
+  section_2_kullanmadan_once   ← hasta odaklı uyarı + kontrendikasyon özeti
+  section_3_nasil_kullanilir   ← doz/kullanım (hasta dili)
+  section_4_yan_etkiler        ← yan etkiler (hasta dili)
+  section_5_saklanmasi         ← saklama
+  parse_quality_score          ← LLM filtresi için zorunlu
+  parse_version                ← pipeline takibi
+  raw_text                     ← reparse pipeline için tut
+
+DROP — GÜVENLİ:
+  drug_interactions  ← kodda kullanılmıyor, KÜB'de var
+  source_url         ← V2.kt_url ile AYNI
+
+────────────────────────────────────────
+medication_kub  (klinik/resmi bilgiler)
+────────────────────────────────────────
+KAL:
+  id, medication_id
+  therapeutic_indications      ← klinik endikasyon (KT'den daha kapsamlı)
+  contraindications            ← klinik kontrendikasyon (KT'den daha kapsamlı)
+  drug_interactions            ← etkileşimler (%80.3 dolu)
+  side_effects                 ← yan etkiler klinik versiyon
+  special_warnings             ← özel popülasyon, organ yetmezliği
+  pregnancy_and_lactation      ← gebelik/emzirme (KT'de yok)
+  raw_text                     ← reparse pipeline için tut
+
+DROP — GÜVENLİ (redundant / değersiz):
+  product_name           ← V2.ilac_adi ile AYNI
+  source_url             ← V2.kub_url ile AYNI
+  license_holder         ← hiçbir değer yok
+  pharmaceutical_form    ← V2.ilac_adi zaten içeriyor
+  shelf_life             ← KT section_5 var, daha iyi
+  storage_conditions     ← aynı gerekçe
+  pharmacodynamic_properties  ← teknik, chat scope dışı
+  pharmacokinetic_properties  ← aynı gerekçe
+
+DROP — RİSKLİ (şimdilik tut, sonra karar):
+  overdose               ← acil bilgi, raw_text'ten reparse gerekir
+  driving_and_machine_use← special_warnings'ta örtüşüyor olabilir
+  dosage_and_administration ← KT ile örtüşüyor ama KÜB daha uzun
+  composition            ← fill rate düşük, chat değeri belirsiz
+
+────────────────────────────────────────
+GÜVENLİ DROP ÖNERİSİ (12 kolon, 2 tablo)
+────────────────────────────────────────
+  ALTER TABLE medication_kt  DROP COLUMN drug_interactions;
+  ALTER TABLE medication_kt  DROP COLUMN source_url;
+  ALTER TABLE medication_kub DROP COLUMN product_name;
+  ALTER TABLE medication_kub DROP COLUMN source_url;
+  ALTER TABLE medication_kub DROP COLUMN license_holder;
+  ALTER TABLE medication_kub DROP COLUMN pharmaceutical_form;
+  ALTER TABLE medication_kub DROP COLUMN shelf_life;
+  ALTER TABLE medication_kub DROP COLUMN storage_conditions;
+  ALTER TABLE medication_kub DROP COLUMN pharmacodynamic_properties;
+  ALTER TABLE medication_kub DROP COLUMN pharmacokinetic_properties;
+
+  NOT: medication_kub.raw_text TUTULMALI (reparse pipeline için).
+  NOT: medication_kub.overdose, driving_and_machine_use,
+       dosage_and_administration, composition — chat bağlanınca karar.
+
+============================================================================
+Rapor tamamlandı  (25.4s)
+DB'ye HİÇBİR yazma yapılmadı.
+============================================================================

@@ -1,0 +1,57 @@
+========================================================================
+composition FILL-ONLY DRY-RUN
+========================================================================
+Üretim tarihi: 2026-05-29 18:05:19
+DB'ye HİÇBİR yazma yapılmadı.
+
+composition IS NULL toplam: 3162
+
+İlk 50 NULL kayıt çekiliyor…
+50 kayıt geldi.
+
+========================================================================
+ÖRNEK SONUÇLAR — 50 kayıt tarandı, ✅ olanlar gösteriliyor
+========================================================================
+
+[✅ 1] id=008d88dd…  ?
+     İçerik: 'Etkin maddeler: / Rosuvastatin kalsiyum 10.42 mg / (10 mg Rosuvastatin'e e$defer miktarda) / Asetilsalisilik asit 75,00 mg / Yardrmcr maddeler! / Laktoz monohidrat 116,08 mg / Kroskarmelloz sodytm 9,00 mg / Yardrmcr maddeler iqin 6.1'e bakrnrz.'
+     Uzunluk: 230 char  |  Etkin madde ifadesi: ✅
+
+[✅ 2] id=021f9e25…  ?
+     İçerik: 'Etkin madde: / Her bir film kaph tablette 200 mg sefiksime egdeger 223,815 mg sefiksim trihidrat ve 125 mg / klarulanik aside egde$er 297,876 rngpotasJum klarulanat avisel (l: l) bulunmaktadrr. / Yard  …  (soya)(E322) 0,455 mg / Yardrrncr maddeler igin 6.1'e bakrmz'
+     Uzunluk: 275 char  |  Etkin madde ifadesi: ✅
+
+[✅ 3] id=0317361a…  ?
+     İçerik: 'Etkin madder Her bir efervesan tablette; / Sefdinir 600 mg / Klavulanik Asit 125 mg (296,912 mgPotas''um Klavulanat; Syloid Kangrmrna eqdefer) / Yardrmcr maddelerr / Sodlum hidrojen karbonat 473,00 mg / Sodlum kloriir 40,00 mg / Yardrmcr maddeler igin 6.1'e bakrmz.'
+     Uzunluk: 253 char  |  Etkin madde ifadesi: ✅
+
+========================================================================
+İLK 50 KAYIT ÖZETİ
+========================================================================
+  ✅ Doldurulacak (ok)       :    3 / 50  (6.0%)
+  ⛔ Anchor bulunamadı       :   31 / 50
+  ⛔ Çok kısa (<30 char)     :    0 / 50
+  ⛔ Kontaminasyon           :    0 / 50
+  ⛔ raw_text yok            :   16 / 50
+
+========================================================================
+TAM TABLO TARAMASI (3162 NULL kayıt)
+========================================================================
+Taranıyor…
+
+Tarama tamamlandı: 3162 kayıt  (32.9s)
+
+  ✅ Doldurulabilecek       :   128 / 3162  (4.0%)
+  ⛔ Anchor bulunamadı      :  1929 / 3162
+  ⛔ Çok kısa (<30 char)    :     1 / 3162
+  ⛔ Kontaminasyon          :     0 / 3162
+  ⛔ raw_text yok           :  1104 / 3162
+
+  Uzunluk dağılımı:
+    min=82  p25=153  p50=192  p75=244  p95=367  max=1021
+
+========================================================================
+ONAY NOTU
+========================================================================
+  Onaylıyorsanız → kub_composition_apply.py çalıştırın.
+  DB'ye HİÇBİR yazma yapılmadı.

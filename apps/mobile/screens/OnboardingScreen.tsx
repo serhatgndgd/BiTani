@@ -15,6 +15,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  groupMedicationsByBrand,
+  medicationVariantLabel,
+  type MedicationBrandGroup as BaseMedicationBrandGroup,
+} from '../lib/medicationBranding';
 import { supabase } from '../lib/supabase';
 import type { ConditionCatalogRow } from '../navigation/types';
 import { C } from '../theme';
@@ -30,10 +35,8 @@ type MedRow = {
   };
 };
 
-type MedicationBrandGroup = {
+type MedicationBrandGroup = BaseMedicationBrandGroup<MedRow> & {
   conditionId: string;
-  brand: string;
-  variants: MedRow[];
 };
 
 type ConditionSection = { title: string; data: ConditionCatalogRow[] };
@@ -46,7 +49,6 @@ const TOTAL_STEPS = 4;
 // Hastalığa göre ilaç önerisi (condition_medications) parametreleri
 const CONDITION_MED_CONFIDENCE_MIN = 0.7;
 const CONDITION_MED_LIMIT = 100; // hastalık başına en yüksek güvenli öneri sayısı
-const MEDICATION_BRAND_REGEX = /^([A-ZÇĞİÖŞÜ\s]+?)(\s+\d|\s+\d+\s*MG|\s+\d+\s*ML|$)/;
 const DATE_PICKER_LOCALE = 'tr-TR';
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
@@ -97,28 +99,9 @@ function groupByCategory(rows: ConditionCatalogRow[]): Map<string, ConditionCata
   return new Map([...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'tr')));
 }
 
-function normalizeMedicationName(value: string): string {
-  return value.toLocaleUpperCase('tr-TR').trim().replace(/\s+/g, ' ');
-}
-
-function extractMedicationBrand(name: string): string {
-  const normalized = normalizeMedicationName(name);
-  return (normalized.match(MEDICATION_BRAND_REGEX)?.[1] ?? normalized).trim().replace(/\s+/g, ' ');
-}
-
-function medicationVariantLabel(row: MedRow, brand: string): string {
-  const normalized = normalizeMedicationName(row.medication.ilac_adi);
-  const variant = normalized.slice(brand.length).trim();
-  return variant.length > 0 ? variant : row.medication.ilac_adi;
-}
-
 function groupMedRowsByBrand(rows: MedRow[], conditionId: string): MedicationBrandGroup[] {
-  const groups = new Map<string, MedRow[]>();
-  for (const row of rows) {
-    const brand = extractMedicationBrand(row.medication.ilac_adi);
-    groups.set(brand, [...(groups.get(brand) ?? []), row]);
-  }
-  return [...groups.entries()].map(([brand, variants]) => ({ conditionId, brand, variants }));
+  return groupMedicationsByBrand(rows, (row) => row.medication.ilac_adi)
+    .map((group) => ({ ...group, conditionId }));
 }
 
 async function resolveAuthUserId(maxAttempts = 40, delayMs = 120): Promise<string | null> {
@@ -566,7 +549,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
                       onPress={() => toggleMed(medication.id)}
                       disabled={saving}>
                       <View style={styles.medInfo}>
-                        <Text style={styles.rowName}>{medicationVariantLabel(row, item.brand)}</Text>
+                        <Text style={styles.rowName}>{medicationVariantLabel(medication.ilac_adi, item.brand)}</Text>
                         {medication.etkin_madde_adi
                           ? <Text style={styles.medSub}>{medication.etkin_madde_adi}</Text>
                           : null}

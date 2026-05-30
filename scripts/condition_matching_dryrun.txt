@@ -1,0 +1,186 @@
+============================================================================
+ADIM 2 — İLAÇ ↔ HASTALIK KURAL BAZLI EŞLEŞTİRME (DRY-RUN)
+============================================================================
+Tarih: 2026-05-29 19:06:12  |  DB'ye YAZMA YOK
+
+Kaynak metinler çekiliyor…
+  KÜB therapeutic_indications dolu :  13605
+  KT  section_1_nedir dolu         :  13412
+  Birleşik benzersiz ilaç          :  14172
+
+Eşleştiriliyor…
+
+============================================================================
+A) GENEL İSTATİSTİK
+============================================================================
+  Toplam (hastalık, ilaç) eşleşmesi :   22225
+  Eşleşmesi olan benzersiz ilaç     :    9902
+  En az 1 eşleşmesi olan hastalık   : 71 / 71
+  SIFIR eşleşme hastalık (0): —
+  confidence  min/ort/max          : 0.62 / 0.91 / 0.95
+
+============================================================================
+B) HASTALIK BAZINDA DAĞILIM (tümü, çoktan aza)
+============================================================================
+    #   Eşleşme  Hastalık
+  ------------------------------------------------------------
+    1      1336  Hipertansiyon
+    2      1034  Pnömoni
+    3       791  Sinüzit
+    4       771  Romatoid Artrit
+    5       723  Orta Kulak Enfeksiyonu
+    6       685  Diyabet Tip 2
+    7       678  Kronik Böbrek Hastalığı
+    8       634  Üriner Sistem Enfeksiyonu
+    9       629  KOAH
+   10       613  Astım
+   11       591  Depresyon
+   12       591  Tonsillit
+   13       570  Kalp Yetmezliği
+   14       567  Koroner Arter Hastalığı
+   15       543  Epilepsi
+   16       502  Karaciğer Yetmezliği
+   17       458  Anksiyete Bozukluğu
+   18       448  Şizofreni
+   19       441  Ankilozan Spondilit
+   20       437  Gut Hastalığı
+   21       436  Bipolar Bozukluk
+   22       389  Hiperkolesterolemi
+   23       363  Ürtiker
+   24       362  Alerjik Rinit
+   25       340  Lösemi
+   26       331  Egzama
+   27       306  Sedef Hastalığı
+   28       304  Demir Eksikliği Anemisi
+   29       294  Meme Kanseri
+   30       288  Reflü (GÖRH)
+   31       283  Mantar Enfeksiyonu
+   32       279  Vertigo
+   33       276  Ülseratif Kolit
+   34       275  Nöropatik Ağrı
+   35       255  Alzheimer Hastalığı
+   36       253  Psikoz
+   37       252  Parkinson Hastalığı
+   38       224  Akciğer Kanseri
+   39       223  Lenfoma
+   40       213  Tromboemboli
+   41       202  Peptik Ülser
+   42       174  Akne
+   43       173  Bakteriyel Enfeksiyon
+   44       165  Migren
+   45       165  Hipertrigliseridemi
+   46       162  Crohn Hastalığı
+   47       153  Glokom
+   48       149  Viral Enfeksiyon
+   49       147  Konjunktivit
+   50       147  Derin Ven Trombozu
+   51       141  Osteoporoz
+   52       140  HIV/AIDS
+   53       139  Tüberküloz
+   54       130  Hepatit B
+   55       125  DEHB
+   56       121  Atriyal Fibrilasyon
+   57       109  Multipl Skleroz
+   58       103  Prostat Kanseri
+   59        76  Prostat Hiperplazisi
+   60        70  Böbrek Taşı
+   61        68  Hepatit C
+   62        63  Obezite
+   63        62  İrritabl Bağırsak Sendromu
+   64        54  Kolon Kanseri
+   65        53  Koroner Bypass
+   66        51  Katarakt
+   67        36  Tiroid Kanseri
+   68        33  Kronik Ağrı
+   69        11  Maküler Dejenerasyon
+   70         8  Diyabet Tip 1
+   71         7  Metabolik Sendrom
+
+============================================================================
+C) UÇLAR
+============================================================================
+  ── En çok eşleşen 5 ──
+       1336  Hipertansiyon
+       1034  Pnömoni
+        791  Sinüzit
+        771  Romatoid Artrit
+        723  Orta Kulak Enfeksiyonu
+  ── En az eşleşen 5 (sıfır hariç) ──
+         36  Tiroid Kanseri
+         33  Kronik Ağrı
+         11  Maküler Dejenerasyon
+          8  Diyabet Tip 1
+          7  Metabolik Sendrom
+
+============================================================================
+D) 10 ÖRNEK EŞLEŞME (çeşitli hastalıklardan, gözle kontrol)
+============================================================================
+
+  ▸ Parkinson Hastalığı  (conf=0.95)
+    İlaç : LEPONEX 25 MG TABLET
+    Kanıt: [KÜB|parkinson hastalığı] …e ölüm riski taşıyan eylemlerde bulunmasını ifade eder. - Parkinson hastalığı süresince ortaya çıkan psikoz LEPONEX ayrıca, standart ted…
+
+  ▸ Psikoz  (conf=0.95)
+    İlaç : LEPONEX 25 MG TABLET
+    Kanıt: [KÜB|psikoz] …ı ifade eder. - Parkinson hastalığı süresince ortaya çıkan psikoz LEPONEX ayrıca, standart tedavinin ba şarısız olduğu vakal…
+
+  ▸ Şizofreni  (conf=0.95)
+    İlaç : LEPONEX 25 MG TABLET
+    Kanıt: [KÜB|şizofreni] …- Tedaviye dirençli şizofreni LEPONEX tedavisi, tedaviye dirençli şizofreni hastalarında…
+
+  ▸ Tüberküloz  (conf=0.93)
+    İlaç : PAS 1G TABLET
+    Kanıt: [KÜB|antitüberküloz] …Tüberkülozun k ısa ve uzun süreli tedavisinde, di ğer antitüberküloz ilaçlanyla birlikte kullanılır.…
+
+  ▸ Epilepsi  (conf=0.95)
+    İlaç : LATRİGAL 100 MG ÇİĞNEME TABLETİ
+    Kanıt: [KÜB|epilepsi] …Epilepsi Adölesanlar ve Yetişkinler (12 yaş üzeri) LATRİGAL epilep…
+
+  ▸ Bipolar Bozukluk  (conf=0.95)
+    İlaç : LATRİGAL 100 MG ÇİĞNEME TABLETİ
+    Kanıt: [KÜB|bipolar bozukluk] …sans nöbetlerinin tedavisinde monoterapi olarak endikedir. Bipolar bozukluk Yetişkinler (18 yaş ve üzeri) LATRİGAL, bipolar bozukluğu…
+
+  ▸ Reflü (GÖRH)  (conf=0.8)
+    İlaç : NEXSTEP 40 MG ENTERİK KAPLI TABLET
+    Kanıt: [KT|mide yanması] …tedavisinde) - Mide suyunun y emek borusuna kaçışına bağlı mide yanması ve kusma gibi hastalık belirtilerinde (Gastro-özofajial re…
+
+  ▸ Alerjik Rinit  (conf=0.95)
+    İlaç : LEZIN 0,5 MG/ML ORAL ÇÖZELTI
+    Kanıt: [KÜB|alerjik rinit] …LEZİN, 2 yaşın üzerindeki hastalarda, alerjik rinit (intermittan / persistan veya mevsimsel / pereniyal) ve kr…
+
+  ▸ Ürtiker  (conf=0.95)
+    İlaç : LEZIN 0,5 MG/ML ORAL ÇÖZELTI
+    Kanıt: [KÜB|ürtiker] …persistan veya mevsimsel / pereniyal) ve kronik idiopatik ürtiker ile ilişkili semptomların giderilmesinde endikedir.…
+
+  ▸ Hipertansiyon  (conf=0.95)
+    İlaç : AUROVALS 40 MG FILM KAPLI TABLET
+    Kanıt: [KÜB|hipertansiyon] …Hipertansiyon tedavisi. Kalp yetersizliği (NYHA sınıf II, III ve IV). D…
+
+============================================================================
+E) EN ŞÜPHELİ 5 EŞLEŞME (düşük conf + kısa/muğlak kanıt)
+============================================================================
+
+  ⚠ Obezite  (conf=0.67)
+    İlaç : THINCAL 120 MG KAPSÜL
+    Kanıt: [KÜB|obez] …TH İNCAL obez veya a şırı kilolu ve buna ba ğlı ba şka hastalıkları da ol…
+
+  ⚠ Akne  (conf=0.95)
+    İlaç : ERİTSA %4 JEL
+    Kanıt: [KÜB|akne] …Topikal akne tedavisi…
+
+  ⚠ Akne  (conf=0.95)
+    İlaç : ERİTSA %2 JEL
+    Kanıt: [KÜB|akne] …Topikal akne tedavisi…
+
+  ⚠ Hipertansiyon  (conf=0.95)
+    İlaç : HYPERIUM 1 MG TABLET
+    Kanıt: [KÜB|hipertansiyon] …Hipertansiyon…
+
+  ⚠ Akne  (conf=0.95)
+    İlaç : SKINOREN %20 KREM
+    Kanıt: [KÜB|akne] …Akne vulgaris, Melazma…
+
+============================================================================
+DRY-RUN tamamlandı  (284.2s)  —  DB'ye HİÇBİR yazma yapılmadı.
+Apply için: condition_matching_apply.py (ayrı onay gerekir).
+============================================================================

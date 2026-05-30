@@ -14,6 +14,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '../components/EmptyState';
 import { SkeletonBox } from '../components/SkeletonBox';
+import {
+  groupMedicationsByBrand,
+  medicationVariantLabel,
+  type MedicationBrandGroup,
+} from '../lib/medicationBranding';
 import { supabase } from '../lib/supabase';
 import { C } from '../theme';
 
@@ -28,41 +33,11 @@ type MedResult = {
   kt_url: string | null;
 };
 
-type MedicationBrandGroup = {
-  brand: string;
-  variants: MedResult[];
-};
-
 // ─── Sabitler ─────────────────────────────────────────────────────────────────
 
 const PAGE_SIZE    = 50;
 const DEBOUNCE_MS  = 300;
 const MIN_QUERY    = 2;
-const BRAND_REGEX  = /^([A-ZÇĞİÖŞÜ\s]+?)(\s+\d|\s+\d+\s*MG|\s+\d+\s*ML|$)/;
-
-function normalizeDrugName(value: string): string {
-  return value.toLocaleUpperCase('tr-TR').trim().replace(/\s+/g, ' ');
-}
-
-function extractMedicationBrand(name: string): string {
-  const normalized = normalizeDrugName(name);
-  return (normalized.match(BRAND_REGEX)?.[1] ?? normalized).trim().replace(/\s+/g, ' ');
-}
-
-function medicationVariantLabel(medication: MedResult, brand: string): string {
-  const normalized = normalizeDrugName(medication.ilac_adi);
-  const variant = normalized.slice(brand.length).trim();
-  return variant.length > 0 ? variant : medication.ilac_adi;
-}
-
-function groupMedicationsByBrand(rows: MedResult[]): MedicationBrandGroup[] {
-  const groups = new Map<string, MedResult[]>();
-  for (const row of rows) {
-    const brand = extractMedicationBrand(row.ilac_adi);
-    groups.set(brand, [...(groups.get(brand) ?? []), row]);
-  }
-  return [...groups.entries()].map(([brand, variants]) => ({ brand, variants }));
-}
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
@@ -106,7 +81,10 @@ export default function SearchScreen() {
   const offsetRef   = useRef(0);
   const activeQuery = useRef('');
 
-  const groupedResults = useMemo(() => groupMedicationsByBrand(results), [results]);
+  const groupedResults = useMemo(
+    () => groupMedicationsByBrand(results, (row) => row.ilac_adi),
+    [results],
+  );
 
   // Kullanıcının ilaç ID'lerini yükle (badge için)
   useEffect(() => {
@@ -216,7 +194,7 @@ export default function SearchScreen() {
     });
   }, []);
 
-  const renderBrandGroup = useCallback(({ item }: { item: MedicationBrandGroup }) => {
+  const renderBrandGroup = useCallback(({ item }: { item: MedicationBrandGroup<MedResult> }) => {
     const expanded = expandedBrands.has(item.brand);
     return (
       <View>
@@ -243,7 +221,7 @@ export default function SearchScreen() {
                   <View style={styles.itemInfo}>
                     <View style={styles.itemTitleRow}>
                       <Text style={styles.variantName} numberOfLines={1}>
-                        {medicationVariantLabel(variant, item.brand)}
+                        {medicationVariantLabel(variant.ilac_adi, item.brand)}
                       </Text>
                       {isMine && (
                         <View style={styles.mineBadge}>
@@ -404,7 +382,7 @@ function DrugDetail({ drug, onClose }: DrugDetailProps) {
       {/* Etken Madde */}
       {drug.etkin_madde_adi != null && (
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Etken Madde</Text>
+          <Text style={styles.detailLabel}>ETKİN MADDE</Text>
           <Text style={styles.detailValue}>{drug.etkin_madde_adi}</Text>
         </View>
       )}
@@ -561,7 +539,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
   },
-  detailLabel: { color: C.text3, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', marginBottom: 5 },
+  detailLabel: { color: C.text3, fontSize: 11, fontWeight: '700', marginBottom: 5 },
   detailValue: { color: C.text2, fontSize: 14, lineHeight: 20 },
 
   linkGroup: { gap: 8, marginTop: 4 },

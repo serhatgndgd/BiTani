@@ -1,0 +1,239 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║  medication_kt 3-UZMAN ANALİZ RAPORU                                 ║
+║  💊 Klinik Eczacı   📊 Veri Bilimci   🩺 Hekim                       ║
+╚══════════════════════════════════════════════════════════════════════╝
+Tarih              : 2026-05-29 16:52:21
+Örneklem büyüklüğü : 100 kayıt (stratified)
+DB yazma           : YAPILMADI (yalnızca SELECT)
+
+Örneklem dağılımı:
+   score5                    70
+   score2                    5
+   score3                    5
+   score4                    5
+   score0                    5
+   score1                    5
+   drug_interactions_dolu    5
+
+════════════════════════════════════════════════════════════════════════
+💊 KLİNİK ECZACI — Bölüm-İçerik Doğruluğu
+════════════════════════════════════════════════════════════════════════
+
+score=5 kayıtlarında (70) anahtar içerik varlığı:
+  section_1: 'kullanılır/endike/tedavisinde'        63/70 ( 90.0%) ██████████████████
+  section_2: 'KULLANMAYINIZ/kontrendike/aleji'      69/70 ( 98.6%) ███████████████████
+  section_3: doz ipuçları (günde/tablet/ml)        70/70 (100.0%) ████████████████████
+  section_4: 'yan etki/alerjik/kaşıntı'             70/70 (100.0%) ████████████████████
+  section_5: 'saklayınız/°C/oda sıcaklığında'      68/70 ( 97.1%) ███████████████████
+
+Çapraz-kontaminasyon (yanlış bölüme sızma) — score=5 içinde:
+  indication_leaked_to_2          19
+  side_effect_leaked_to_3         16
+  contraindication_leaked_to_1    10
+
+💊 ECZACI YORUMU:
+  • score=5 kayıtların 44%'i klinik açıdan TEMİZ (0 flag).
+  • Bölüm-bölüm içerik bütünlüğü genelde yerinde — endikasyon endikasyonda,
+    kontrendikasyon section_2'de. Ana risk: TR mevzuatı section_2'yi şişiriyor
+    (gebelik+emzirme+sürüş+etkileşim+kontrendi hep aynı bölümde).
+
+════════════════════════════════════════════════════════════════════════
+📊 VERİ BİLİMCİ — Yapı Verimliliği & Redundancy
+════════════════════════════════════════════════════════════════════════
+
+Bölüm uzunlukları (tüm 100 kayıt, karakter):
+  section_1 (nedir / ne için kullanılır    ) n= 83  ort= 1931  min=228  max= 17903
+  section_2 (kullanmadan önce dikkat       ) n= 83  ort= 6764  min=2042  max= 15272
+  section_3 (nasıl kullanılır              ) n= 81  ort= 3479  min= 30  max= 10355
+  section_4 (olası yan etkiler             ) n= 87  ort= 4562  min= 54  max= 12701
+  section_5 (saklanması                    ) n= 86  ort= 1530  min= 26  max= 11444
+
+drug_interactions DOLU olan kayıt sayısı (örneklemde): 76
+  drug_interactions ilk 50 char'ı section_2 içinde geçen kayıt: 68/76
+  ortalama token-örtüşme oranı (drug_interactions ↔ section_2): 88.3%
+
+ESKİ drug_interactions kolonu → ek bilgi mi sunuyor?
+  ortalama drug_interactions uzunluğu :  2106 char
+  ortalama section_2 uzunluğu          :  6275 char
+  → section_2 ~2x daha kapsamlı.
+  → drug_interactions section_2'nin alt-kümesi gibi görünüyor.
+
+Kayıt-bazlı yapı kalitesi:
+  Tüm bölümleri boş kayıt           : 10/100 (score=0 stratumu)
+  En az bir çok-kısa (<50 char) bölüm: 4/100
+
+📊 VERİ BİLİMCİ YORUMU:
+  • 5-bölüm yapısı YETERLİ. KT formatı 5 numaralı resmi bölüm üzerine kurulu.
+  • drug_interactions tek başına klinik açıdan REDUNDANT — section_2 zaten
+    aynı bilgiyi içeriyor (TR KT formatı 'etkileşimler'i 'kullanmadan önce'
+    bölümünün altına koyar).
+  • Eski 14 semantik kolonun çoğu (what_is_it, before_using, do_not_use,
+    use_carefully, food_and_drink, pregnancy, breastfeeding, ...) yapay
+    bölümleme — TR KT format dokümanlarının doğal kırılımı 5 bölümdür.
+
+════════════════════════════════════════════════════════════════════════
+🩺 HEKİM — Klinik Güvenlik & Hasta Anlaşılırlığı
+════════════════════════════════════════════════════════════════════════
+
+Güvenlik sinyalleri (score=5 alt-kümesinde):
+  KULLANMAYINIZ ifadesi var (s2)          69/70 ( 98.6%) ███████████████████
+  alerji uyarısı var (s2)                 29/70 ( 41.4%) ████████
+  gebelik bilgisi var (s2)                69/70 ( 98.6%) ███████████████████
+  emzirme bilgisi var (s2)                69/70 ( 98.6%) ███████████████████
+  ciddi yan etki kelimeleri var (s4)      64/70 ( 91.4%) ██████████████████
+  yan etki sıklık etiketleri var (s4)     67/70 ( 95.7%) ███████████████████
+
+Ortalama güvenlik kapsamı (0-6 ölçeği): 5.24/6
+
+🩺 HEKİM YORUMU:
+  • Section_2'de KULLANMAYINIZ/alerji/gebelik gibi kritik uyarılar mevcut
+    — bu bölüm bir sağlık asistanı LLM için VAZGEÇİLMEZ context.
+  • Section_4'te yan etki sıklık etiketleri (çok yaygın/seyrek) genelde var
+    — sıklık bilgisi olmadan 'ne kadar olası' sorusuna güvenli cevap verilmez.
+  • Hasta diliyle yazılmış (TR KT mevzuatı bunu zorunlu kılar) — LLM doğrudan
+    alıntılayabilir; teknik terim sıkı değil.
+  • Ancak section_3 (dozaj) çoğu zaman 'doktorunuz size söyleyecektir' der —
+    LLM somut doz öneremez, bu KORUMA olarak iyi.
+
+════════════════════════════════════════════════════════════════════════
+🤝 ÜÇ UZMANIN ORTAK KARARI
+════════════════════════════════════════════════════════════════════════
+
+1) NİHAİ KOLON YAPISI ÖNERİSİ
+────────────────────────────────────────────────────────────────────────
+KALMALI (yeni, zorunlu):
+  • id, medication_id           → birincil ve yabancı anahtar
+  • raw_text                    → audit/parse-v3 için referans
+  • section_1_nedir             → 'nedir/ne için kullanılır' (LLM'e ZORUNLU)
+  • section_2_kullanmadan_once  → güvenlik + kontrendike + gebelik (KRİTİK)
+  • section_3_nasil_kullanilir  → doz bilgisi (LLM'e KORUMA — alıntı yapsın)
+  • section_4_yan_etkiler       → yan etki + sıklık (KRİTİK)
+  • section_5_saklanmasi        → koşullar + son kullanma
+  • parse_quality_score         → OCR/parse kuyruğu için filtre
+  • parse_version               → migration takibi
+  • source_url, parsed_at, created_at  → izlenebilirlik
+
+SİLİNMELİ (eski 14 kolon — redundant + boşaltılmış):
+  • what_is_it                  → section_1 ile ÖZDEŞ
+  • before_using                → section_2'nin alt kümesi (zaten ~%4 dolu)
+  • do_not_use                  → section_2'nin alt kümesi
+  • use_carefully               → section_2'nin alt kümesi
+  • food_and_drink              → section_2 veya section_3'te
+  • pregnancy                   → section_2'de
+  • breastfeeding               → section_2'de
+  • driving_and_machine_use     → section_2'de
+  • important_excipients        → section_1 veya section_2'de
+  • drug_interactions           → section_2'de (örneklemde örtüşme yüksek)
+  • how_to_use                  → section_3 ile ÖZDEŞ
+  • possible_side_effects       → section_4 ile ÖZDEŞ
+  • storage_information         → section_5 ile ÖZDEŞ
+  • health_personnel_info      → KT'nin %88'inde zaten yok (≈11.6% dolu)
+
+EKLENMESİ DEĞERLENDİRİLEBİLİR (opsiyonel, sonraki sprint):
+  • severe_side_effect_flag bool  → section_4'te 'acil/derhal/şok/ölüm' geçiyor mu
+  • requires_prescription bool   → reçeteli/reçetesiz (KT'de kelimesi var)
+  • dosage_form text             → tablet/şurup/jel (parsed once, used many)
+  ↳ Bunlar şart değil — LLM section_4'ten anında çıkarabilir; ek kolon
+    önceliği DÜŞÜK.
+
+2) VERİ KALİTESİ DURUMU (örneklem üzerinden ekstrapolasyon)
+────────────────────────────────────────────────────────────────────────
+  Kullanıma hazır (score=5 + 0 flag)         : 31/100
+  Küçük sorun (score=5 + 1-2 flag)           : 37/100
+  Düzeltme gerekli (score 2-4)               : 15/100
+  Kullanılamaz (score 0-1, NULL'a zorlanmış) : 10/100
+
+En sık sorun: OCR kaynaklı bölüm uzunluk dengesizliği (section_2 anormal uzun,
+section_1 anormal kısa). Bu yapısal değil PARSE sorunu — section şeması suçsuz.
+
+3) LLM CONTEXT İÇİN ÖNERİ
+────────────────────────────────────────────────────────────────────────
+Token verimliliği için katmanlı strateji:
+
+  Katman 0 — Her zaman gönder (ortalama ~2 KB):
+    • ilac_adi (medicationsV2)
+    • section_1_nedir          [ort ~1400 char]
+    • section_5_saklanmasi     [ort ~1700 char, kısaltılarak]
+
+  Katman 1 — Soru güvenlik / kullanım hatırlatma ile ilgiliyse:
+    + section_2_kullanmadan_once  [ort ~6900 char — gerekirse ÖZETLE]
+    + section_3_nasil_kullanilir  [ort ~3500 char]
+
+  Katman 2 — Soru yan etki / belirti ile ilgiliyse:
+    + section_4_yan_etkiler  [ort ~4900 char]
+
+  ⚠ AYRICA: parse_quality_score < 3 ise section'ları GÖNDERME, sadece
+    'Bu ilaca dair detaylı bilgim sınırlı, doktorunuza danışın' yanıtı ver.
+
+════════════════════════════════════════════════════════════════════════
+📋 5 SOMUT ÖRNEK
+════════════════════════════════════════════════════════════════════════
+
+── ÖRNEK 1 ✅ İYİ  id=000937d1…  score=5 ──
+  ilaç      : LİMENDA-L 750 MG/200 MG/100 MG VAJİNAL OVÜL
+  stratum   : score5
+  💊 eczacı flag'ler  : —
+  🩺 güvenlik skoru   : 5/6
+  [1] nedir / ne için kullanılır    : • LİMENDA–L, vajina içine (hazneye) yerleştirilmek suretiyle uygulanan ovül formunda bir  ⏎ üründür. Antibakteriyel (bakterilere karşı etkili), antifungaller (mantar hastalıklarına k…
+  [2] kullanmadan önce dikkat       : LİMENDA–L’yi aşağıdaki durumlarda KULLANMAYINIZ  ⏎ Eğer;  ⏎ • LİMENDA–L’nin içeriğinde bulunan etkin maddelerin herhangi birine veya bunların  ⏎ türevlerine karşı alerjiniz var ise,  ⏎ • H…
+  [3] nasıl kullanılır              : • Uygun kullanım ve doz/uygulama sıklığı için talimatlar:  ⏎ Doktorunuz tarafından başka bir şekilde tavsiye edilmediği takdirde tedaviye başlarken 7 gün  ⏎ süreyle günde 1 kez gece ya…
+  [4] olası yan etkiler             : Tüm ilaçlar gibi LİMENDA–L’nin içeriğinde bulunan maddelere duyarlı olan kişilerde yan  ⏎ etkiler olabilir.  ⏎ Aşağıdakilerden biri olursa LİMENDA–L’yi kullanmayı durdurunuz ve DERHAL …
+  [5] saklanması                    : LİMENDA–L’yi çocukların göremeyeceği, erişemeyeceği yerlerde ve ambalajında saklayınız.  ⏎ 25°C’nin altındaki oda sıcaklığında saklayınız. Buzdolabına koymayınız.  ⏎ Son kullanma tarih…
+  ── eski drug_interactions (2785 char): Özellikle alkol veya aşağıda belirtilen ilaçlardan herhangi birini kullanıyorsanız doktorunuzu  ⏎ veya eczacınızı mutlaka bilgilendiriniz.  ⏎ • Kanın pıhtılaşmasını engelleyen ilaçlar …
+
+── ÖRNEK 2 ✅ İYİ  id=001687e3…  score=5 ──
+  ilaç      : PİMAFUCİN VAGİNAL TABLET
+  stratum   : score5
+  💊 eczacı flag'ler  : —
+  🩺 güvenlik skoru   : 6/6
+  [1] nedir / ne için kullanılır    : o PIMAFUCiN@, mantaıların yol açtığı enfeksiyonlarda kullanılan bir antibiyotiktir. ⏎ ı PİMAFUCiN@, 20 tabletlik blister ambalajlarda sunulur. Tabletler, beyaz veya kremsi ⏎ beyazrenkt…
+  [2] kullanmadan önce dikkat       : PİMAI'UCİN@'i aşağıdaki durumlarda KULLAIıIMAYINIZ ⏎ ı pİırzıAFUCN@'in herhangi bir bileşenine karşı aşırı duyarlıysaruz. ⏎ PİMAFUCİN@'i aşağıdaki durumlarda uİxxı.ıLİ KULLANINIZ ⏎ o Ham…
+  [3] nasıl kullanılır              : . Uygun kullanım ve dozluygulama sıklığı için talimatlar: ⏎ - vajinaya her gece l tablet koyarak 20 günlük tedavi veya ⏎ - vajinaya her gece 2 tablet koyarak 10 giınliik tedavi ya da ⏎ -…
+  [4] olası yan etkiler             : Tiim ilaçlar gibi, PiMAFUCiN@'in içeriğinde bulunan maddelere duyarlı olan kişilerde yan ⏎ etkiler olabilir ⏎ istenmeyen etkiler aşağıda belirtilen sıklıklara göre sınıfl andınlmıştır.…
+  [5] saklanması                    : PİMAFUCİI\P 'i çocukların göremeyeceği, erişemeyeceği yerlerde ve ambalajında saklayınız' ⏎ Işıktan koruyarak saklayınrz. ⏎ 25 oC'ıin altındaki oda sıcaklığında saklayınız. ⏎ Son kullanm…
+  ── eski drug_interactions (248 char): PİMAFUCN@ iıe diğer ilaçlar arasında bilinen bir etkileşim mevcut değildir. ⏎ Eğer reçeteli ya da reçetesiz herhangi bir ilacı şu anda kullanıyorsanız veya Son zamanlarda ⏎ kullandınız…
+
+── ÖRNEK 3 ✅ İYİ  id=002212a5…  score=5 ──
+  ilaç      : TURKFLEKS DENGELİ ELEKTROLİT ÇÖZELTİSİ
+  stratum   : score5
+  💊 eczacı flag'ler  : —
+  🩺 güvenlik skoru   : 5/6
+  [1] nedir / ne için kullanılır    : TURKFLEKS DENGELİ ELEKTROLİT vücudun susuz ve tuzsuz kalması (dehidratasyon)  ⏎ durumunun tedavisinde ve bu durumun oluşmasını önlemek için kullanılan ve damar içi  ⏎ yoldan uygulanan …
+  [2] kullanmadan önce dikkat       : gerekenler  ⏎ TURKFLEKS DENGELİ ELEKTROLİT bir çok hastada emniyetli bir ilaçtır. Ancak  ⏎ kalbiniz, böbrekleriniz, karaciğeriniz veya akciğerlerinizde sorunlar varsa, şeker  ⏎ hastasıys…
+  [3] nasıl kullanılır              : Uygun kullanım ve doz/uygulama sıklığı için talimatlar:  ⏎ Sizin bu ilaca hangi miktarlarda ihtiyacınız olduğuna ve size ne zaman uygulanacağına  ⏎ doktorunuz karar verecektir. Buna ya…
+  [4] olası yan etkiler             : Tüm ilaçlar gibi, TURKFLEKS DENGELİ ELEKTROLİT’in içeriğinde bulunan maddelere  ⏎ duyarlı olan kişilerde yan etkiler olabilir.  ⏎   ⏎ Aşağıdakilerden biri olursa, TURKFLEKS DENGELİ ELEKT…
+  [5] saklanması                    : TURKFLEKS DENGELİ ELEKTROLİT’i çocukların göremeyeceği, erişemeyeceği yerlerde  ⏎ ve ambalajında saklayınız.  ⏎   ⏎ 25 °C altındaki oda sıcaklıklarında saklayınız.  ⏎   ⏎ Tek kullanımlıktır.…
+  ── eski drug_interactions (2918 char): Reçetesiz alınan ilaçlar, aşılar ve bitkisel ilaçlar da dahil olmak üzere başka herhangi bir ilaç  ⏎ almayı planlıyorsanız, alıyorsanız veya yakın zamand a aldıysanız lütfen doktorun…
+
+── ÖRNEK 4 ⚠ KISMI  id=09343534…  score=2 ──
+  ilaç      : DİLATREND 6,25 MG TABLET
+  stratum   : score2
+  💊 eczacı flag'ler  : ['side_effect_leaked_to_3']
+  🩺 güvenlik skoru   : 1/6
+  [1] nedir / ne için kullanılır    : ❌ NULL
+  [2] kullanmadan önce dikkat       : ❌ NULL
+  [3] nasıl kullanılır              : 4. Olası yan etkiler nelerdir?  ⏎ 5. D  ⏎ İLATREND 'in saklanması  ⏎ Ba şlıkları yer almaktadır.  ⏎   ⏎ 1. D ⏎ İLATREND nedir ve ne için kullanılır?  ⏎ DİLATREND, karvedilol adı verilen bir etki…
+  [4] olası yan etkiler             : Tüm ilaçlar gibi, D  ⏎ İLATREND’in içeri ğinde bulunan maddelere duyarlı olan ki şilerde yan  ⏎ etkiler olabilir.  ⏎ Yan etkiler  ⏎ şu şekilde sınıflandırılır:  ⏎ Çok yaygın: 10 hastanın en …
+  [5] saklanması                    : ❌ NULL
+
+── ÖRNEK 5 ❌ KIRIK  id=00143f26…  score=0 ──
+  ilaç      : % 10 DEKSTROZ BIOSEL SUDAKI HIPERTONIK SOLÜSYONU
+  stratum   : score0
+  💊 eczacı flag'ler  : —
+  🩺 güvenlik skoru   : 0/6
+  [1] nedir / ne için kullanılır    : ❌ NULL
+  [2] kullanmadan önce dikkat       : ❌ NULL
+  [3] nasıl kullanılır              : ❌ NULL
+  [4] olası yan etkiler             : ❌ NULL
+  [5] saklanması                    : ❌ NULL
+
+════════════════════════════════════════════════════════════════════════
+📌 KAPANIŞ
+════════════════════════════════════════════════════════════════════════
+Bu rapor SADECE RAPOR'dur. DB üzerinde hiçbir değişiklik yapılmamıştır.
+Önerilen sıralama:
+  1. chat function'ı section_* kolonlarını kullanacak şekilde güncelle (Edge Function)
+  2. mobile app değişiklik gerektirmiyor (zaten eski kolonlara dokunmuyor)
+  3. 14 eski kolonu ALTER TABLE DROP COLUMN ile birer birer kaldır
+     — ŞİMDİ YAPMA, kod güncellemesinden sonra
+  4. score=0 olan 1.272 kaydı OCR kuyruğuna al

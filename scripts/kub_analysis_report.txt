@@ -1,0 +1,130 @@
+========================================================================
+KÜB (medication_kub) KALİTE ANALİZİ RAPORU
+========================================================================
+Üretim tarihi: 2026-05-29 17:45:59
+Örneklem (reparse): 200  |  Tam tablo istatistikleri: True
+DB'ye HİÇBİR yazma yapılmadı.
+
+========================================================================
+A) KOLON KALİTESİ  (tüm tablo)
+========================================================================
+Tüm tablo taranıyor (50 batch)…
+
+Toplam taranan kayıt: 15503  (182.0s)
+
+Kolon                            Toplam     NULL   <50ch    Çöp   Kirli   NULL%  Kirli%
+--------------------------------------------------------------------------------
+therapeutic_indications           15503     1898     115      7    1120   12.2%    7.2%
+contraindications                 15503     1433      50     44    1295    9.2%    8.4%
+drug_interactions                 15503     4517      11      0     449   29.1%    2.9%
+side_effects                      15503     1719       8      6     526   11.1%    3.4%
+composition                       15503     3162       0      0     418   20.4%    2.7%
+product_name                      15503     3163    8525      0     139   20.4%    0.9%
+
+Herhangi bir kolonda kirli metin içeren satır  :   2856 / 15503  (18.4%)
+
+========================================================================
+B) KONTAMINASYON ANALİZİ
+========================================================================
+  therapeutic_indications içinde 'kontrend*' geçen  :    699  (4.5%)
+  contraindications içinde saf 'endikasyon' geçen   :    305  (2.0%)
+
+  NOT: contraindications'ta 'kontrendikasyon' içeren normal kabul edildi.
+       Yalnızca 'kontr' öneki OLMAYAN 'endikasyon' sayıldı.
+
+========================================================================
+C) METİN KİRLİLİĞİ — ÖRNEKLER
+========================================================================
+İlk 5 kirli therapeutic_indications:
+  id=0005887d…  'DESRİNAL®, alerjik rinit ile ilişkili, hapşırı k, burunda akıntı ve ka şınma, konjesyon/burun 
+tıkan'
+  id=00491774…  'FİXMENT yetişkin ve ergenlerde (13 -17 yaş) şizofreni tedavisinde (akut şizofreni 
+epizodlarının ted'
+  id=00f6e312…  'Epilepsi 
+Sekonder jeneralize konvülsiyonların e şlik etti ği ya da etmedi ği, basit ya da kompleks '
+  id=01429f9d…  'CUBICIN, erişkinlerde metisilin e duyarlı ve metisilin e dirençli izolatların neden olduğu 
+sağ kalp'
+  id=01683fcb…  'Hemofili B (konjenital faktör IX eksikliği) hastalarında kanamanın tedavisi ve profilaksisinde 
+endi'
+
+========================================================================
+D) REPARSE PROTOTİPİ  (örneklem: 200 kayıt)
+========================================================================
+Örneklem çekiliyor…
+  200 kayıt  (3.4s)
+
+Reparse başarısı  : 185 / 200  (92.5%)
+Anchor bulunamayan: 15 / 200
+
+Bölüm                             FILL   IMPROVE      SAME    DAMAGE    NODATA
+------------------------------------------------------------------------
+therapeutic_indications              2       162         1         9        14
+contraindications                    1        44         3       132         8
+drug_interactions                   23       123        12         8        22
+side_effects                         8       100        30        44         6
+composition                         25       147         5         7         4
+product_name                         5       160         0         1        22
+
+Karar açıklamaları:
+  FILL   : mevcut NULL/boş → reparse dolu  (kazanç)
+  IMPROVE: ikisi dolu, reparse %20+ uzun  (kazanç)
+  SAME   : fark ihmal edilebilir          (nötr)
+  DAMAGE : reparse çok kısa (%40 altı)    (risk)
+  NODATA : her ikisi de boş               (nötr)
+
+========================================================================
+E) ÖRNEK REPARSE SONUÇLARI
+========================================================================
+
+FILL örnekleri (NULL → dolu):
+  [composition]  id=000b23cc…
+    MevCut : NULL
+    Reparse: 'Konsantrasyon Osmolalite* (mOsm/kg H2O) Viskozite (mPa.s) 20o 350 mg I/mL 81 22,2 
+2 / 15
+ Endikasyon Konsantrasyon Haci'
+  [composition]  id=002cbd2e…
+    MevCut : NULL
+    Reparse: 'hayvanların yaklaşık %50’sinde maruz bırakılan hayvanların tespitini takiben eritema 
+görülmüştür. Tavşanların gözlerind'
+  [drug_interactions]  id=00341c72…
+    MevCut : NULL
+    Reparse: 'dozlarla elde edilen konsantrasyonlardaki formoterol, sitokrom P450 izoenzimlerini inhibe 
+etmemiştir veya indüklememişt'
+
+DAMAGE örnekleri (reparse kısaltıyor):
+  [composition]  id=0070b412…
+    Mevcut : '1 g göz jelinde; Etkin madde: Gansiklovir 1,5 mg Yardımcı madde(ler): Benzalkony'
+    Reparse: ''
+  [product_name]  id=0070b412…
+    Mevcut : 'VİRGAN %0,15 Göz Jeli'
+    Reparse: ''
+  [composition]  id=00c8e230…
+    Mevcut : 'Etkin madde 
+Tiyokolşikosid 4 mg 
+ 
+Yardımcı maddeler 
+Sodyum klorür 16.80 mg 
+ '
+    Reparse: ''
+
+========================================================================
+F) TAVSİYE
+========================================================================
+Tüm bölümler toplam FILL+IMPROVE : 800
+Tüm bölümler toplam DAMAGE       : 201
+Tüm bölümler toplam SAME         : 51
+
+Risk oranı (DAMAGE / toplam)     : 19.11%
+
+>> TAVSİYE: HEDEFLİ DÜZELTME — reparse güvenilir değil.
+   1) NULL alanları için reparse dene, sonuçları manuel gözden geçir.
+   2) Kirlilik temizliği (regex tabanlı) daha güvenli.
+   3) Kontaminasyonlu kayıtlar için bölüm sınırını yeniden tanımla.
+
+Kirlilik detayı:
+  drug_interactions kirli: 449/15503 (2.9%)
+  drug_interactions NULL : 4517/15503 (29.1%)
+
+========================================================================
+RAPOR SONU
+========================================================================

@@ -11,7 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LEGAL_DOCUMENTS, type LegalDocumentId } from '../legal/documents';
 import { C } from '../theme';
@@ -35,6 +35,7 @@ export function LegalDocumentModal({
   primaryActionLabel,
   onPrimaryAction,
 }: Props) {
+  const insets = useSafeAreaInsets();
   const document = documentId ? LEGAL_DOCUMENTS[documentId] : null;
   const isConsentMode = mode === 'consent';
   const [reachedBottom, setReachedBottom] = useState(false);
@@ -79,9 +80,15 @@ export function LegalDocumentModal({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
-        <View style={styles.header}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      statusBarTranslucent={false}
+      onRequestClose={onClose}
+    >
+      <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top + 8, 20) }]}>
           <Text style={styles.title}>{document?.title ?? 'Yasal Metin'}</Text>
           <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button">
             <Ionicons name="close" size={24} color={C.text1} />
@@ -93,6 +100,7 @@ export function LegalDocumentModal({
           </View>
         ) : null}
         <ScrollView
+          style={styles.scroll}
           contentContainerStyle={styles.content}
           onScroll={isConsentMode ? handleScroll : undefined}
           onLayout={
@@ -187,11 +195,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: C.bg,
   },
+  scroll: {
+    flex: 1,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
   },
@@ -204,7 +216,8 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingBottom: 60,
+    paddingTop: 24,
+    paddingBottom: 96,
   },
   progressTrack: {
     height: 3,
@@ -218,6 +231,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: C.border,
+    backgroundColor: C.bg,
   },
   primaryButton: {
     backgroundColor: C.text1,

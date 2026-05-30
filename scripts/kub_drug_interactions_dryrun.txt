@@ -1,0 +1,282 @@
+========================================================================
+drug_interactions FILL-ONLY DRY-RUN
+========================================================================
+Üretim tarihi: 2026-05-29 17:51:59
+DB'ye HİÇBİR yazma yapılmadı.
+
+drug_interactions IS NULL toplam: 4517
+
+İlk 50 NULL kayıt çekiliyor…
+50 kayıt geldi.
+
+========================================================================
+ÖRNEK SONUÇLAR (50 kayıt)
+========================================================================
+
+[  1] id=0008029d…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[  2] id=000b23cc…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[  3] id=0016e7c6…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[  4] id=00194727…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[  5] id=00341c72…  ROLASTYM COMBİ 12/400 mcg inhalasyon içi
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'dozlarla elde edilen konsantrasyonlardaki formoterol, sitokrom P450 izoenzimlerini inhibe  etmemiştir veya indüklememiştir.    Biyotransformasvon - Budesonid:  Budesonid akciğerlerde metabolize olma z  …(…)…  indeki artmış risk olasılığı göz ardı edilememektedir.    Pediyatrik popülasvon:'
+     Uzunluk: 2954 char
+
+[  6] id=0076636f…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[  7] id=00871029…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[  8] id=008b8b43…  ZINCDUR 25 mg / 5 ml şurup
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Çinko tuzları ile tetrasiklinler ve penisilaminlerin birlikte alımı etki azalmasına neden olabilir ,  bu maddeler çinko tuzları ile üç saat ara ile kullanılmalıdır.    Yüksek dozda demir preparatları   …(…)…  popülasyon  Pediyatrik popülasyona ait hiçbir etkileşim çalışması yapılmamıştır.'
+     Uzunluk: 1388 char
+
+[  9] id=008d88dd…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 10] id=00e70934…  RİVELTO 15 mg film kaplı tablet
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Pediyatrik popülasyondaki etkileşimlerin ölçüsü bilinmemektedir . Yetişkinlerde elde edilen ve  aşağıda belirtilen etkileşim verileri ile bölüm 4.4’teki uyarılar, pediyatrik popülasyon için dikkate  a  …(…)…  rametresi  testleri (ör. PTZ, aPTT, Hep Test®) etkilenmektedir (bkz. bölüm 5.1).'
+     Uzunluk: 7141 char
+
+[ 11] id=00ebf201…  ?
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Sinıetidin, eritrumisin ve dekstropropoksifenin MHD farmakokiııetiği üzerinde etkileri yoktıır.  Viioksazin MIID'nin plazma seviyelerinde küçük değişiklikler meydana getirmiştir (birlikte  uygutanım t  …(…)…  tır.  Lityum ve okskarbaz~pin kombinasyonu artmış nörotoksisiteyeneden olabilir.'
+     Uzunluk: 379 char
+
+[ 12] id=0108d897…  AİRPLUS 50/100 mcg discair inhalasyon iç
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'salmeterol maruziyetini anlamlı derecede artırdığı gözlenmiştir (Cmaks 1.4 kat ve EAA 15 kat),  bu durum QTc aralığında uzamaya neden olabili r (Bkz 5.2 Farmakokinetik Özellikler). Güçlü  CYP3A4 inhib  …(…)…  ileşim riskinin olması muhtemeldir (örn, itrakonazol,  telitromisin, ritonavir).'
+     Uzunluk: 580 char
+
+[ 13] id=011dc5b8…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 14] id=011ed54d…  ZATERON 250 mg film kaplı tablet
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'mg’lık tek doz abirateron asetat ile birlikte verildiğinde, pioglitazonun EAA değeri % 46 artmış ve  pioglitazonun aktif metabolitleri olan M -III ve M -IV için EAA değerleri % 10 azalmıştır. CYP2C8    …(…)…  ıştır.    Pediyatrik popülasyon  Herhangi bir etkileşim çalışması yapılmamıştır.'
+     Uzunluk: 1597 char
+
+[ 15] id=0144d39a…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 16] id=0149f12f…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 17] id=019d77ce…  AMARYL 1 mg tablet
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Glimepirid diğer bazı tıbbi ürünlerle aynı anda alınırsa, glimepiridin hipoglisemik etkisinde  hem istenmeyen artışlar hem de azalmalar meydana gelebilir. Bu n edenle diğer tıbbi ürünler  sadece dokto  …(…)…  nmiştir. Bu nedenle glimepirid kolesevelamdan en az  4 saat önce uygulanmalıdır.'
+     Uzunluk: 2867 char
+
+[ 18] id=01a5853d…  ?
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Kortikosteroid veya kortikostimülanlarla tedavi uygulanan hastalarda hipertansiyon ve aşırı su  retansiyonuna yol açmamak için dikkatli kullanımı gerekir.'
+     Uzunluk: 154 char
+
+[ 19] id=01afa548…  MİDRİSOL %0.5 göz damlası 
+Steril
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Atropinin etkileri antimuskarinik etkileri olan diğer ilaçların birlikte kullanımı ile artabilir.  Çalışmalar atropin sülfatın emiliminin yüksek osmolariteye sahip solüsyonlarla  gecikebileceğini göstermiştir.'
+     Uzunluk: 209 char
+
+[ 20] id=01b4683d…  V
+İNKO 1
+ 
+mg/
+ml I.V. 
+i
+nfüzyon 
+i
+çin
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Kem o terapi, karaciğer   dahil  portal lar vasıtasıyla  radyoterapi ile birlikte verileceği zaman,  vinblastin kullanımı ,   radyoterapi tamamlanana kadar geciktir il melidir.     Mitomisin ile kombi  …(…)…  diyatrik popülasyona ilişkin herhangi bir etkileşim çalışması  bulunmamaktadır .'
+     Uzunluk: 2217 char
+
+[ 21] id=01c1014d…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 22] id=01cdc7d5…  LEVOPRONT 60 mg tablet
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Her ne kadar klinik çalışmalar süresince benzodiazepinler ile bir etkileşim gözlenmemişse de,  özellikle sedatif ilaç alan duyarlı hastalarda kullanırken dikkatli olunması gerekir.    Hayvanlarda yapı  …(…)…  Pediyatrik popülasyona ilişkin herhangi bir etkileşim çalışması bulunmamaktadır.'
+     Uzunluk: 1287 char
+
+[ 23] id=01f1a2e8…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 24] id=01ff5437…  PRIVIGEN® 2.5 g/25 mL IV infüzyonluk çöz
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Canlılığı azaltılmış virüs aşıları  İmmünoglobulinlerle tedavinin ardından, kızamık, kabakulak, kızamıkçık ve su çiçeği aşıları gibi  canlılığı azaltılmış aşıların etkililiği en az 6 hafta ila 3 ay a   …(…)…  n, pedi yatrik popülasyonda aynı etkileşimlerin meydana gelmesi  beklenmektedir.'
+     Uzunluk: 847 char
+
+[ 25] id=020043b7…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 26] id=0208cd99…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 27] id=021f9e25…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 28] id=0224af64…  SİLİNA 250 mg Kapsül
+     Karar : ✅ DOLDURULACAK
+     İçerik: '• Allopürinol ile kullanımı: Özellikle hiperürisemik hastalarda d eri döküntüsü riskini  arttırabilir.  • Bakteriyostatik antibiyotiklerle kullanımı: Kloramfenikol, erit romisin, sulfonamid ve  tetras  …(…)…  emiştir.    Pediyatrik popülasyon:  Hiçbir etkileşim çalışması bildirilmemiştir.'
+     Uzunluk: 1659 char
+
+[ 29] id=0238dd3f…  HİRBES 75 mg film kaplı tablet
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Diüretikler ve diğer antihipertansif ajanlar:  Diğer antihipertansif ajanlar, irbesartanın hipotansif etkisini artırabilir. Bununla birlikte  HİRBES, tiyazid diüretikleri, uzun etkili kalsiyum kanal b  …(…)…  bi advers olaylarla ilişkili olduğunu  göstermiştir (bkz. Bölüm 4.3, 4.4 ve 5.1)'
+     Uzunluk: 3555 char
+
+[ 30] id=02459cfe…  GLİRİD ® 2 mg çentikli tablet
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Glimepirid diğer bazı tıbbi ürünlerle aynı anda alınırsa, glimepiridin hipoglisemik etkisinde  hem istenmeyen artışlar hem de azalmalar meydana gelebilir. Bu nedenle diğer tıbbi ürünler  sadece doktor  …(…)…    için yeterli olmadığından, glimepiridin bu hasta grubunda kullanımı önerilmez.'
+     Uzunluk: 3267 char
+
+[ 31] id=0247278a…  ?
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Öneri l meyen kombinasyon lar: Alkol: Akut alkol intoksikasyonunda, özellikle açlık veya malnütrisyon ve karaciğer yetersizliği durumlarında laktik asidoz riski artar. iyotlu kontrast maddeler: iyotlu  …(…)…  da ve diğer ilacın kesiImesinden sonra antidiyabetik ilacın dozu ayarlanmalıdır.'
+     Uzunluk: 1134 char
+
+[ 32] id=024d8b1a…  ?
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Everolimus Everolimus düzeylerinde olası ↑  Sirolimus Sirolimus düzeylerinde olası ↑  Takrolimus Takrolimus düzeylerinde olası ↑  Lipid dü şürücü ajanlar  Atorvastatin Atorvastatin düzeylerinde olası   …(…)…  dan met abolize edilmezler ve  verapamil ile etkile şim olasılıkları daha azdır.'
+     Uzunluk: 3523 char
+
+[ 33] id=024fc177…  PRADOSE 0.5 mg Tablet
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Pramipeksol plazma proteinlerine çok dü şük bir düzeyde (< %20) ba ğlan ır ve insanlarda  düşük boyutlarda bir biyotransformasyon görülür . Bu nedenle plazma proteinlerine ba ğlanma  ya da biyotransfo  …(…)…  ir veri bulunmamaktadır.  Pediyatrik popülasyon:  Özel bir veri bulunmamaktadır.'
+     Uzunluk: 1885 char
+
+[ 34] id=02707b3d…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 35] id=027af61b…  ?
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'sentezi için sınırlayıcı faktör de ğildir.    Hayvanlarda yapılmı ş deneysel çalı şmalar, glutamin sentezindeki artı şın, amonyak  seviyesini dü şürmek için devreye giren bir mekanizma olduğunu ortaya  …(…)…  tlerin, aromatik aminoasitlere  dönü şme oranı açısından iyile şme görülmü ştür.'
+     Uzunluk: 349 char
+
+[ 36] id=0296fd83…  PACLITAXEL KABI 300 mg/50 mL İnfüzyonluk
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'yüksek paklitaksel maruziyeti nedeniyle paklitaksel toksisitesi artabileceği için, CYP2C8  veya CYP3A4'ü baskıladığı bilinen ilaçlar (örneğin ketokonazol ve diğer imidazol  antifungaller, eritromisin,  …(…)…  i olarak  proteaz inhibitörleri almakta olan hastalarda dikkatle uygulanmalıdır.'
+     Uzunluk: 1138 char
+
+[ 37] id=02a33417…  : 
+ 
+MON.NaF (18F) 250 MBq /mL i.v. enje
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Bu konuda yapılmış çalışma bulunmamaktadır.    Özel popülasyonlara ilişkin ek bilgiler  Özel bilgi yoktur.    Pediyatrik popülasyon:  Özel bilgi yoktur.'
+     Uzunluk: 152 char
+
+[ 38] id=02a4812c…  OLMECOMB® PLUS 40 mg/5 mg/12,5 mg film k
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'en az 4 saat önce uygulanması düşünülmelidir (bkz. Bölüm 5.2).  Antasit (alüminyum magnezyum hidroksit) ile tedaviden sonra olmesartanın  biyoyararlanımında orta derecede bir azalma gözlenmiştir.  Olm  …(…)…  niyle OLMECOMB PLUS’ın 18 yaşın  altındaki hastalarda kullanımı önerilmemektedir'
+     Uzunluk: 8267 char
+
+[ 39] id=02c28c1f…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 40] id=02e23008…  PSOVATE %0,05 losyon
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 41] id=02e8559f…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 42] id=03159c72…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 43] id=0317361a…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 44] id=03371079…  PİRFECT 267 mg Sert Kapsül
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 45] id=0359c667…  ARTJET 25 mg/ 1 mL enjeksiyonluk çözelti
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Salisilik asit içeren steroid olmayan antienflamatuvar ilaçlar  Hayvan deneylerinde salisilik asit içeren NSAİİ'lerin tübüler metotreksat salgısının azalmasına  neden olduğu ve toksik etkilerini arttı  …(…)…  Pediyatrik popülasyona ilişkin herhangi bir etkileşim çalışması bulunmamaktadır.'
+     Uzunluk: 6415 char
+
+[ 46] id=0374903e…  BECLOSP 80 mcg aerosol inhalasyonu, çöze
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'BECLOSP az miktarda etil alkol içermektedir. Özellikle d isülfiram veya metronidazol alan  duyarlı hastalarda teorik olarak etkileşim potansiyeli vardır.    Beklometazon, CYP3A metabolizmasına diğer k  …(…)…  rik popülasyon:  Herhangi bir etkileşim çalışması yapılmamıştır.          8 / 15'
+     Uzunluk: 692 char
+
+[ 47] id=0374aee0…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 48] id=037f372e…  KİTODİN 500 mg/5mL IV enjeksiyonluk çöze
+     Karar : ✅ DOLDURULACAK
+     İçerik: 'Bu bölümde belirtilen bilgiler, sugammadeks ve diğer ilaçlar arasındaki bağlanma afinitesi,  klinik dışı deneyler, klinik çalışmalar ve nöromüsküler bloke edici ajanların farmakodinamik  etkileri ve n  …(…)…   ve  Bölüm 4.4’ deki uyarılar pediyatrik popülasyon için de dikkate alınmalıdır.'
+     Uzunluk: 5330 char
+
+[ 49] id=038011c2…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+[ 50] id=038a1565…  ?
+     Karar : ⛔ anchor yok
+     Sebep  : no_anchor
+
+========================================================================
+İLK 50 KAYIT ÖZETİ
+========================================================================
+  ✅ Doldurulacak (ok)       :   25 / 50  (50.0%)
+  ⛔ Anchor bulunamadı       :   25 / 50
+  ⛔ Çok kısa (<30 char)     :    0 / 50
+  ⛔ Kontaminasyon filtresi  :    0 / 50
+
+========================================================================
+TAM TABLO TARAMASI (4517 NULL kayıt)
+========================================================================
+raw_text + id çekiliyor (batch=50)…
+
+Tarama tamamlandı: 4517 kayıt  (82.7s)
+
+  ✅ Doldurulabilecek       :  2151 / 4517  (47.6%)
+  ⛔ Anchor bulunamadı      :  2276 / 4517
+  ⛔ Çok kısa (<30 char)    :    90 / 4517
+  ⛔ Kontaminasyon filtresi :     0 / 4517
+
+  Çıkarılan metin uzunluğu dağılımı:
+    min=30  p25=612  p50=1576  p75=3523  p95=7306  max=56662
+
+========================================================================
+ONAY NOTU
+========================================================================
+  Yukarıdaki sonuçları onaylıyorsanız:
+  → kub_drug_interactions_apply.py çalıştırın (fill-only, güvenli yazma)
+  Onaylamıyorsanız anchor/filtre mantığını düzeltelim.
+
+DB'ye HİÇBİR yazma yapılmadı.

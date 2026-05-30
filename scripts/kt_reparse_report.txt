@@ -1,0 +1,133 @@
+
+========================================================================
+KT RE-PARSE PROTOTİPİ RAPORU
+========================================================================
+Örneklem: 100 kayıt (medication_kt.raw_text, id sıralı)
+Üretim tarihi: 2026-05-29 15:40:09
+Veri tabanına HİÇBİR yazma yapılmadı.
+
+========================================================================
+1) BAŞARI ORANI
+========================================================================
+  5/5 bölüm bulundu     :  81 / 100  (81%)
+  Kısmi (1-4 bölüm)     :   7 / 100  (7%)
+  Hiçbir bölüm yok      :  12 / 100  (12%)
+
+========================================================================
+2) HANGİ BÖLÜMLER EKSİK?
+========================================================================
+  Bölüm 1 (nedir_ne_icin_kullanilir      ) eksik:  17   17.0%  ███
+  Bölüm 2 (kullanmadan_once_dikkat       ) eksik:  15   15.0%  ███
+  Bölüm 3 (nasil_kullanilir              ) eksik:  16   16.0%  ███
+  Bölüm 4 (olasi_yan_etkiler             ) eksik:  15   15.0%  ███
+  Bölüm 5 (saklanmasi                    ) eksik:  13   13.0%  ██
+
+  En sık eksik kombinasyonlar:
+    eksik=[1, 2, 3, 4, 5]  →  12 kayıt
+    eksik=[1, 2, 3, 4]  →  1 kayıt
+    eksik=[1, 4]  →  1 kayıt
+    eksik=[1, 2, 3, 5]  →  1 kayıt
+    eksik=[1, 3]  →  1 kayıt
+
+========================================================================
+3) OCR GÜRÜLTÜ TESPİTİ
+========================================================================
+  Temiz görünen kayıt        :  26 / 100  (26%)
+  OCR-gürültülü görünen kayıt :  74 / 100  (74%)
+
+  Gürültü sinyali dağılımı (ilk 5 örnek):
+    id=000098b5…  score=3  reasons=['PUA karakter (31)', "başlık-2: 'EMULİD’i' karışık vaka"]
+    id=00040d61…  score=1  reasons=["başlık-2: 'LEBEL’i' karışık vaka"]
+    id=000698b7…  score=1  reasons=["başlık-2: 'CİCİFEN’i' karışık vaka"]
+    id=000937d1…  score=1  reasons=["başlık-2: 'LİMENDA–L’yi' karışık vaka"]
+    id=00143f26…  score=2  reasons=['PUA karakter (8)']
+
+  Temiz kayıtlarda 5/5 başarı : 12/26  (46%)
+  Gürültülülerde 5/5 başarı   : 69/74  (93%)
+
+========================================================================
+4) ORTALAMA BÖLÜM UZUNLUKLARI (karakter)
+========================================================================
+  Bölüm 1 (nedir_ne_icin_kullanilir      ): n= 83  ort= 1432  min= 228  max=17903
+  Bölüm 2 (kullanmadan_once_dikkat       ): n= 85  ort= 6903  min=2042  max=21648
+  Bölüm 3 (nasil_kullanilir              ): n= 84  ort= 3507  min=  31  max=10355
+  Bölüm 4 (olasi_yan_etkiler             ): n= 85  ort= 4853  min= 831  max=12119
+  Bölüm 5 (saklanmasi                    ): n= 87  ort= 1615  min=  26  max=11444
+
+========================================================================
+5) 3 ÖRNEK BÖLÜM ÇIKTI (her bölüm ilk 200 char)
+========================================================================
+
+── ÖRNEK 1  id=000098b5-5560-46f2-9536-a648e87157d7  med_id=397df5cd…  raw=9724 char ──
+  [1] HEADER: 1. EMULİD nedir ve ne için kullanılır?
+      BODY  :  EMULİD, etkin madde olarak nimesulid içeren jel formunda bir ilaçtır.  ⏎  EMULİD topikal kullanılan non-steroidal antiinflamatuvar preparatları olarak adlandırılan bir  ⏎ ilaç grubuna dahildir.  ⏎  EMUL
+  [2] HEADER: 2. EMULİD’i kullanmadan önce dikkat edilmesi gerekenler
+      BODY  : EMULİD’i aşağıdaki durumlarda KULLANMAYINIZ  ⏎ Eğer;  ⏎  EMULİD’in içeriğinde bulunan etkin ve/veya yardımcı maddelerden herhangi birine karşı  ⏎ alerjiniz var ise;  ⏎  Alerjik tepkileri uyaran ve prostagla
+  [3] HEADER: 3. EMULİD nasıl kullanılır?
+      BODY  : Uygun kullanım ve doz / uygulama sıklığı için talimatlar:  ⏎ Doktorunuz tarafından başka bir ş ekilde tavsiye edilmediği takdirde EMULİD’i hastalıklı  ⏎ bölgeye ve çevresine günde 3 veya 4 kez uygulayınız
+  [4] HEADER: 4. Olası yan etkiler nelerdir?
+      BODY  : Tüm ilaçlar gibi, EMULİD’in içeriğinde bulunan maddelere duyarlı olan kişilerde yan etkiler  ⏎ ortaya çıkabilir.  ⏎ Aşağıdakilerden biri olursa, EMULİD’i kullanmayı durdurunuz ve DERHAL doktorunuza  ⏎ bildi
+  [5] HEADER: 5. EMULİD’in saklanması
+      BODY  : EMULİD’i çocukların göremeyeceği, erişemeyeceği yerlerde ve ambalajında saklayınız.  ⏎ 25˚C altındaki oda sıcaklığında saklayınız.  ⏎ Son kullanma tarihiyle uyumlu olarak kullanınız.  ⏎ Ambalajdaki son kull
+
+── ÖRNEK 2  id=00040d61-5059-4079-83c5-e987d56790c9  med_id=ba3a73b6…  raw=28684 char ──
+  [1] HEADER: 1. LEBEL nedir ve ne için kullanılır?
+      BODY  : LEBEL tablet ağızdan alınır. Beyaz renkli, oblong, tek çentikli, film kaplı tabletlerdir. Her bir  ⏎ tablette 250 mg levofloksasin'e eşdeğer levofloksasin hemihidrat içeren, 3 ve 10 film kaplı  ⏎ tabletli
+  [2] HEADER: 2. LEBEL’i kullanmadan önce dikkat edilmesi gerekenler
+      BODY  : LEBEL’i aşağıdaki durumlarda KULLANMAYINIZ  ⏎ Eğer,  ⏎ • Levofloksasine veya bu ilaçtaki bileşenlerden herhangi birine karşı veya florokinolonlar  ⏎ grubu antibiyotiklerden (moksifloksasin, siprofloksasin, 
+  [3] HEADER: 3. LEBEL nasıl kullanılır?
+      BODY  : Uygun kullanım ve doz/uygulama sıklığı için talimatlar:  ⏎   ⏎ Doktorunuz, ilacınızı nasıl ve hangi dozda kullanmanız gerektiğini size söyleyecektir.  ⏎ LEBEL erişkinlerde kullanılır.  ⏎   ⏎ LEBEL günde tek doz
+  [4] HEADER: 4. Olası yan etkiler nelerdir?
+      BODY  : Tüm ilaçlar gibi LEBEL’in içeriğinde bulunan maddelere duyarlı olan kişilerde yan etkiler  ⏎ olabilir.  ⏎ Yan etkiler aşağıdaki kategorilerde gösterildiği şekilde sıralanmıştır. Çok yaygın: 10 hastanın  ⏎ e
+  [5] HEADER: 5. LEBEL’in saklanması
+      BODY  : LEBEL’i çocukların göremeyeceği, erişemeyeceği yerlerde ve ambalajında saklayınız.  ⏎   ⏎ 25°C’nin altındaki oda sıcaklığında ve ambalajında saklanmalıdır.  ⏎   ⏎ Son kullanma tarihiyle uyumlu olarak kullanın
+
+── ÖRNEK 3  id=000698b7-bf4f-446a-b441-c9a3bea21f3a  med_id=78e40290…  raw=30212 char ──
+  [1] HEADER: 1. CİCİFEN nedir ve ne için kullanılır?
+      BODY  : • CİCİFEN, turuncu renkli, portakal aromalı bir süspansiyondur.  ⏎ • CİCİFEN, 100 mL’lik amber renkli cam şişeler içinde ve bir adet 5 mL’lik kaşık ile birlikte  ⏎ piyasaya sunulmaktadır.  ⏎ • CİCİFEN’in et
+  [2] HEADER: 2. CİCİFEN’i kullanmadan önce dikkat edilmesi gerekenler
+      BODY  : Kalp damar sistemi ile ilgili riskler  ⏎ - Diğer NSAİİ’ler gibi CİCİFEN, hastaneye yatışa sebep olabilecek hatta ölümcül olabilecek  ⏎ trombotik (pıhtılaşma ile ilgili) olaylar, miyokardiyal infarktüs (ka
+  [3] HEADER: 3. CİCİFEN nasıl kullanılır?
+      BODY  : CİCİFEN’i çocuğunuza ne zaman ve ne şekilde vereceğiniz konusunda doktorunuzun  ⏎ talimatlarını izleyiniz. Eğer emin değilseniz, doktorunuza ya da eczacınıza sormalısınız.  ⏎ Uygun kullanım ve doz/uygulam
+  [4] HEADER: 4. Olası yan etkiler nelerdir?
+      BODY  : Tüm ilaçlar gibi, CİCİFEN’in içeriğinde bulunan maddelere duyarlı olan kişilerde yan etkiler  ⏎ olabilir.  ⏎ Aşağıdakilerden biri olursa CİCİFEN’i kullanmayı durdurunuz ve DERHAL  ⏎ doktorunuza bildiriniz v
+  [5] HEADER: 5. CİCİFEN’in Saklanması
+      BODY  : CİCİFEN’i çocukların göremeyeceği, erişemeyeceği yerlerde ve ambalajında saklayınız.  ⏎ 25ºC’nin altındaki oda sıcaklığında saklayınız.  ⏎ Son kullanma tarihiyle uyumlu olarak kullanınız.  ⏎ Ambalajdaki son
+
+========================================================================
+6) SONUÇ VE ÖNERİ
+========================================================================
+
+  Bu strateji ile başarı oranı     : %81 (tam 5/5)
+  Kısmi başarı dahil               : %88
+
+  KIRILDIĞI YERLER:
+    • En sık eksik kombinasyon : [1, 2, 3, 4, 5]  (12 kayıt)
+    • Bölüm-3 ('nasıl kullanılır') eksik    : 16 kayıt
+    • Bölüm-4 ('olası yan etkiler') eksik   : 15 kayıt
+    • OCR-gürültülü kayıtların 7%'i başarısız
+
+  KOLON YAPISI ÖNERİSİ (medication_kt yeniden inşa edilirse):
+    - id                          uuid PK
+    - medication_id               uuid → medicationsV2(id) NOT NULL
+    - raw_text                    text NOT NULL    (orijinal PDF metni — referans)
+    - section_1_nedir             text             (1. ... nedir ve ne için kullanılır?)
+    - section_2_kullanmadan_once  text             (2. ... kullanmadan önce dikkat edilmesi gerekenler)
+    - section_3_nasil_kullanilir  text             (3. ... nasıl kullanılır?)
+    - section_4_yan_etkiler       text             (4. olası yan etkiler nelerdir?)
+    - section_5_saklanmasi        text             (5. ... saklanması)
+    - parse_version               text             ('v2-prototype' gibi)
+    - parse_quality_score         int              (5=tam, 4=bir bölüm eksik, ...)
+    - source_url                  text
+    - parsed_at                   timestamptz default now()
+    - created_at                  timestamptz default now()
+
+  Mevcut 14+ kolon yerine 5 anlamlı + raw_text yeterli. LLM'in birden
+  fazla bölümü birleştirmesine gerek kalmaz.
+
+  YAYINLAMA ÖNCESİ ÖNERİ:
+    1. Burada gözle 3 örneği doğrula.
+    2. Tam tabloda kuru-koşum yap (bu script SAMPLE_SIZE=15473 ile).
+    3. Başarı %95+ ise gerçek upsert için ayrı script yaz (idempotent,
+       sadece eski section_* NULL olan kayıtları doldur).
+    4. Bu prototip ASLA UPDATE çağırmıyor — güvenlik açısından commit'le.

@@ -1,0 +1,825 @@
+{
+  "b1048f2d-d59c-457c-ba20-a12957b2a00a": {
+    "name": "Diyabet Tip 1",
+    "synonyms": [
+      "diyabet tip 1",
+      "iddm",
+      "insülin bağımlı diabetes",
+      "insüline bağımlı diyabet",
+      "juvenil diyabet",
+      "t1dm",
+      "tip 1 diabetes",
+      "tip 1 diabetes mellitus",
+      "tip 1 diyabet",
+      "tip i diyabet",
+      "çocukluk çağı diyabeti"
+    ]
+  },
+  "e7435d8a-8d28-42f3-868c-393a23045d2e": {
+    "name": "Diyabet Tip 2",
+    "synonyms": [
+      "aşikar diyabet",
+      "diabetes mellitus tip 2",
+      "diyabet tip 2",
+      "insüline bağımlı olmayan diyabet",
+      "niddm",
+      "t2dm",
+      "tip 2 diabetes",
+      "tip 2 diabetes mellitus",
+      "tip 2 diyabet",
+      "tip ii diyabet",
+      "şeker hastalığı"
+    ]
+  },
+  "666f94e9-2365-4955-a3be-b969a21aab71": {
+    "name": "Obezite",
+    "synonyms": [
+      "aşırı kilo",
+      "kilo kontrolü",
+      "kilo yönetimi",
+      "obez",
+      "obezite",
+      "vücut ağırlığı kontrolü",
+      "şişmanlık"
+    ]
+  },
+  "8611159d-4552-49b8-98e7-8e70b5a995e3": {
+    "name": "Hipertansiyon",
+    "synonyms": [
+      "arteriyel hipertansiyon",
+      "esansiyel hipertansiyon",
+      "hipertansiyon",
+      "kan basıncı yüksekliği",
+      "pulmoner hipertansiyon",
+      "yüksek kan basıncı",
+      "yüksek tansiyon"
+    ]
+  },
+  "d237f669-62c2-46f5-90d0-7aaac57fe874": {
+    "name": "Koroner Arter Hastalığı",
+    "synonyms": [
+      "angina",
+      "angina pektoris",
+      "anjina pektoris",
+      "iskemik kalp hastalığı",
+      "kararlı angina",
+      "kararsız angina",
+      "koroner arter hastalığı",
+      "koroner kalp hastalığı",
+      "miyokard enfarktüsü",
+      "miyokart enfarktüsü"
+    ]
+  },
+  "292ecc10-5410-41e5-9e73-a8472d96dc5f": {
+    "name": "Kalp Yetmezliği",
+    "synonyms": [
+      "kalp yetersizliği",
+      "kalp yetmezliği",
+      "konjestif kalp yetersizliği",
+      "konjestif kalp yetmezliği",
+      "kronik kalp yetmezliği"
+    ]
+  },
+  "bd603a59-f4c0-47a5-93ec-b9c959b51e71": {
+    "name": "Atriyal Fibrilasyon",
+    "synonyms": [
+      "afib",
+      "atriyal fibrilasyon",
+      "atriyal fibrilasyonu",
+      "atriyal flutter",
+      "atriyum fibrilasyonu"
+    ]
+  },
+  "2e4c284f-602a-4f05-8966-49a904e611f0": {
+    "name": "Astım",
+    "synonyms": [
+      "alerjik astım",
+      "astım",
+      "astım bronşiale",
+      "astım tedavisi",
+      "bronkospazm",
+      "bronşiyal astım"
+    ]
+  },
+  "dbced801-5a45-4694-8529-4df4cd9d5a12": {
+    "name": "KOAH",
+    "synonyms": [
+      "amfizem",
+      "koah",
+      "kronik bronşit",
+      "kronik obstrüktif",
+      "kronik obstrüktif akciğer hastalığı"
+    ]
+  },
+  "cea20920-36c0-41ce-a60a-9857d9e2a42d": {
+    "name": "Alerjik Rinit",
+    "synonyms": [
+      "alerjik nezle",
+      "alerjik rinit",
+      "alerjik rinokonjunktivit",
+      "mevsimsel alerjik rinit",
+      "perennial rinit",
+      "saman nezlesi"
+    ]
+  },
+  "019f5dd6-8a8a-457e-b2bf-9b318596ae5e": {
+    "name": "Reflü (GÖRH)",
+    "synonyms": [
+      "gastro-özofageal reflü",
+      "gastroözofageal reflü",
+      "gastroözofageal reflü hastalığı",
+      "görh",
+      "mide yanması",
+      "reflü",
+      "reflü özofajiti",
+      "özofajit"
+    ]
+  },
+  "5d74745d-7926-450f-9c69-b24f25e22c74": {
+    "name": "Crohn Hastalığı",
+    "synonyms": [
+      "crohn",
+      "crohn hastalığı",
+      "iltihabi bağırsak hastalığı",
+      "inflamatuar bağırsak hastalığı"
+    ]
+  },
+  "e93089ce-c694-44c2-9d75-5709f1099631": {
+    "name": "Ülseratif Kolit",
+    "synonyms": [
+      "kolit",
+      "ülseratif colitis",
+      "ülseratif kolit"
+    ]
+  },
+  "75ec5231-0bcf-4240-b29b-e0bf45585f28": {
+    "name": "İrritabl Bağırsak Sendromu",
+    "synonyms": [
+      "huzursuz bağırsak sendromu",
+      "ibs",
+      "irritabl bağırsak sendromu",
+      "irritabl kolon",
+      "spastik kolon"
+    ]
+  },
+  "9ef27756-7eb3-42f7-b6c0-da46b0d27d38": {
+    "name": "Epilepsi",
+    "synonyms": [
+      "antiepileptik",
+      "epilepsi",
+      "epileptik",
+      "epileptik nöbet",
+      "jeneralize nöbet",
+      "konvulsiyon",
+      "konvülsiyon",
+      "parsiyel nöbet",
+      "sara hastalığı"
+    ]
+  },
+  "15288b90-5d2d-4809-b621-a1092b64ac1f": {
+    "name": "Migren",
+    "synonyms": [
+      "auralı migren",
+      "aurasız migren",
+      "hemikrani",
+      "migren",
+      "migren atağı",
+      "migren baş ağrısı",
+      "migren profilaksisi"
+    ]
+  },
+  "060bc487-6baa-4434-9efa-faddb37c2d61": {
+    "name": "Depresyon",
+    "synonyms": [
+      "depresif bozukluk",
+      "depresif dönem",
+      "depresif epizod",
+      "depresyon",
+      "major depresif bozukluk",
+      "majör depresif bozukluk",
+      "majör depresyon"
+    ]
+  },
+  "fef4cd19-d7f0-4513-ad36-de5658ae2d41": {
+    "name": "Anksiyete Bozukluğu",
+    "synonyms": [
+      "anksiyete",
+      "anksiyete bozuklukları",
+      "anksiyete bozukluğu",
+      "kaygı bozukluğu",
+      "panik atak",
+      "panik bozukluğu",
+      "sosyal anksiyete",
+      "yaygın anksiyete bozukluğu"
+    ]
+  },
+  "4e7e953c-ccd7-4592-9027-c3f49954e041": {
+    "name": "Kronik Böbrek Hastalığı",
+    "synonyms": [
+      "böbrek fonksiyon bozukluğu",
+      "böbrek yetmezliği",
+      "diyaliz",
+      "kbh",
+      "kronik böbrek hastalığı",
+      "kronik böbrek yetmezliği",
+      "renal yetmezlik",
+      "son dönem böbrek hastalığı"
+    ]
+  },
+  "d08ae3cd-1af1-40fe-8f22-14c9edba575c": {
+    "name": "Romatoid Artrit",
+    "synonyms": [
+      "eklem iltihabı",
+      "inflamatuar artrit",
+      "juvenil idiopatik artrit",
+      "romatizma",
+      "romatoid artrit",
+      "romatoid artriti"
+    ]
+  },
+  "04eb640a-2a9a-4d4d-8a11-5cfdd7a59329": {
+    "name": "Osteoporoz",
+    "synonyms": [
+      "kemik erimesi",
+      "kemik kaybı",
+      "kemik yoğunluğu azalması",
+      "osteopeni",
+      "osteoporoz",
+      "postmenopozal osteoporoz"
+    ]
+  },
+  "1a91efb7-a47f-46f0-be36-34633f9cb545": {
+    "name": "Demir Eksikliği Anemisi",
+    "synonyms": [
+      "anemi tedavisi",
+      "demir eksikliği",
+      "demir eksikliği anemisi",
+      "demir eksikliğine bağlı anemi",
+      "kansızlık"
+    ]
+  },
+  "3e2c4604-deb0-4059-8e31-7327f2b6cfe8": {
+    "name": "Bakteriyel Enfeksiyon",
+    "synonyms": [
+      "bakteri enfeksiyonu",
+      "bakteriyel enfeksiyon",
+      "bakteriyel enfeksiyonlar",
+      "bakteriyel hastalık",
+      "duyarlı mikroorganizma"
+    ]
+  },
+  "33ae32c1-d277-490e-9039-aa7ca5ae84e9": {
+    "name": "Viral Enfeksiyon",
+    "synonyms": [
+      "antiviral",
+      "viral enfeksiyon",
+      "viral enfeksiyonlar",
+      "viral hastalık",
+      "virüs enfeksiyonu"
+    ]
+  },
+  "9bb1335b-7d0f-462a-8409-199093617039": {
+    "name": "Üriner Sistem Enfeksiyonu",
+    "synonyms": [
+      "idrar yolu enfeksiyonu",
+      "idrar yolu iltihabı",
+      "piyelonefrit",
+      "pyelonefrit",
+      "sistit",
+      "üretrit",
+      "üriner enfeksiyon",
+      "üriner sistem enfeksiyonu"
+    ]
+  },
+  "505059ef-f48f-4e85-a803-742a708a5e22": {
+    "name": "Pnömoni",
+    "synonyms": [
+      "akciğer enfeksiyonu",
+      "akciğer iltihabı",
+      "alt solunum yolu enfeksiyonu",
+      "pnömokokal pnömoni",
+      "pnömoni",
+      "toplum kökenli pnömoni",
+      "zatürre",
+      "zatürree"
+    ]
+  },
+  "937d4bec-df73-4d10-9922-afe4e3b02831": {
+    "name": "Akne",
+    "synonyms": [
+      "akne",
+      "akne vulgaris",
+      "akne vulgariz",
+      "inflamatuar akne",
+      "komedonal akne",
+      "sivilce",
+      "yüz sivilcesi"
+    ]
+  },
+  "0c17958e-ecb4-4d95-9785-a5883d18be11": {
+    "name": "Egzama",
+    "synonyms": [
+      "atopik dermatit",
+      "dermatit",
+      "egzama",
+      "egzema",
+      "ekzama",
+      "kontakt dermatit",
+      "seboreik dermatit"
+    ]
+  },
+  "fa8a4160-b027-44c7-ac2c-2f93a5f92439": {
+    "name": "Sedef Hastalığı",
+    "synonyms": [
+      "plak psoriazis",
+      "plak sedef",
+      "psoriasis",
+      "psoriatik artrit",
+      "psoriazis",
+      "psoriyazis",
+      "psöriazis",
+      "sedef",
+      "sedef hastalığı"
+    ]
+  },
+  "f2d58bc9-12a5-4d00-861e-7e6a30e7fc02": {
+    "name": "Ürtiker",
+    "synonyms": [
+      "anjiyoödem",
+      "kronik spontan ürtiker",
+      "kronik ürtiker",
+      "kurdeşen",
+      "ürtiker",
+      "ürtikeri"
+    ]
+  },
+  "448c7513-aa8c-4338-8d13-71cbb9fde72f": {
+    "name": "Parkinson Hastalığı",
+    "synonyms": [
+      "idiopatik parkinson",
+      "parkinson",
+      "parkinson hastalığı",
+      "parkinsonizm"
+    ]
+  },
+  "e500aabb-5f28-431f-9023-68a20c2b3c76": {
+    "name": "Alzheimer Hastalığı",
+    "synonyms": [
+      "alzheimer",
+      "alzheimer hastalığı",
+      "alzheimer tipi demans",
+      "bunama",
+      "demans",
+      "demansı"
+    ]
+  },
+  "3c411342-2330-4261-8324-3f993e29f731": {
+    "name": "Multipl Skleroz",
+    "synonyms": [
+      "multipl skleroz",
+      "multiple skleroz",
+      "relapsing remitting",
+      "yineleyici multipl skleroz"
+    ]
+  },
+  "6ac1c770-d239-47fc-9328-6cb8fa9e2d46": {
+    "name": "Kronik Ağrı",
+    "synonyms": [
+      "devamlı ağrı",
+      "kronik ağrı",
+      "kronik ağrı sendromu",
+      "kronik ağrı tedavisi",
+      "süreğen ağrı",
+      "uzun süreli ağrı",
+      "şiddetli kronik ağrı"
+    ]
+  },
+  "6c18abb5-114a-415e-9a59-d3064872830b": {
+    "name": "Nöropatik Ağrı",
+    "synonyms": [
+      "diyabetik nöropati",
+      "diyabetik periferik nöropati",
+      "nevralji",
+      "nöropati ağrısı",
+      "nöropatik ağrı",
+      "periferik nöropati",
+      "postherpetik nevralji",
+      "postherpetik nöralji",
+      "sinir ağrısı",
+      "trigeminal nevralji"
+    ]
+  },
+  "f4ec932a-daf1-4389-9797-362f5fe74507": {
+    "name": "Gut Hastalığı",
+    "synonyms": [
+      "akut gut atağı",
+      "damla hastalığı",
+      "gut",
+      "gut artriti",
+      "gut hastalığı",
+      "hiperürisemi",
+      "ürik asit"
+    ]
+  },
+  "2ffc0a2b-7b68-44d9-bfa8-fdf8b0ebd901": {
+    "name": "Ankilozan Spondilit",
+    "synonyms": [
+      "aksiyel spondiloartrit",
+      "ankilozan spondilit",
+      "ankilozan spondilitis",
+      "spondilit",
+      "spondiloartrit"
+    ]
+  },
+  "03a5a9c7-10e5-4601-a25c-4b72065081ab": {
+    "name": "Prostat Hiperplazisi",
+    "synonyms": [
+      "alt üriner sistem semptomları",
+      "benign prostat hiperplazisi",
+      "benign prostat hipertrofisi",
+      "bph",
+      "iyi huylu prostat büyümesi",
+      "prostat büyümesi",
+      "prostat hiperplazisi"
+    ]
+  },
+  "5b85fbba-14a6-4b4f-aa0d-5b0e4b4814b3": {
+    "name": "Böbrek Taşı",
+    "synonyms": [
+      "böbrek taşları",
+      "böbrek taşı",
+      "böbrek taşı oluşumu",
+      "idrar yolu taşı",
+      "kalsiyum okzalat taşı",
+      "nefrolitiyazis",
+      "renal kolik",
+      "renal taş",
+      "üreter taşı",
+      "ürik asit taşı",
+      "üriner sistem taş hastalığı",
+      "ürolitiyazis"
+    ]
+  },
+  "e6da2e60-7051-4af6-a550-b3600319736d": {
+    "name": "Hepatit B",
+    "synonyms": [
+      "b hepatiti",
+      "hbv",
+      "hepatit b",
+      "kronik hepatit b"
+    ]
+  },
+  "97c8da0c-c839-4b8e-ac1a-cb34e0ab4b3f": {
+    "name": "Hepatit C",
+    "synonyms": [
+      "c hepatiti",
+      "hcv",
+      "hepatit c",
+      "kronik hepatit c"
+    ]
+  },
+  "f258e31e-fdb2-41ff-a28f-539c773495ce": {
+    "name": "Karaciğer Yetmezliği",
+    "synonyms": [
+      "hepatik ensefalopati",
+      "hepatik yetmezlik",
+      "karaciğer hastalığı",
+      "karaciğer sirozu",
+      "karaciğer yetmezliği",
+      "siroz"
+    ]
+  },
+  "a976685f-c4a2-4284-8ee2-33f71f1e251b": {
+    "name": "Peptik Ülser",
+    "synonyms": [
+      "duodenal ülser",
+      "duodenum ülseri",
+      "gastrik ülser",
+      "gastroduodenal ülser",
+      "mide ülseri",
+      "peptik ülser",
+      "ülser tedavisi"
+    ]
+  },
+  "550f3221-f135-4c53-a4dc-1c312bcf3234": {
+    "name": "Kolon Kanseri",
+    "synonyms": [
+      "kalın bağırsak kanseri",
+      "kolon kanseri",
+      "kolon tümörü",
+      "kolorektal kanser",
+      "metastatik kolorektal kanser",
+      "rektum kanseri"
+    ]
+  },
+  "45895da8-7442-4326-aed9-cfcde7e097ae": {
+    "name": "Akciğer Kanseri",
+    "synonyms": [
+      "akciğer kanseri",
+      "akciğer karsinomu",
+      "akciğer tümörü",
+      "bronş kanseri",
+      "khak",
+      "khdak",
+      "küçük hücreli akciğer kanseri",
+      "küçük hücreli dışı akciğer kanseri"
+    ]
+  },
+  "1a5b5f94-eef2-4e08-ac5a-35e5c9b74033": {
+    "name": "Meme Kanseri",
+    "synonyms": [
+      "erken evre meme kanseri",
+      "her2 pozitif meme",
+      "meme kanseri",
+      "meme karsinomu",
+      "meme tümörü",
+      "metastatik meme kanseri"
+    ]
+  },
+  "514dc035-7864-42a4-ab5e-d58d35b44dbc": {
+    "name": "Prostat Kanseri",
+    "synonyms": [
+      "kastrasyona dirençli prostat",
+      "metastatik prostat kanseri",
+      "prostat kanseri",
+      "prostat karsinomu",
+      "prostat tümörü"
+    ]
+  },
+  "66704490-aa72-4628-a001-531c087b3ac0": {
+    "name": "Lösemi",
+    "synonyms": [
+      "akut lenfoblastik lösemi",
+      "akut lösemi",
+      "akut miyeloid lösemi",
+      "kan kanseri",
+      "kronik lenfositik lösemi",
+      "kronik lösemi",
+      "kronik miyeloid lösemi",
+      "lökemi",
+      "lösemi"
+    ]
+  },
+  "99de02e8-e911-4edf-9f13-07aab3929219": {
+    "name": "Lenfoma",
+    "synonyms": [
+      "b hücreli lenfoma",
+      "hodgkin hastalığı",
+      "hodgkin lenfoma",
+      "lenf bezi kanseri",
+      "lenf kanseri",
+      "lenfoma",
+      "non-hodgkin lenfoma"
+    ]
+  },
+  "fc34cecd-9311-4861-a9c8-41725c1815d4": {
+    "name": "HIV/AIDS",
+    "synonyms": [
+      "aids",
+      "antiretroviral",
+      "edinsel immün yetmezlik",
+      "hiv enfeksiyonu",
+      "hiv pozitif",
+      "hiv-1",
+      "insan immün yetmezlik virüsü"
+    ]
+  },
+  "aeca5daf-811f-4094-b888-433aa72988b3": {
+    "name": "Tüberküloz",
+    "synonyms": [
+      "akciğer veremi",
+      "antitüberküloz",
+      "latent tüberküloz",
+      "mycobacterium tuberculosis",
+      "tüberküloz",
+      "tüberküloz tedavisi",
+      "verem"
+    ]
+  },
+  "5876e944-c993-4eb8-8c60-33a5db7d12b7": {
+    "name": "Mantar Enfeksiyonu",
+    "synonyms": [
+      "ayak mantarı",
+      "dermatofitoz",
+      "fungal enfeksiyon",
+      "kandida",
+      "kandidiyaz",
+      "kandidiyazis",
+      "mantar enfeksiyonu",
+      "mikoz",
+      "onikomikoz",
+      "tinea",
+      "vajinal kandidiyaz"
+    ]
+  },
+  "b3e53edf-abd1-4259-a5d7-d5aa46167d46": {
+    "name": "Hiperkolesterolemi",
+    "synonyms": [
+      "dislipidemi",
+      "hiperkolesterol",
+      "hiperkolesterolemi",
+      "hiperlipidemi",
+      "kolesterol yüksekliği",
+      "ldl yüksekliği",
+      "yüksek kolesterol"
+    ]
+  },
+  "978d1069-720a-46ee-9006-ffd0a3ed826f": {
+    "name": "Hipertrigliseridemi",
+    "synonyms": [
+      "hiperlipidemi",
+      "hipertrigliseridemi",
+      "trigliserid yüksekliği",
+      "trigliserit yüksekliği",
+      "yüksek trigliserid"
+    ]
+  },
+  "956e7592-dda7-4a23-9438-5f445e6a057a": {
+    "name": "Metabolik Sendrom",
+    "synonyms": [
+      "insülin direnci sendromu",
+      "metabolik risk",
+      "metabolik sendrom",
+      "metabolik sendrom x",
+      "sendrom x"
+    ]
+  },
+  "e6b8d997-5026-4df0-96b0-0e11ba299772": {
+    "name": "Tiroid Kanseri",
+    "synonyms": [
+      "foliküler tiroid kanseri",
+      "medüller tiroid kanseri",
+      "papiller tiroid kanseri",
+      "tiroid kanseri",
+      "tiroid karsinomu",
+      "tiroid tümörü"
+    ]
+  },
+  "c7fa555d-dddf-4186-98b6-f50fe1acfbd3": {
+    "name": "Psikoz",
+    "synonyms": [
+      "akut psikoz",
+      "psikotik",
+      "psikotik atak",
+      "psikotik bozukluk",
+      "psikoz"
+    ]
+  },
+  "0f03134c-3e71-4524-b39f-0308641192b7": {
+    "name": "Bipolar Bozukluk",
+    "synonyms": [
+      "bipolar",
+      "bipolar afektif bozukluk",
+      "bipolar bozukluk",
+      "iki uçlu bozukluk",
+      "mani epizodu",
+      "manik depresif",
+      "manik epizod"
+    ]
+  },
+  "e0b1f4a2-6beb-4f08-9742-22743dfc9336": {
+    "name": "Şizofreni",
+    "synonyms": [
+      "şizoaffektif",
+      "şizofreni",
+      "şizofreni tedavisi",
+      "şizofrenik"
+    ]
+  },
+  "31296a6a-bb9c-4094-a430-65d630fee4dc": {
+    "name": "DEHB",
+    "synonyms": [
+      "adhd",
+      "dehb",
+      "dikkat eksikliği hiperaktivite bozukluğu"
+    ]
+  },
+  "483adfc2-1c13-46f5-9b9d-4801c912054c": {
+    "name": "Vertigo",
+    "synonyms": [
+      "baş dönmesi",
+      "bppv",
+      "meniere",
+      "menière",
+      "vertigo",
+      "vestibüler",
+      "vestibüler vertigo"
+    ]
+  },
+  "8648c83d-c30b-4aac-81f5-0b83d3d573af": {
+    "name": "Glokom",
+    "synonyms": [
+      "açık açılı glokom",
+      "glokom",
+      "göz içi basıncı",
+      "göz tansiyonu",
+      "intraoküler basınç",
+      "oküler hipertansiyon"
+    ]
+  },
+  "a4fcdec1-f72c-47d4-b22f-bd8efb308c72": {
+    "name": "Katarakt",
+    "synonyms": [
+      "katarakt",
+      "katarakt cerrahisi",
+      "lens opasitesi"
+    ]
+  },
+  "a5d000c7-fa8d-4b88-8a3f-04d91a680963": {
+    "name": "Maküler Dejenerasyon",
+    "synonyms": [
+      "maküla dejenerasyonu",
+      "maküler dejenerasyon",
+      "neovasküler",
+      "sarı nokta hastalığı",
+      "yaş tip maküler",
+      "yaşa bağlı maküler dejenerasyon"
+    ]
+  },
+  "fb320cd9-c9c6-4a99-a258-274f8fdb8e3e": {
+    "name": "Konjunktivit",
+    "synonyms": [
+      "alerjik konjunktivit",
+      "bakteriyel konjunktivit",
+      "göz iltihabı",
+      "konjonktiva iltihabı",
+      "konjonktivit",
+      "konjunktivit"
+    ]
+  },
+  "ff10dbc8-e7d4-42fa-97f0-19219ed8c1ad": {
+    "name": "Orta Kulak Enfeksiyonu",
+    "synonyms": [
+      "akut otitis media",
+      "kulak enfeksiyonu",
+      "kulak iltihabı",
+      "orta kulak enfeksiyonu",
+      "orta kulak iltihabı",
+      "otitis media"
+    ]
+  },
+  "f3e508f4-2790-420c-8fcb-3bd1ddc33a39": {
+    "name": "Sinüzit",
+    "synonyms": [
+      "akut sinüzit",
+      "kronik sinüzit",
+      "rinosinüzit",
+      "sinüs enfeksiyonu",
+      "sinüs iltihabı",
+      "sinüzit"
+    ]
+  },
+  "d8dba204-22bd-4b0d-8c87-84065f3452e8": {
+    "name": "Tonsillit",
+    "synonyms": [
+      "bademcik iltihabı",
+      "boğaz enfeksiyonu",
+      "boğaz iltihabı",
+      "farengotonsillit",
+      "farenjit",
+      "tonsillit",
+      "tonsillofarenjit"
+    ]
+  },
+  "ab6d79a6-25c9-40dc-b9c4-382b72d9be37": {
+    "name": "Koroner Bypass",
+    "synonyms": [
+      "aortokoroner bypass",
+      "baypas cerrahisi",
+      "bypass ameliyatı",
+      "bypass cerrahisi",
+      "bypass greft",
+      "cabg",
+      "kalp baypas",
+      "kalp bypass",
+      "koroner arter baypas",
+      "koroner arter bypass",
+      "koroner arter bypass greft",
+      "koroner baypas",
+      "koroner bypass",
+      "koroner revaskülarizasyon"
+    ]
+  },
+  "3e314c19-e079-4b74-a495-11506fdab970": {
+    "name": "Tromboemboli",
+    "synonyms": [
+      "akciğer embolisi",
+      "pulmoner emboli",
+      "pulmoner embolizm",
+      "tromboemboli",
+      "tromboembolik",
+      "tromboembolik olay",
+      "venöz tromboembolizm"
+    ]
+  },
+  "4466ac7d-fd72-4ff8-aca7-bd28cdabde4c": {
+    "name": "Derin Ven Trombozu",
+    "synonyms": [
+      "derin ven trombozu",
+      "derin ven tıkanıklığı",
+      "derin venöz tromboz",
+      "dvt",
+      "venöz tromboz"
+    ]
+  }
+}

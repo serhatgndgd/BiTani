@@ -1,0 +1,106 @@
+========================================================================
+therapeutic_indications DECONTAMINASYON DRY-RUN
+========================================================================
+Üretim tarihi: 2026-05-29 18:14:45
+DB'ye HİÇBİR yazma yapılmadı.
+
+'kontrendike' içeren therapeutic_indications: 502
+
+İlk 50 kontamine kayıt çekiliyor…
+50 kayıt geldi.
+
+========================================================================
+ÖRNEKLER (trimmed: max 10 | riskli: max 3 | korunan: max 3)
+========================================================================
+
+[TRIM  1] id=00527bd7  Norditropin® NordiFlex® 15 mg/1.5 mL, en
+  ÖNCE  ( 2228 ch): 'Çocuklarda:  | Büyüme hormonu eksikliğine (BHE) bağlı büyüme geriliği,  |   | Kızlarda gonadal disgeneziye bağlı büyüme geriliği (Turner Sendromu),  |   | Puberte öncesi çocuklarda kronik böbrek hastalığına bağ'
+  KES   : 'kontrendike olduğunda, alternatif provokatif testler uygulanmalıdır. Arjinin testi ile büy'
+  SONRA ( 1939 ch): 'Çocuklarda:  | Büyüme hormonu eksikliğine (BHE) bağlı büyüme geriliği,  |   | Kızlarda gonadal disgeneziye bağlı büyüme geriliği (Turner Sendromu),  |   | Puberte öncesi '
+
+[TRIM  2] id=03640d01  GENOTROPİN MİNİQUİCK® S.C. enjeksiyonluk
+  ÖNCE  ( 3014 ch): ' Büyüme hormonunun yetersiz salgılanmasına bağlı çocuklardaki büyüme bozukluklarında;  | büyüme hormonunun yetersi zliği iki ayrı dinamik büyüme hormonu uyarı testi ile  | doğrulanarak;  |  Gonadal disgen'
+  KES   : 'kontrendikedir. 60 yaş üstünde hastalarda riskli olabileceğinden tercih edilmemelidir.'
+  SONRA ( 2130 ch): ' Büyüme hormonunun yetersiz salgılanmasına bağlı çocuklardaki büyüme bozukluklarında;  | büyüme hormonunun yetersi zliği iki ayrı dinamik büyüme hormonu uyarı te'
+
+[TRIM  3] id=037398cb  ?
+  ÖNCE  (11195 ch): 'ERELONG, yeterli bir seksüel performans için gerekli penil ereksiyonun sağlanamaması Veya | sürdürülememesi olarak tanımlanan erektil disfonksiyonun semptomatik tedavisinde | endikedir. | ERELONG'un etkili '
+  KES   : 'kontrendikedir (Bkz Bölüm 4.3 Kontrendikasyonlar).'
+  SONRA ( 1999 ch): 'ERELONG, yeterli bir seksüel performans için gerekli penil ereksiyonun sağlanamaması Veya | sürdürülememesi olarak tanımlanan erektil disfonksiyonun semptomatik t'
+
+[KORU  1] id=045b8dc3  REVOLADE 50 mg film kaplı tablet
+  (760 ch, güçlü sinyal yok — endikasyon cümlesi korundu)
+  'REVOLADE, d iğer tedavilere dirençli (örneğin kortikost eroid, immünoglobulinler veya  | splenektomiye rağmen) ya da splenektominin kontrendike olduğu veya yapılamadığı durumlarda 1  | yaşından itibaren k'
+
+[TRIM  4] id=049b46cc  ?
+  ÖNCE  (20097 ch): 'CHORIOMON® gonad fonksiyonlarının aktifleştirilmesi gereken durumlar için endikedir ve  | tedavinin başarısı gonadların fonksiyonel kapasitesine bağlıdır. Geri dönüşümsüz primer  | gonadal yetmezliğin bir'
+  KES   : '4.3-Kontrendikasyonlar'
+  SONRA ( 6288 ch): 'CHORIOMON® gonad fonksiyonlarının aktifleştirilmesi gereken durumlar için endikedir ve  | tedavinin başarısı gonadların fonksiyonel kapasitesine bağlıdır. Geri dö'
+
+[KORU  2] id=04c234b4  POLİX 500.000 IU enjeksiyonluk çözelti h
+  (2739 ch, güçlü sinyal yok — endikasyon cümlesi korundu)
+  'Pseudomonas aeruginosa’nın duyarlı suşlarının neden olduğu akut enfeksiyonlar  | UYARI: Bu ilaç intramüsküler ve/veya intratekal olarak verildiğinde, bir doktor tarafından  | sürekli denetim sağlanması ge'
+
+[TRIM  5] id=052f1cea  ?
+  ÖNCE  (10932 ch): 'Aşağıdaki parazitlerin neden olduğu enfeksiyonların tedavisinde endikedir. | o Ascaris lumbricoides | o Enterobiusvermicularis | o Ancylostomaduodenale | o Necator americanus | o Trichostrongtlus colubriformis '
+  KES   : '4.3. Kontrendikasyonlar'
+  SONRA ( 3289 ch): 'Aşağıdaki parazitlerin neden olduğu enfeksiyonların tedavisinde endikedir. | o Ascaris lumbricoides | o Enterobiusvermicularis | o Ancylostomaduodenale | o Necator amer'
+
+[KORU  3] id=05c9ec85  BİMZELX 160 mg/mL SC enjeksiyonluk çözel
+  (1368 ch, güçlü sinyal yok — endikasyon cümlesi korundu)
+  'Plak psoriazis  |   | BİMZELX, siklosporin, metotreksat veya fototerapi gibi geleneksel sistemik tedavilere yanıt  | vermeyen, tolere edemeyen ya da bu tür tedavilerin kontrendike olduğu erişkin hastalarda '
+
+[TRIM  6] id=0665adb3  ?
+  ÖNCE  (  322 ch): 'CLINIMIX-2 oral ya da enteral beslenmenin mümkün ol madı ğı, yetersiz kaldı ğı ya da  | kontrendike oldu ğu durumlarda parenteral beslenmede kullanılır.  | Uzun süreli parenteral beslenme uygulanacak hast'
+  KES   : 'kontrendike oldu ğu durumlarda parenteral beslenmede kullanılır.'
+  SONRA (   84 ch): 'CLINIMIX-2 oral ya da enteral beslenmenin mümkün ol madı ğı, yetersiz kaldı ğı ya da'
+
+[TRIM  7] id=07be9a64  ?
+  ÖNCE  ( 7329 ch): 'Paranazal sinüslerin akut ve kronik enflamasyonlarında endikedir.  |   | 4.2. Dozaj ve Uygulama Yöntemi  |   | Başka türlü reçete edilmediği takdirde, yetişkinler ve 12 yaş ve üzeri ergenler günde 3 kere 1  | k'
+  KES   : 'kullanılmamalıdır.'
+  SONRA (  739 ch): 'Paranazal sinüslerin akut ve kronik enflamasyonlarında endikedir.  |   | 4.2. Dozaj ve Uygulama Yöntemi  |   | Başka türlü reçete edilmediği takdirde, yetişkinler ve 12'
+
+[TRIM  8] id=090193a6  ?
+  ÖNCE  (20102 ch): 'CHORIOMON® gonad fonksiyonlarının aktifleştirilmesi gereken durumlar için endikedir ve  | tedavinin başarısı gonadların fonksiyonel kapasitesine bağlıdır. Geri dönüşümsüz primer  | gonadal yetmezliğin bir'
+  KES   : '4.3-Kontrendikasyonlar'
+  SONRA ( 6293 ch): 'CHORIOMON® gonad fonksiyonlarının aktifleştirilmesi gereken durumlar için endikedir ve  | tedavinin başarısı gonadların fonksiyonel kapasitesine bağlıdır. Geri dö'
+
+[TRIM  9] id=09081da4  ?
+  ÖNCE  (20950 ch): 'BUCEF duyarlı mikroorganizmalar tarafindan oluşturulan enfeksiyonların tedavisinde | endikedir. | Üst solunum yolu enfeksiyonları: Farenjit, tonsilit, sinüzit, kızıl, otitis media. | Alt solunum yolları enf'
+  KES   : '4.3. Kontrendikasyonlar'
+  SONRA ( 2379 ch): 'BUCEF duyarlı mikroorganizmalar tarafindan oluşturulan enfeksiyonların tedavisinde | endikedir. | Üst solunum yolu enfeksiyonları: Farenjit, tonsilit, sinüzit, kızı'
+
+[TRIM 10] id=093c34e9  STELARA 45 mg enjeksiyonluk çözelti 
+Ste
+  ÖNCE  ( 1464 ch): 'Plak Tip Psoriasis | STELARA sistemik tedaviye (örneğin; siklosporin, metotreksat (MTX) veya psoralen  | ultraviyole A (PUVA)) yanıt vermeyen, kontrendike olan veya bu tedaviyi tolere edemeyen  | yetişkinle'
+  KES   : 'kontrendikasyonları olan orta ile şiddetli aktif Crohn hastalığına sahip yetişkin hastalar'
+  SONRA ( 1036 ch): 'Plak Tip Psoriasis | STELARA sistemik tedaviye (örneğin; siklosporin, metotreksat (MTX) veya psoralen  | ultraviyole A (PUVA)) yanıt vermeyen, kontrendike olan veya'
+
+========================================================================
+İLK 50 KONTAMINE KAYIT ÖZETİ
+========================================================================
+  TRIM  Temizlenebilir               :   30 / 50  (60.0%)
+  RISK  Riskli (kesince <50 ch)     :    0 / 50  (0.0%)
+  KORU  Korunan (inline, no signal) :   20 / 50  (40.0%)
+  ----  kontrendike yok (DB hatasi) :    0 / 50
+
+========================================================================
+TAM TABLO TARAMASI (502 kontamine kayıt)
+========================================================================
+Taranıyor…
+
+Tarama tamamlandı: 502 kayıt  (10.2s)
+
+  TRIM  Temizlenebilir               :  256 / 502  (51.0%)
+  RISK  Riskli (kesince <50 ch)      :    0 / 502  (0.0%)
+  KORU  Korunan (inline, no signal)  :  246 / 502  (49.0%)
+
+  Kesilen karakter dağılımı (ne kadar kısaldı):
+    min=32  p25=1043  p50=15953  p75=25730  max=100807
+    Toplam temizlenen: 4,619,190 char  (18043 char/kayıt ortalama)
+
+========================================================================
+ONAY NOTU
+========================================================================
+  Onaylıyorsanız → kub_indications_decontam_apply.py çalıştırın.
+  DB'ye HİÇBİR yazma yapılmadı.
