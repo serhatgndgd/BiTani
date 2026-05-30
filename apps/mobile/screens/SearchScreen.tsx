@@ -297,7 +297,7 @@ export default function SearchScreen() {
       {query.length === 0 && (
         <View style={styles.hint}>
           <Text style={styles.hintText}>
-            Türkiye'de kayıtlı 25.000+ ilacı arayın.{'\n'}
+            Türkiye'de kayıtlı 15.000+ ilacı arayın.{'\n'}
             İlaç adı veya etken madde yazın.
           </Text>
         </View>
