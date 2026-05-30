@@ -47,6 +47,8 @@ const INITIAL_READ_STATE: ReadState = {
   chat_history: false,
 };
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 const CONSENT_DOCUMENTS: Record<ReadableConsentKey, LegalDocumentId> = {
   kvkk_read: 'kvkk_aydinlatma',
   saglik_veri: 'acik_riza',
@@ -72,7 +74,10 @@ function isAtLeast18(date: Date | null): boolean {
 function mapAuthError(error: AuthError): string {
   const raw = (error.message ?? '').toLowerCase();
   if (raw.includes('user already registered') || raw.includes('already been registered')) {
-    return 'Bu e-posta ile zaten bir hesap var.';
+    return 'Bu e-posta adresi zaten kayıtlı. Giriş yapmayı deneyin.';
+  }
+  if (raw.includes('email not confirmed')) {
+    return 'Bu e-posta onaylanmamış. Gelen kutunuzu kontrol edin.';
   }
   if (raw.includes('password')) {
     return 'Şifre politikasına uymuyor. Kuralları kontrol et.';
@@ -249,7 +254,16 @@ export default function RegisterScreen({ navigation }: Props) {
     consents.chat_history &&
     consents.age_18 &&
     isAtLeast18(birthDate);
-  const submitDisabled = loading || !requiredConsentsAccepted;
+  const submitDisabled =
+    loading ||
+    !requiredConsentsAccepted ||
+    !email.trim() ||
+    !rules.minLen ||
+    !rules.upper ||
+    !rules.digit ||
+    !rules.special ||
+    password !== confirm ||
+    !birthDate;
 
   function toggleConsent(key: ConsentKey) {
     setConsents((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -307,6 +321,10 @@ export default function RegisterScreen({ navigation }: Props) {
       setError('E-posta gerekli.');
       return;
     }
+    if (!EMAIL_PATTERN.test(trimmed)) {
+      setError('Geçerli bir e-posta adresi girin.');
+      return;
+    }
     if (!rules.minLen || !rules.upper || !rules.digit || !rules.special) {
       setError('Şifre tüm kuralları sağlamalı.');
       return;
@@ -315,12 +333,20 @@ export default function RegisterScreen({ navigation }: Props) {
       setError('Şifreler eşleşmiyor.');
       return;
     }
+    if (!birthDate) {
+      setError('Doğum tarihini seçmelisin.');
+      return;
+    }
     if (!isAtLeast18(birthDate)) {
       setError('18 yaşından küçükler uygulamayı kullanamaz.');
       return;
     }
     if (!requiredConsentsAccepted) {
       setError('Devam etmek için zorunlu metinleri okuyup onaylamalısın.');
+      return;
+    }
+    if (!hasRead.kvkk_read || !hasRead.saglik_veri || !hasRead.chat_history) {
+      setError('Lütfen tüm belgeleri okuyup onaylayın.');
       return;
     }
     setLoading(true);
