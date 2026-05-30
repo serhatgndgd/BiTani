@@ -3,6 +3,7 @@ import { Picker } from '@react-native-picker/picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -431,6 +432,27 @@ export default function ProfileScreen() {
       setDeletingAccount(false);
     }
   }, []);
+
+  const handleSignOut = useCallback(async () => {
+    await supabase.auth.signOut();
+  }, []);
+
+  const confirmSignOut = useCallback(() => {
+    Alert.alert(
+      'Çıkış Yap',
+      'Hesabından çıkış yapmak istediğine emin misin?',
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Çıkış Yap',
+          style: 'destructive',
+          onPress: () => {
+            void handleSignOut();
+          },
+        },
+      ],
+    );
+  }, [handleSignOut]);
 
   // ── Profil düzenleme ────────────────────────────────────────────────────
   const openEditProfile = () => {
@@ -1091,7 +1113,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* ── Çıkış ── */}
-        <Pressable style={styles.signOutBtn} onPress={() => void supabase.auth.signOut()}>
+        <Pressable style={styles.signOutBtn} onPress={confirmSignOut}>
           <Ionicons name="log-out-outline" size={20} color={C.error} />
           <Text style={styles.signOutText}>Çıkış Yap</Text>
         </Pressable>
