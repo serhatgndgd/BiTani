@@ -29,8 +29,14 @@ type MedRow = {
   };
 };
 
+type MedicationBrandGroup = {
+  conditionId: string;
+  brand: string;
+  variants: MedRow[];
+};
+
 type ConditionSection = { title: string; data: ConditionCatalogRow[] };
-type MedSection      = { conditionId: string; title: string; data: MedRow[] };
+type MedSection      = { conditionId: string; title: string; data: MedicationBrandGroup[] };
 
 type Props = { onComplete: () => void };
 
@@ -39,6 +45,7 @@ const TOTAL_STEPS = 4;
 // Hastalığa göre ilaç önerisi (condition_medications) parametreleri
 const CONDITION_MED_CONFIDENCE_MIN = 0.7;
 const CONDITION_MED_LIMIT = 100; // hastalık başına en yüksek güvenli öneri sayısı
+const MEDICATION_BRAND_REGEX = /^([A-ZÇĞİÖŞÜ\s]+?)(\s+\d|\s+\d+\s*MG|\s+\d+\s*ML|$)/;
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: 'male',        label: 'Erkek' },
@@ -76,6 +83,30 @@ function groupByCategory(rows: ConditionCatalogRow[]): Map<string, ConditionCata
     map.set(cat, list);
   }
   return new Map([...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'tr')));
+}
+
+function normalizeMedicationName(value: string): string {
+  return value.toLocaleUpperCase('tr-TR').trim().replace(/\s+/g, ' ');
+}
+
+function extractMedicationBrand(name: string): string {
+  const normalized = normalizeMedicationName(name);
+  return (normalized.match(MEDICATION_BRAND_REGEX)?.[1] ?? normalized).trim().replace(/\s+/g, ' ');
+}
+
+function medicationVariantLabel(row: MedRow, brand: string): string {
+  const normalized = normalizeMedicationName(row.medication.ilac_adi);
+  const variant = normalized.slice(brand.length).trim();
+  return variant.length > 0 ? variant : row.medication.ilac_adi;
+}
+
+function groupMedRowsByBrand(rows: MedRow[], conditionId: string): MedicationBrandGroup[] {
+  const groups = new Map<string, MedRow[]>();
+  for (const row of rows) {
+    const brand = extractMedicationBrand(row.medication.ilac_adi);
+    groups.set(brand, [...(groups.get(brand) ?? []), row]);
+  }
+  return [...groups.entries()].map(([brand, variants]) => ({ conditionId, brand, variants }));
 }
 
 async function resolveAuthUserId(maxAttempts = 40, delayMs = 120): Promise<string | null> {
@@ -146,6 +177,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
   const [selectedMedIds, setSelectedMedIds]     = useState<Set<string>>(new Set());
   const [medDosages, setMedDosages]             = useState<Map<string, string>>(new Map());
   const [noMedConditions, setNoMedConditions]   = useState<Set<string>>(new Set());
+  const [expandedMedBrands, setExpandedMedBrands] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -332,7 +364,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
       [...condMedsGrouped.entries()].map(([conditionId, meds]) => ({
         conditionId,
         title: conditionNameMap.get(conditionId) ?? conditionId,
-        data: noMedConditions.has(conditionId) ? [] : meds,
+        data: noMedConditions.has(conditionId) ? [] : groupMedRowsByBrand(meds, conditionId),
       })),
     [condMedsGrouped, conditionNameMap, noMedConditions],
   );
@@ -361,7 +393,11 @@ export default function OnboardingScreen({ onComplete }: Props) {
   // Bu şekilde TextInput focus kaybedilmez.
   const step4Sections = useMemo<MedSection[]>(() => {
     if (medSearch.trim()) {
-      return [{ conditionId: '__search__', title: '', data: flatMedResults }];
+      return [{
+        conditionId: '__search__',
+        title: '',
+        data: groupMedRowsByBrand(flatMedResults, '__search__'),
+      }];
     }
     return medSections;
   }, [medSearch, flatMedResults, medSections]);
@@ -406,6 +442,15 @@ export default function OnboardingScreen({ onComplete }: Props) {
 
   const setDosage = useCallback((medId: string, val: string) => {
     setMedDosages((prev) => { const n = new Map(prev); n.set(medId, val); return n; });
+  }, []);
+
+  const toggleExpandedMedBrand = useCallback((key: string) => {
+    setExpandedMedBrands((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   }, []);
 
   // ─── SectionList render callbackleri — Step 3 ────────────────────────────────
@@ -478,42 +523,62 @@ export default function OnboardingScreen({ onComplete }: Props) {
   // ─── SectionList / FlatList render callbackleri — Step 4 ─────────────────────
 
   const keyExtractorMed = useCallback(
-    (item: MedRow) => `${item.condition_id}:${item.medication.id}`,
+    (item: MedicationBrandGroup) => `${item.conditionId}:${item.brand}`,
     [],
   );
 
-  const renderMedItemRow = useCallback(
-    ({ item }: { item: MedRow }) => {
-      const { medication } = item;
-      const sel = selectedMedIds.has(medication.id);
+  const renderMedBrandGroup = useCallback(
+    ({ item }: { item: MedicationBrandGroup }) => {
+      const groupKey = `${item.conditionId}:${item.brand}`;
+      const expanded = expandedMedBrands.has(groupKey);
       return (
         <View>
           <Pressable
-            style={[styles.checkRow, sel && styles.checkRowSelected]}
-            onPress={() => toggleMed(medication.id)}
+            style={styles.medBrandRow}
+            onPress={() => toggleExpandedMedBrand(groupKey)}
             disabled={saving}>
             <View style={styles.medInfo}>
-              <Text style={styles.rowName}>{medication.ilac_adi}</Text>
-              {medication.etkin_madde_adi
-                ? <Text style={styles.medSub}>{medication.etkin_madde_adi}</Text>
-                : null}
+              <Text style={styles.rowName}>{item.brand}</Text>
+              <Text style={styles.medBrandCount}>{item.variants.length} varyant</Text>
             </View>
-            <Ionicons name={sel ? ICON_ON : ICON_OFF} size={22} color={sel ? C.primary : C.text3} />
+            <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={20} color={C.text3} />
           </Pressable>
-          {sel && (
-            <TextInput
-              style={styles.dosageInput}
-              value={medDosages.get(medication.id) ?? ''}
-              onChangeText={(v) => setDosage(medication.id, v)}
-              placeholder="Doz (örn: 500 mg, günde 2×) — opsiyonel"
-              placeholderTextColor={C.text3}
-              editable={!saving}
-            />
-          )}
+          {expanded
+            ? item.variants.map((row) => {
+                const { medication } = row;
+                const sel = selectedMedIds.has(medication.id);
+                return (
+                  <View key={`${row.condition_id}:${medication.id}`}>
+                    <Pressable
+                      style={[styles.medVariantRow, sel && styles.checkRowSelected]}
+                      onPress={() => toggleMed(medication.id)}
+                      disabled={saving}>
+                      <View style={styles.medInfo}>
+                        <Text style={styles.rowName}>{medicationVariantLabel(row, item.brand)}</Text>
+                        {medication.etkin_madde_adi
+                          ? <Text style={styles.medSub}>{medication.etkin_madde_adi}</Text>
+                          : null}
+                      </View>
+                      <Ionicons name={sel ? ICON_ON : ICON_OFF} size={22} color={sel ? C.primary : C.text3} />
+                    </Pressable>
+                    {sel && (
+                      <TextInput
+                        style={styles.dosageInput}
+                        value={medDosages.get(medication.id) ?? ''}
+                        onChangeText={(v) => setDosage(medication.id, v)}
+                        placeholder="Doz (örn: 500 mg, günde 2×) — opsiyonel"
+                        placeholderTextColor={C.text3}
+                        editable={!saving}
+                      />
+                    )}
+                  </View>
+                );
+              })
+            : null}
         </View>
       );
     },
-    [selectedMedIds, saving, toggleMed, medDosages, setDosage],
+    [expandedMedBrands, medDosages, saving, selectedMedIds, setDosage, toggleExpandedMedBrand, toggleMed],
   );
 
   const renderMedSectionHeader = useCallback(
@@ -836,10 +901,10 @@ export default function OnboardingScreen({ onComplete }: Props) {
 
       {/* ── Adım 4: İlaç seçimi — tek SectionList (search/gruplu mod) ── */}
       {step === 4 && hasMedConditions && (
-        <SectionList<MedRow, MedSection>
+        <SectionList<MedicationBrandGroup, MedSection>
           sections={step4Sections}
           keyExtractor={keyExtractorMed}
-          renderItem={renderMedItemRow}
+          renderItem={renderMedBrandGroup}
           renderSectionHeader={renderMedSectionHeader}
           stickySectionHeadersEnabled={false}
           ListHeaderComponent={step4Header}
@@ -950,6 +1015,19 @@ const styles = StyleSheet.create({
   rowName:          { color: C.text1, fontSize: 15, flex: 1, marginRight: 12 },
   medInfo:          { flex: 1, marginRight: 12 },
   medSub:           { color: C.text3, fontSize: 12, marginTop: 2 },
+  medBrandRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 13, paddingHorizontal: 12,
+    borderRadius: 10, borderWidth: 1, borderColor: C.border,
+    marginBottom: 8, backgroundColor: C.surface,
+  },
+  medBrandCount: { color: C.text3, fontSize: 12, marginTop: 2 },
+  medVariantRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 12, paddingHorizontal: 12,
+    borderRadius: 10, borderWidth: 1, borderColor: C.border,
+    marginLeft: 12, marginBottom: 8, backgroundColor: C.surfaceAlt,
+  },
 
   dosageInput: {
     backgroundColor: C.bg, borderWidth: 1, borderColor: C.border,
