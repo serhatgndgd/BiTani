@@ -768,7 +768,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
                     <Pressable key={value} style={[styles.chip, on && styles.chipSelected]}
                       onPress={() => setGender(value)} disabled={saving}>
                       <Text style={[styles.chipText, on && styles.chipTextSelected]}>{label}</Text>
-                      {on && <Ionicons name={ICON_ON} size={18} color={C.primary} />}
+                      {on && <Ionicons name={ICON_ON} size={18} color={C.text1} />}
                     </Pressable>
                   );
                 })}
@@ -904,9 +904,9 @@ const styles = StyleSheet.create({
     borderRadius: 10, borderWidth: 1, borderColor: C.border,
     paddingVertical: 12, paddingHorizontal: 14, marginBottom: 10, backgroundColor: C.surface,
   },
-  chipSelected:     { borderColor: C.primary, backgroundColor: C.primaryDim },
-  chipText:         { color: C.text2, fontSize: 15 },
-  chipTextSelected: { color: C.primary, fontWeight: '600' },
+  chipSelected:     { borderColor: C.primary, backgroundColor: C.primary },
+  chipText:         { color: C.text1, fontSize: 15 },
+  chipTextSelected: { color: C.text1, fontWeight: '600' },
 
   bmiWarn: { color: C.warning, fontSize: 14, marginTop: 4, marginBottom: 8 },
 
