@@ -57,10 +57,21 @@ type Message = {
 
 type ChatNavProp = BottomTabNavigationProp<MainTabParamList, 'Chat'>;
 
+type ProfileRow = {
+  full_name: string | null;
+  name?: string | null;
+};
+
+type UserConditionRow = {
+  conditions_catalog: { name: string } | { name: string }[] | null;
+};
+
 const CHAT_ERROR_NETWORK = 'İnternet bağlantınızı kontrol edin';
 const CHAT_ERROR_SERVER = 'Asistan şu an yanıt veremiyor';
 const CHAT_ERROR_GENERIC = 'Bir sorun oluştu, tekrar deneyin';
 const CHAT_DISCLAIMER_ACCEPTED_KEY = 'chat_disclaimer_v1_accepted';
+const DEFAULT_WELCOME_MESSAGE =
+  'Merhaba! Ben BiTanı sağlık bilgi rehberiyim. Sağlıkla ilgili sorularında yardımcı olmaya hazırım.';
 
 function mapChatError(error: unknown): string {
   if (!(error instanceof Error)) return CHAT_ERROR_GENERIC;
@@ -192,6 +203,25 @@ function fmtTime(ts: number): string {
   return new Date(ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 }
 
+function firstConditionName(row: UserConditionRow): string | null {
+  if (Array.isArray(row.conditions_catalog)) {
+    return row.conditions_catalog[0]?.name ?? null;
+  }
+  return row.conditions_catalog?.name ?? null;
+}
+
+function buildWelcomeMessage(profile: ProfileRow | null, conditions: string[]): string {
+  const fullName = (profile?.full_name ?? profile?.name ?? '').trim();
+  const firstName = fullName.split(/\s+/)[0] ?? '';
+  const prefix = firstName ? `Merhaba ${firstName}!` : 'Merhaba!';
+
+  if (conditions.length > 0) {
+    return `${prefix} Ben BiTanı sağlık asistanınım. Kayıtlı hastalıklarını ve ilaçlarını bilerek sana daha doğru bilgi verebilirim. Sağlıkla ilgili bir şikayet veya sorun var mı?`;
+  }
+
+  return `${prefix} Ben BiTanı sağlık asistanınım. Sağlıkla ilgili sorularında yardımcı olmaya hazırım. Bir şikayetin veya sorun var mı?`;
+}
+
 // ─── Alt bileşenler ───────────────────────────────────────────────────────────
 
 function MessageBubble({ message }: { message: Message }) {
@@ -257,7 +287,12 @@ export default function ChatScreen() {
   const navigation = useNavigation<ChatNavProp>();
 
   const [loadingProfile, setLoadingProfile] = useState(true);
-  const [messages, setMessages]             = useState<Message[]>([]);
+  const [messages, setMessages]             = useState<Message[]>([{
+    id: 'welcome',
+    role: 'assistant',
+    content: DEFAULT_WELCOME_MESSAGE,
+    ts: Date.now(),
+  }]);
   const [input, setInput]                   = useState('');
   const [sending, setSending]               = useState(false);
   const [sendError, setSendError]           = useState<string | null>(null);
@@ -272,22 +307,36 @@ export default function ChatScreen() {
     if (!user?.id) {
       setMessages([{
         id: 'welcome', role: 'assistant', ts: Date.now(),
-        content: 'Merhaba! Ben BiTanı sağlık bilgi rehberiyim. Sağlıkla ilgili sorularında yardımcı olmaya hazırım.',
+        content: DEFAULT_WELCOME_MESSAGE,
       }]);
       setLoadingProfile(false);
       return;
     }
 
-    const { data: profile } = await supabase
-      .from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+    try {
+      const [profileRes, conditionsRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('user_conditions')
+          .select('conditions_catalog(name)')
+          .eq('user_id', user.id),
+      ]);
 
-    const firstName = (profile?.full_name as string | null)?.split(' ')[0] ?? '';
-    const greeting  = firstName
-      ? `Merhaba ${firstName}! Ben BiTanı sağlık bilgi rehberiyim. Sağlıkla ilgili sorularında yardımcı olmaya hazırım.`
-      : 'Merhaba! Ben BiTanı sağlık bilgi rehberiyim. Sağlıkla ilgili sorularında yardımcı olmaya hazırım.';
-
-    setMessages([{ id: 'welcome', role: 'assistant', content: greeting, ts: Date.now() }]);
-    setLoadingProfile(false);
+      const conditions = ((conditionsRes.data ?? []) as UserConditionRow[])
+        .map(firstConditionName)
+        .filter((name): name is string => !!name);
+      const greeting = buildWelcomeMessage((profileRes.data as ProfileRow | null) ?? null, conditions);
+      setMessages([{ id: 'welcome', role: 'assistant', content: greeting, ts: Date.now() }]);
+    } catch (error) {
+      console.error('chat-welcome:', error);
+      setMessages([{ id: 'welcome', role: 'assistant', content: DEFAULT_WELCOME_MESSAGE, ts: Date.now() }]);
+    } finally {
+      setLoadingProfile(false);
+    }
   }, []);
 
   useEffect(() => { void loadProfile(); }, [loadProfile]);
