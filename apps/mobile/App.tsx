@@ -71,7 +71,10 @@ function AuthNavigator() {
       <AuthStack.Screen
         name="Login"
         component={LoginScreen}
-        options={{ title: 'Giriş' }}
+        options={{
+          title: 'Giriş Yap',
+          headerBackTitle: '',
+        }}
       />
       <AuthStack.Screen
         name="Register"
