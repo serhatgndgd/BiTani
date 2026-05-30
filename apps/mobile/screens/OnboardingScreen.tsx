@@ -3,6 +3,7 @@ import { Picker } from '@react-native-picker/picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   ScrollView,
@@ -719,6 +720,22 @@ export default function OnboardingScreen({ onComplete }: Props) {
 
   const goBack = () => { setStepError(null); if (step > 1) setStep((s) => s - 1); };
 
+  const confirmSignOut = () => {
+    Alert.alert(
+      'Çıkış Yap',
+      'Çıkış yapmak istediğine emin misin?',
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Evet',
+          onPress: () => {
+            void supabase.auth.signOut();
+          },
+        },
+      ],
+    );
+  };
+
   const handleSave = async () => {
     setSaveError(null);
     if (!validateStep1()) { setStep(1); return; }
@@ -968,25 +985,32 @@ export default function OnboardingScreen({ onComplete }: Props) {
 
       {/* ── Footer ── */}
       <View style={styles.footer}>
-        {step > 1
-          ? <Pressable style={styles.secondaryBtn} onPress={goBack} disabled={saving}><Text style={styles.secondaryBtnText}>Geri</Text></Pressable>
-          : <View style={{ flex: 1 }} />}
-        {step < TOTAL_STEPS
-          ? (
-              <Pressable
-                style={[
-                  styles.primaryBtn,
-                  (saving || (step === 1 && !isStep1Adult)) && styles.primaryBtnDisabled,
-                ]}
-                onPress={() => void goNext()}
-                disabled={saving || (step === 1 && !isStep1Adult)}
-              >
-                <Text style={styles.primaryBtnText}>İleri</Text>
-              </Pressable>
-            )
-          : <Pressable style={[styles.primaryBtn, saving && styles.primaryBtnDisabled]} onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator color={C.bg} /> : <Text style={styles.primaryBtnText}>Tamamla</Text>}
-            </Pressable>}
+        <View style={styles.footerActions}>
+          {step > 1
+            ? <Pressable style={styles.secondaryBtn} onPress={goBack} disabled={saving}><Text style={styles.secondaryBtnText}>Geri</Text></Pressable>
+            : <View style={{ flex: 1 }} />}
+          {step < TOTAL_STEPS
+            ? (
+                <Pressable
+                  style={[
+                    styles.primaryBtn,
+                    (saving || (step === 1 && !isStep1Adult)) && styles.primaryBtnDisabled,
+                  ]}
+                  onPress={() => void goNext()}
+                  disabled={saving || (step === 1 && !isStep1Adult)}
+                >
+                  <Text style={styles.primaryBtnText}>İleri</Text>
+                </Pressable>
+              )
+            : <Pressable style={[styles.primaryBtn, saving && styles.primaryBtnDisabled]} onPress={handleSave} disabled={saving}>
+                {saving ? <ActivityIndicator color={C.bg} /> : <Text style={styles.primaryBtnText}>Tamamla</Text>}
+              </Pressable>}
+        </View>
+        {step === 1 ? (
+          <Pressable style={styles.signOutLink} onPress={confirmSignOut} disabled={saving}>
+            <Text style={styles.signOutLinkText}>Farklı hesapla giriş yap</Text>
+          </Pressable>
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -1100,15 +1124,17 @@ const styles = StyleSheet.create({
   err:      { color: C.error, fontSize: 14, marginTop: 12 },
 
   footer: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
     padding: 16, paddingBottom: 28,
     borderTopWidth: 1, borderTopColor: C.border,
   },
+  footerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   secondaryBtn:       { flex: 1, paddingVertical: 14, borderRadius: 10, borderWidth: 1, borderColor: C.border, alignItems: 'center' },
   secondaryBtnText:   { color: C.text1, fontSize: 16, fontWeight: '600' },
   primaryBtn:         { flex: 1, paddingVertical: 14, borderRadius: 10, backgroundColor: C.text1, alignItems: 'center', justifyContent: 'center' },
   primaryBtnDisabled: { opacity: 0.7 },
   primaryBtnText:     { color: C.bg, fontSize: 16, fontWeight: '700' },
+  signOutLink:        { alignItems: 'center', marginTop: 14, paddingVertical: 4 },
+  signOutLinkText:    { color: C.text3, fontSize: 13 },
 
   retryBtn:     { backgroundColor: C.text1, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 10 },
   retryBtnText: { color: C.bg, fontSize: 16, fontWeight: '700' },

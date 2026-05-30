@@ -229,7 +229,13 @@ export default function App() {
       .eq('id', userId)
       .maybeSingle();
 
-    if (error || !data) {
+    if (error) {
+      console.warn('Profile fetch error:', error.message);
+      setNeedsOnboarding(true);
+      return;
+    }
+
+    if (!data) {
       setNeedsOnboarding(true);
       return;
     }
