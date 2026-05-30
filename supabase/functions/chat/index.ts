@@ -23,6 +23,13 @@ interface ApiMessage {
   content: string
 }
 
+interface ChatRequestBody {
+  messages: ApiMessage[]
+  is_emergency_flagged?: boolean
+  session_id?: string
+  title?: string
+}
+
 interface ChatHistoryRow {
   role: string
   content: string
@@ -280,13 +287,30 @@ function matchesKeywordListFuzzy(message: string, keywords: string[]): boolean {
 async function saveChatHistory(
   supabaseAdmin: ReturnType<typeof createClient>,
   userId: string,
+  sessionId: string,
+  title: string | null,
   userMessage: string,
   assistantReply: string,
 ): Promise<void> {
   try {
+    const updatedAt = new Date().toISOString()
     await supabaseAdmin.from('chat_history').insert([
-      { user_id: userId, role: 'user', content: userMessage },
-      { user_id: userId, role: 'assistant', content: assistantReply },
+      {
+        user_id: userId,
+        session_id: sessionId,
+        title,
+        updated_at: updatedAt,
+        role: 'user',
+        content: userMessage,
+      },
+      {
+        user_id: userId,
+        session_id: sessionId,
+        title,
+        updated_at: updatedAt,
+        role: 'assistant',
+        content: assistantReply,
+      },
     ])
   } catch (error) {
     console.error('chat-fn:', error)
@@ -885,10 +909,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { messages, is_emergency_flagged } = (await req.json()) as {
-      messages: ApiMessage[]
-      is_emergency_flagged?: boolean
-    }
+    const { messages, is_emergency_flagged, session_id, title } = (await req.json()) as ChatRequestBody
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return new Response(
@@ -896,6 +917,16 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
+
+    const requestSessionId =
+      typeof session_id === 'string' && session_id.trim().length > 0
+        ? session_id.trim()
+        : null
+    const activeSessionId = requestSessionId ?? crypto.randomUUID()
+    const requestTitle =
+      typeof title === 'string' && title.trim().length > 0
+        ? title.trim().slice(0, 80)
+        : null
 
     const authHeader = req.headers.get('Authorization')
     const jwt = authHeader?.replace('Bearer ', '')
@@ -995,12 +1026,18 @@ Deno.serve(async (req) => {
     let historyMessages: ApiMessage[] = []
 
     try {
-      const { data: historyRows } = await supabaseAdmin
+      let historyQuery = supabaseAdmin
         .from('chat_history')
         .select('role, content')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(20)
+
+      if (requestSessionId) {
+        historyQuery = historyQuery.eq('session_id', requestSessionId)
+      }
+
+      const { data: historyRows } = await historyQuery
 
       if (historyRows && historyRows.length > 0) {
         // DESC'ten ASC'ye çevir (en eski önce → Groq için doğru sıra)
@@ -1039,6 +1076,7 @@ Deno.serve(async (req) => {
       role: 'user',
       content: inputResult.cleaned,
     }
+    const sessionTitle = requestTitle ?? currentMessage.content.slice(0, 40)
     const isEmergencyFlagged = is_emergency_flagged === true
 
     // Server-side soft emergency tespiti (client flag'den bağımsız — O-8)
@@ -1061,6 +1099,8 @@ Ambulans yola çıktıktan sonra bana belirti detaylarını yazabilirsin.`
       await saveChatHistory(
         supabaseAdmin,
         userId,
+        activeSessionId,
+        sessionTitle,
         currentMessage.content,
         absoluteEmergencyReply,
       )
@@ -1141,7 +1181,14 @@ Ambulans yola çıktıktan sonra bana belirti detaylarını yazabilirsin.`
     }
     const safeReply = validation.sanitizedReply
 
-    await saveChatHistory(supabaseAdmin, userId, currentMessage.content, safeReply)
+    await saveChatHistory(
+      supabaseAdmin,
+      userId,
+      activeSessionId,
+      sessionTitle,
+      currentMessage.content,
+      safeReply,
+    )
 
     return new Response(
       JSON.stringify({ reply: safeReply, is_emergency: finalEmergencyFlag }),
