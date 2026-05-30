@@ -2,11 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -64,6 +67,22 @@ type ProfileRow = {
 
 type UserConditionRow = {
   conditions_catalog: { name: string } | { name: string }[] | null;
+};
+
+type ChatHistoryRow = {
+  id: string;
+  role: string;
+  content: string;
+  created_at: string;
+  session_id: string | null;
+  title: string | null;
+  updated_at: string | null;
+};
+
+type ChatSessionSummary = {
+  sessionId: string;
+  title: string;
+  updatedAt: string;
 };
 
 const CHAT_ERROR_NETWORK = 'İnternet bağlantınızı kontrol edin';
@@ -203,6 +222,34 @@ function fmtTime(ts: number): string {
   return new Date(ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 }
 
+function fmtSessionDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('tr-TR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function createSessionId(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = char === 'x' ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
+function welcomeMessage(content: string): Message {
+  return { id: 'welcome', role: 'assistant', content, ts: Date.now() };
+}
+
+function titleFromMessage(text: string): string {
+  return text.trim().slice(0, 40) || 'Yeni sohbet';
+}
+
 function firstConditionName(row: UserConditionRow): string | null {
   if (Array.isArray(row.conditions_catalog)) {
     return row.conditions_catalog[0]?.name ?? null;
@@ -281,18 +328,42 @@ function TypingIndicator() {
   );
 }
 
+function ChatHistoryRowItem({
+  item,
+  onPress,
+  onLongPress,
+}: {
+  item: ChatSessionSummary;
+  onPress: (sessionId: string) => void;
+  onLongPress: (session: ChatSessionSummary) => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.historyRow, pressed && { opacity: 0.72 }]}
+      onPress={() => onPress(item.sessionId)}
+      onLongPress={() => onLongPress(item)}
+    >
+      <View style={styles.historyRowText}>
+        <Text style={styles.historyTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.historyDate}>{fmtSessionDate(item.updatedAt)}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={C.text3} />
+    </Pressable>
+  );
+}
+
 // ─── Ana bileşen ──────────────────────────────────────────────────────────────
 
 export default function ChatScreen() {
   const navigation = useNavigation<ChatNavProp>();
 
   const [loadingProfile, setLoadingProfile] = useState(true);
-  const [messages, setMessages]             = useState<Message[]>([{
-    id: 'welcome',
-    role: 'assistant',
-    content: DEFAULT_WELCOME_MESSAGE,
-    ts: Date.now(),
-  }]);
+  const [welcomeText, setWelcomeText]       = useState(DEFAULT_WELCOME_MESSAGE);
+  const [messages, setMessages]             = useState<Message[]>([welcomeMessage(DEFAULT_WELCOME_MESSAGE)]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [sessions, setSessions]             = useState<ChatSessionSummary[]>([]);
+  const [historyVisible, setHistoryVisible] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [input, setInput]                   = useState('');
   const [sending, setSending]               = useState(false);
   const [sendError, setSendError]           = useState<string | null>(null);
@@ -300,21 +371,61 @@ export default function ChatScreen() {
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const listRef = useRef<FlatList<Message>>(null);
 
-  const loadProfile = useCallback(async () => {
+  const loadSessions = useCallback(async (userId: string): Promise<ChatSessionSummary[]> => {
+    const { data, error } = await supabase
+      .from('chat_history')
+      .select('session_id, title, updated_at, created_at')
+      .eq('user_id', userId)
+      .not('session_id', 'is', null)
+      .order('updated_at', { ascending: false })
+      .limit(500);
+
+    if (error) throw error;
+
+    const summaries = new Map<string, ChatSessionSummary>();
+    for (const row of (data ?? []) as Pick<ChatHistoryRow, 'session_id' | 'title' | 'updated_at' | 'created_at'>[]) {
+      if (!row.session_id || summaries.has(row.session_id)) continue;
+      summaries.set(row.session_id, {
+        sessionId: row.session_id,
+        title: row.title?.trim() || 'Yeni sohbet',
+        updatedAt: row.updated_at ?? row.created_at,
+      });
+    }
+    return [...summaries.values()];
+  }, []);
+
+  const loadSessionMessages = useCallback(async (sessionId: string): Promise<Message[]> => {
+    const { data, error } = await supabase
+      .from('chat_history')
+      .select('id, role, content, created_at, session_id, title, updated_at')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    return ((data ?? []) as ChatHistoryRow[])
+      .filter((row) => row.role === 'user' || row.role === 'assistant')
+      .map((row) => ({
+        id: row.id,
+        role: row.role as 'user' | 'assistant',
+        content: row.content,
+        ts: new Date(row.created_at).getTime(),
+      }));
+  }, []);
+
+  const loadInitialChat = useCallback(async () => {
     setLoadingProfile(true);
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user?.id) {
-      setMessages([{
-        id: 'welcome', role: 'assistant', ts: Date.now(),
-        content: DEFAULT_WELCOME_MESSAGE,
-      }]);
+      setActiveSessionId(createSessionId());
+      setMessages([welcomeMessage(DEFAULT_WELCOME_MESSAGE)]);
       setLoadingProfile(false);
       return;
     }
 
     try {
-      const [profileRes, conditionsRes] = await Promise.all([
+      const [profileRes, conditionsRes, sessionSummaries] = await Promise.all([
         supabase
           .from('profiles')
           .select('full_name')
@@ -324,22 +435,35 @@ export default function ChatScreen() {
           .from('user_conditions')
           .select('conditions_catalog(name)')
           .eq('user_id', user.id),
+        loadSessions(user.id),
       ]);
 
       const conditions = ((conditionsRes.data ?? []) as UserConditionRow[])
         .map(firstConditionName)
         .filter((name): name is string => !!name);
       const greeting = buildWelcomeMessage((profileRes.data as ProfileRow | null) ?? null, conditions);
-      setMessages([{ id: 'welcome', role: 'assistant', content: greeting, ts: Date.now() }]);
+      setWelcomeText(greeting);
+      setSessions(sessionSummaries);
+
+      const latestSession = sessionSummaries[0];
+      if (latestSession) {
+        const sessionMessages = await loadSessionMessages(latestSession.sessionId);
+        setActiveSessionId(latestSession.sessionId);
+        setMessages(sessionMessages.length > 0 ? sessionMessages : [welcomeMessage(greeting)]);
+      } else {
+        setActiveSessionId(createSessionId());
+        setMessages([welcomeMessage(greeting)]);
+      }
     } catch (error) {
       console.error('chat-welcome:', error);
-      setMessages([{ id: 'welcome', role: 'assistant', content: DEFAULT_WELCOME_MESSAGE, ts: Date.now() }]);
+      setActiveSessionId(createSessionId());
+      setMessages([welcomeMessage(DEFAULT_WELCOME_MESSAGE)]);
     } finally {
       setLoadingProfile(false);
     }
-  }, []);
+  }, [loadSessionMessages, loadSessions]);
 
-  useEffect(() => { void loadProfile(); }, [loadProfile]);
+  useEffect(() => { void loadInitialChat(); }, [loadInitialChat]);
 
   useEffect(() => {
     let mounted = true;
@@ -391,6 +515,95 @@ export default function ChatScreen() {
     }
   }, []);
 
+  const refreshSessions = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.id) return;
+    const nextSessions = await loadSessions(user.id);
+    setSessions(nextSessions);
+  }, [loadSessions]);
+
+  const startNewChat = useCallback(() => {
+    Keyboard.dismiss();
+    setActiveSessionId(createSessionId());
+    setMessages([welcomeMessage(welcomeText)]);
+    setInput('');
+    setSendError(null);
+    setShowEmergency(false);
+    setHistoryVisible(false);
+  }, [welcomeText]);
+
+  const openHistory = useCallback(() => {
+    setHistoryVisible(true);
+    setHistoryLoading(true);
+    void refreshSessions().finally(() => setHistoryLoading(false));
+  }, [refreshSessions]);
+
+  const selectSession = useCallback(async (sessionId: string) => {
+    setHistoryLoading(true);
+    try {
+      const sessionMessages = await loadSessionMessages(sessionId);
+      setActiveSessionId(sessionId);
+      setMessages(sessionMessages.length > 0 ? sessionMessages : [welcomeMessage(welcomeText)]);
+      setSendError(null);
+      setShowEmergency(false);
+      setHistoryVisible(false);
+    } catch (error) {
+      console.error('chat-history-load:', error);
+      setSendError(CHAT_ERROR_GENERIC);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [loadSessionMessages, welcomeText]);
+
+  const deleteSession = useCallback((session: ChatSessionSummary) => {
+    Alert.alert(
+      'Sohbeti Sil',
+      `"${session.title}" sohbetini silmek istediğine emin misin?`,
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Sil',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (!user?.id) return;
+              const { error } = await supabase
+                .from('chat_history')
+                .delete()
+                .eq('user_id', user.id)
+                .eq('session_id', session.sessionId);
+              if (error) {
+                console.error('chat-history-delete:', error);
+                setSendError(CHAT_ERROR_GENERIC);
+                return;
+              }
+              await refreshSessions();
+              if (activeSessionId === session.sessionId) {
+                startNewChat();
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [activeSessionId, refreshSessions, startNewChat]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <Pressable onPress={openHistory} hitSlop={10} style={styles.headerIconBtn}>
+          <Ionicons name="list-outline" size={22} color={C.text1} />
+        </Pressable>
+      ),
+      headerRight: () => (
+        <Pressable onPress={startNewChat} hitSlop={10} style={styles.headerIconBtn}>
+          <Ionicons name="create-outline" size={22} color={C.text1} />
+        </Pressable>
+      ),
+    });
+  }, [navigation, openHistory, startNewChat]);
+
   const send = useCallback(async () => {
     const text = input.trim();
     if (!text || sending || loadingProfile) return;
@@ -399,6 +612,11 @@ export default function ChatScreen() {
     setSendError(null);
 
     const msgId = Date.now().toString();
+    const sessionId = activeSessionId ?? createSessionId();
+    const hasUserMessage = messages.some((message) => message.role === 'user');
+    const existingSession = sessions.find((session) => session.sessionId === sessionId);
+    const title = hasUserMessage ? existingSession?.title ?? titleFromMessage(text) : titleFromMessage(text);
+    if (!activeSessionId) setActiveSessionId(sessionId);
     setMessages((prev) => [...prev, { id: msgId, role: 'user', content: text, ts: Date.now() }]);
 
     setSending(true);
@@ -413,6 +631,8 @@ export default function ChatScreen() {
         body: {
           messages: [{ role: 'user', content: text }],
           is_emergency_flagged: isEmergency,
+          session_id: sessionId,
+          title,
         },
         headers: {
           'Content-Type': 'application/json',
@@ -426,6 +646,7 @@ export default function ChatScreen() {
       if (!reply) throw new Error('server-empty-reply');
 
       setMessages((prev) => [...prev, { id: `${msgId}-a`, role: 'assistant', content: reply, ts: Date.now() }]);
+      void refreshSessions();
 
       if (isEmergency || payload.is_emergency === true || detectEmergency(reply)) {
         setShowEmergency(true);
@@ -438,7 +659,7 @@ export default function ChatScreen() {
     } finally {
       setSending(false);
     }
-  }, [input, sending, loadingProfile]);
+  }, [activeSessionId, input, loadingProfile, messages, refreshSessions, sending, sessions]);
 
   if (loadingProfile) {
     return (
@@ -464,6 +685,8 @@ export default function ChatScreen() {
           renderItem={renderMessage}
           ListFooterComponent={renderListFooter}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          onScrollBeginDrag={Keyboard.dismiss}
         />
 
         {showEmergency && (
@@ -507,6 +730,45 @@ export default function ChatScreen() {
         primaryActionLabel="Okudum ve Kabul Ediyorum"
         onPrimaryAction={acceptDisclaimer}
       />
+      <Modal
+        visible={historyVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setHistoryVisible(false)}
+      >
+        <SafeAreaView style={styles.historyModal} edges={['top', 'bottom', 'left', 'right']}>
+          <View style={styles.historyHeader}>
+            <Text style={styles.historyHeaderTitle}>Sohbet Geçmişi</Text>
+            <Pressable onPress={() => setHistoryVisible(false)} hitSlop={10}>
+              <Ionicons name="close" size={24} color={C.text1} />
+            </Pressable>
+          </View>
+          {historyLoading ? (
+            <View style={styles.historyCenter}>
+              <ActivityIndicator color={C.primary} />
+            </View>
+          ) : sessions.length === 0 ? (
+            <View style={styles.historyCenter}>
+              <Ionicons name="chatbubble-ellipses-outline" size={34} color={C.text3} />
+              <Text style={styles.historyEmptyTitle}>Henüz sohbet yok</Text>
+              <Text style={styles.historyEmptyText}>İlk mesajını gönderdiğinde burada görünecek.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={sessions}
+              keyExtractor={(item) => item.sessionId}
+              contentContainerStyle={styles.historyList}
+              renderItem={({ item }) => (
+                <ChatHistoryRowItem
+                  item={item}
+                  onPress={(sessionId) => void selectSession(sessionId)}
+                  onLongPress={deleteSession}
+                />
+              )}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -517,6 +779,7 @@ const styles = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: C.bg },
   flex:   { flex: 1 },
   center: { flex: 1, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center' },
+  headerIconBtn: { paddingHorizontal: 14, paddingVertical: 6 },
 
   list:        { flex: 1 },
   listContent: { padding: 12, paddingBottom: 8, gap: 2 },
@@ -574,4 +837,34 @@ const styles = StyleSheet.create({
   },
   sendBtn:         { width: 46, height: 46, borderRadius: 23, backgroundColor: C.text1, justifyContent: 'center', alignItems: 'center' },
   sendBtnDisabled: { opacity: 0.35 },
+
+  historyModal: { flex: 1, backgroundColor: C.bg },
+  historyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  historyHeaderTitle: { color: C.text1, fontSize: 20, fontWeight: '700' },
+  historyList: { padding: 14, gap: 10 },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 14,
+    backgroundColor: C.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    gap: 10,
+  },
+  historyRowText: { flex: 1 },
+  historyTitle: { color: C.text1, fontSize: 15, fontWeight: '600', marginBottom: 4 },
+  historyDate: { color: C.text3, fontSize: 12 },
+  historyCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 28 },
+  historyEmptyTitle: { color: C.text1, fontSize: 16, fontWeight: '700' },
+  historyEmptyText: { color: C.text3, fontSize: 14, textAlign: 'center' },
 });
