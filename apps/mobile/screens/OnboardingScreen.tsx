@@ -46,6 +46,7 @@ const TOTAL_STEPS = 4;
 const CONDITION_MED_CONFIDENCE_MIN = 0.7;
 const CONDITION_MED_LIMIT = 100; // hastalık başına en yüksek güvenli öneri sayısı
 const MEDICATION_BRAND_REGEX = /^([A-ZÇĞİÖŞÜ\s]+?)(\s+\d|\s+\d+\s*MG|\s+\d+\s*ML|$)/;
+const DATE_PICKER_LOCALE = 'tr-TR';
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: 'male',        label: 'Erkek' },
@@ -54,8 +55,9 @@ const GENDER_OPTIONS: { value: Gender; label: string }[] = [
 ];
 
 const MONTH_LABELS = [
-  'Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
-  'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık',
+  ...Array.from({ length: 12 }, (_, index) =>
+    new Date(2020, index, 1).toLocaleString(DATE_PICKER_LOCALE, { month: 'long' }),
+  ),
 ];
 
 function daysInMonth(year: number, month: number): number {
