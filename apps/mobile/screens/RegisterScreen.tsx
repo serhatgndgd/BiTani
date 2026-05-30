@@ -1,6 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AuthError } from '@supabase/supabase-js';
-import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -48,7 +47,6 @@ const INITIAL_READ_STATE: ReadState = {
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const FULL_NAME_PATTERN = /^[A-Za-zÇĞİÖŞÜçğıöşü\s]+$/;
 
 const CONSENT_DOCUMENTS: Record<ReadableConsentKey, LegalDocumentId> = {
   kvkk_read: 'kvkk_aydinlatma',
@@ -56,21 +54,6 @@ const CONSENT_DOCUMENTS: Record<ReadableConsentKey, LegalDocumentId> = {
   ai_transfer: 'acik_riza',
   chat_history: 'acik_riza',
 };
-
-function maxAdultBirthDate(): Date {
-  const d = new Date();
-  d.setFullYear(d.getFullYear() - 18);
-  return d;
-}
-
-function formatDate(date: Date | null): string {
-  if (!date) return 'Doğum tarihini seç';
-  return date.toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' });
-}
-
-function isAtLeast18(date: Date | null): boolean {
-  return date !== null && date.getTime() <= maxAdultBirthDate().getTime();
-}
 
 function mapAuthError(error: AuthError): string {
   const raw = (error.message ?? '').toLowerCase();
@@ -228,14 +211,11 @@ function ConsentRow({
 // ─── Ana ekran ────────────────────────────────────────────────────────────────
 
 export default function RegisterScreen({ navigation }: Props) {
-  const [fullName, setFullName] = useState('');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm]   = useState('');
   const [consents, setConsents] = useState<ConsentState>(INITIAL_CONSENTS);
   const [hasRead, setHasRead] = useState<ReadState>(INITIAL_READ_STATE);
-  const [birthDate, setBirthDate] = useState<Date | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [readingConsent, setReadingConsent] = useState<ReadableConsentKey | null>(null);
   const [error, setError]       = useState<string | null>(null);
   const [loading, setLoading]   = useState(false);
@@ -254,19 +234,16 @@ export default function RegisterScreen({ navigation }: Props) {
     consents.kvkk_read &&
     consents.saglik_veri &&
     consents.chat_history &&
-    consents.age_18 &&
-    isAtLeast18(birthDate);
+    consents.age_18;
   const submitDisabled =
     loading ||
     !requiredConsentsAccepted ||
-    fullName.trim().length < 2 ||
     !email.trim() ||
     !rules.minLen ||
     !rules.upper ||
     !rules.digit ||
     !rules.special ||
-    password !== confirm ||
-    !birthDate;
+    password !== confirm;
 
   function toggleConsent(key: ConsentKey) {
     setConsents((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -307,24 +284,9 @@ export default function RegisterScreen({ navigation }: Props) {
     }
   }
 
-  function handleBirthDateChange(_event: DateTimePickerEvent, selected?: Date) {
-    if (Platform.OS !== 'ios') setShowDatePicker(false);
-    if (selected) {
-      setBirthDate(selected);
-      if (selected.getTime() > maxAdultBirthDate().getTime()) {
-        setConsents((prev) => ({ ...prev, age_18: false }));
-      }
-    }
-  }
-
   async function handleSignUp() {
     setError(null);
-    const trimmedFullName = fullName.trim();
     const trimmed = email.trim();
-    if (trimmedFullName.length < 2 || !FULL_NAME_PATTERN.test(trimmedFullName)) {
-      setError('Ad soyad en az 2 karakter olmalı ve sadece harf ile boşluk içermeli.');
-      return;
-    }
     if (!trimmed) {
       setError('E-posta gerekli.');
       return;
@@ -341,14 +303,6 @@ export default function RegisterScreen({ navigation }: Props) {
       setError('Şifreler eşleşmiyor.');
       return;
     }
-    if (!birthDate) {
-      setError('Doğum tarihini seçmelisin.');
-      return;
-    }
-    if (!isAtLeast18(birthDate)) {
-      setError('18 yaşından küçükler uygulamayı kullanamaz.');
-      return;
-    }
     if (!requiredConsentsAccepted) {
       setError('Devam etmek için zorunlu metinleri okuyup onaylamalısın.');
       return;
@@ -362,7 +316,6 @@ export default function RegisterScreen({ navigation }: Props) {
       const { data, error: signError } = await supabase.auth.signUp({
         email: trimmed,
         password,
-        options: { data: { full_name: trimmedFullName } },
       });
       if (signError) {
         setError(mapAuthError(signError));
@@ -413,16 +366,6 @@ export default function RegisterScreen({ navigation }: Props) {
             </View>
 
             <Text style={styles.heading}>Hesap oluştur</Text>
-
-            <Text style={styles.label}>Ad Soyad</Text>
-            <FocusInput
-              value={fullName}
-              onChangeText={setFullName}
-              placeholder="Adın ve soyadın"
-              autoCorrect={false}
-              editable={!loading}
-              style={styles.inputGap}
-            />
 
             <Text style={styles.label}>E-posta</Text>
             <FocusInput
@@ -491,30 +434,6 @@ export default function RegisterScreen({ navigation }: Props) {
               editable={!loading}
               style={styles.inputGap}
             />
-
-            <Text style={styles.label}>Doğum Tarihi</Text>
-            <Pressable
-              style={styles.dateBtn}
-              onPress={() => setShowDatePicker(true)}
-              disabled={loading}
-            >
-              <Ionicons name="calendar-outline" size={18} color={C.text2} />
-              <Text style={birthDate ? styles.dateText : styles.datePlaceholder}>
-                {formatDate(birthDate)}
-              </Text>
-            </Pressable>
-            {birthDate && !isAtLeast18(birthDate) ? (
-              <Text style={styles.error}>18 yaşından küçükler kullanamaz.</Text>
-            ) : null}
-            {showDatePicker ? (
-              <DateTimePicker
-                value={birthDate ?? maxAdultBirthDate()}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                maximumDate={maxAdultBirthDate()}
-                onChange={handleBirthDateChange}
-              />
-            ) : null}
 
             <View style={styles.consentBlock}>
               <Text style={styles.consentTitle}>Rıza ve Bilgilendirme</Text>
@@ -605,21 +524,6 @@ const styles = StyleSheet.create({
   inputInner:  { color: C.text1, fontSize: 16, paddingHorizontal: 14, paddingVertical: 14 },
   inputGap:    { marginBottom: 16 },
   inputGapSm:  { marginBottom: 8 },
-
-  dateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.surface,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 16,
-  },
-  dateText: { color: C.text1, fontSize: 15 },
-  datePlaceholder: { color: C.text3, fontSize: 15 },
 
   /* Kurallar */
   rules:  { marginBottom: 12 },
