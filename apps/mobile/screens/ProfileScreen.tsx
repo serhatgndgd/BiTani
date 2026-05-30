@@ -821,7 +821,7 @@ export default function ProfileScreen() {
                         {isActive ? <Text style={styles.alreadyLabel}>Zaten kullanılıyor</Text> : null}
                       </View>
                       {isActive
-                        ? <Ionicons name="checkmark-circle" size={22} color="#4a5a7a" />
+                        ? <Ionicons name="checkmark-circle" size={22} color={C.primary} />
                         : <Ionicons name={selected ? 'checkbox' : 'square-outline'} size={22} color={selected ? C.primary : C.text2} />}
                     </Pressable>
                     {selected ? (
@@ -830,7 +830,7 @@ export default function ProfileScreen() {
                         value={modalMedDosages.get(medication.id) ?? ''}
                         onChangeText={(v) => setModalDosage(medication.id, v)}
                         placeholder="Doz (örn: 500 mg, günde 2×) — opsiyonel"
-                        placeholderTextColor="#555"
+                        placeholderTextColor={C.text3}
                       />
                     ) : null}
                   </View>
@@ -954,7 +954,7 @@ export default function ProfileScreen() {
             <Text style={styles.sectionTitle}>Profil Bilgileri</Text>
             {!editingProfile && (
               <Pressable onPress={openEditProfile} style={styles.actionBtn}>
-                <Ionicons name="pencil-outline" size={16} color="#aaa" />
+                <Ionicons name="pencil-outline" size={16} color={C.text2} />
                 <Text style={styles.actionBtnText}>Düzenle</Text>
               </Pressable>
             )}
@@ -976,7 +976,7 @@ export default function ProfileScreen() {
                 value={fullName}
                 onChangeText={setFullName}
                 placeholder="Adın Soyadın"
-                placeholderTextColor="#888"
+                placeholderTextColor={C.text3}
                 autoCapitalize="words"
                 editable={!savingProfile}
               />
@@ -985,18 +985,18 @@ export default function ProfileScreen() {
                 <View style={styles.pickerCol}>
                   <Text style={styles.pickerCaption}>Gün</Text>
                   <View style={styles.pickerBox}>
-                    <Picker selectedValue={day} onValueChange={(v) => setDay(String(v))} style={styles.picker} dropdownIconColor="#fff">
-                      {dayItems.map((d) => <Picker.Item key={d} label={d} value={d} color="#fff" />)}
+                    <Picker selectedValue={day} onValueChange={(v) => setDay(String(v))} style={styles.picker} dropdownIconColor={C.text1}>
+                      {dayItems.map((d) => <Picker.Item key={d} label={d} value={d} color={C.text1} />)}
                     </Picker>
                   </View>
                 </View>
                 <View style={styles.pickerCol}>
                   <Text style={styles.pickerCaption}>Ay</Text>
                   <View style={styles.pickerBox}>
-                    <Picker selectedValue={month} onValueChange={(v) => setMonth(String(v))} style={styles.picker} dropdownIconColor="#fff">
+                    <Picker selectedValue={month} onValueChange={(v) => setMonth(String(v))} style={styles.picker} dropdownIconColor={C.text1}>
                       {MONTH_LABELS.map((label, idx) => {
                         const v = String(idx + 1);
-                        return <Picker.Item key={v} label={label} value={v} color="#fff" />;
+                        return <Picker.Item key={v} label={label} value={v} color={C.text1} />;
                       })}
                     </Picker>
                   </View>
@@ -1004,8 +1004,8 @@ export default function ProfileScreen() {
                 <View style={styles.pickerCol}>
                   <Text style={styles.pickerCaption}>Yıl</Text>
                   <View style={styles.pickerBox}>
-                    <Picker selectedValue={year} onValueChange={(v) => setYear(String(v))} style={styles.picker} dropdownIconColor="#fff">
-                      {years.map((y) => <Picker.Item key={y} label={y} value={y} color="#fff" />)}
+                    <Picker selectedValue={year} onValueChange={(v) => setYear(String(v))} style={styles.picker} dropdownIconColor={C.text1}>
+                      {years.map((y) => <Picker.Item key={y} label={y} value={y} color={C.text1} />)}
                     </Picker>
                   </View>
                 </View>
@@ -1022,9 +1022,9 @@ export default function ProfileScreen() {
                 })}
               </View>
               <Text style={styles.fieldLabel}>Boy (cm)</Text>
-              <TextInput style={styles.input} value={heightCm} onChangeText={(t) => setHeightCm(t.replace(/[^0-9]/g, ''))} placeholder="50 – 250" placeholderTextColor="#888" keyboardType="number-pad" editable={!savingProfile} />
+              <TextInput style={styles.input} value={heightCm} onChangeText={(t) => setHeightCm(t.replace(/[^0-9]/g, ''))} placeholder="50 – 250" placeholderTextColor={C.text3} keyboardType="number-pad" editable={!savingProfile} />
               <Text style={styles.fieldLabel}>Kilo (kg)</Text>
-              <TextInput style={styles.input} value={weightKg} onChangeText={(t) => setWeightKg(t.replace(/[^0-9]/g, ''))} placeholder="10 – 300" placeholderTextColor="#888" keyboardType="number-pad" editable={!savingProfile} />
+              <TextInput style={styles.input} value={weightKg} onChangeText={(t) => setWeightKg(t.replace(/[^0-9]/g, ''))} placeholder="10 – 300" placeholderTextColor={C.text3} keyboardType="number-pad" editable={!savingProfile} />
               {profileError ? <Text style={styles.err}>{profileError}</Text> : null}
               <View style={styles.editActions}>
                 <Pressable style={styles.cancelBtn} onPress={() => { setEditingProfile(false); setProfileError(null); }} disabled={savingProfile}>
@@ -1174,9 +1174,9 @@ export default function ProfileScreen() {
               <Ionicons name="close" size={24} color={C.text1} />
             </Pressable>
           </View>
-          <TextInput style={styles.modalSearch} value={conditionsSearch} onChangeText={setConditionsSearch} placeholder="Hastalık ara..." placeholderTextColor="#888" />
+          <TextInput style={styles.modalSearch} value={conditionsSearch} onChangeText={setConditionsSearch} placeholder="Hastalık ara..." placeholderTextColor={C.text3} />
           {loadingConditions ? (
-            <ActivityIndicator style={styles.modalLoader} color="#fff" />
+            <ActivityIndicator style={styles.modalLoader} color={C.text1} />
           ) : conditionsError ? (
             <Text style={[styles.err, styles.modalPad]}>{conditionsError}</Text>
           ) : (
@@ -1242,7 +1242,7 @@ export default function ProfileScreen() {
                 value={condMedSearch}
                 onChangeText={setCondMedSearch}
                 placeholder="İlaç adı ara..."
-                placeholderTextColor="#888"
+                placeholderTextColor={C.text3}
               />
               {loadingCondMeds ? (
                 <ActivityIndicator style={styles.modalLoader} color={C.text1} />
@@ -1303,7 +1303,7 @@ export default function ProfileScreen() {
                   value={dosageInput}
                   onChangeText={setDosageInput}
                   placeholder="ör. Günde 1 tablet"
-                  placeholderTextColor="#888"
+                  placeholderTextColor={C.text3}
                 />
                 {addMedError ? <Text style={styles.err}>{addMedError}</Text> : null}
                 <View style={styles.editActions}>
@@ -1322,7 +1322,7 @@ export default function ProfileScreen() {
                   value={medSearch}
                   onChangeText={setMedSearch}
                   placeholder="İlaç adı ara..."
-                  placeholderTextColor="#888"
+                  placeholderTextColor={C.text3}
                   autoFocus={userConditions.length === 0}
                 />
                 {searchingMeds ? (
@@ -1550,7 +1550,7 @@ function createStyles(C: ThemeColors) {
     flex: 1,
     justifyContent: 'center',
     padding: 20,
-    backgroundColor: 'rgba(0,0,0,0.72)',
+    backgroundColor: C.overlay,
   },
   confirmBox: {
     backgroundColor: C.surface,

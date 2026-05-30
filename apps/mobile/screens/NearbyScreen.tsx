@@ -753,7 +753,7 @@ function createStyles(C: ThemeColors) {
   tabText:       { color: C.text3, fontSize: 13, fontWeight: '600' },
   tabTextActive: { color: C.text1 },
   countBadge:       { backgroundColor: C.surfaceAlt, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 },
-  countBadgeActive: { backgroundColor: 'rgba(255,255,255,0.22)' },
+  countBadgeActive: { backgroundColor: C.primaryLight },
   countText:        { color: C.text3, fontSize: 11, fontWeight: '700' },
   countTextActive:  { color: C.text1 },
 

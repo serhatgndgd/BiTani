@@ -1,10 +1,13 @@
 export const darkTheme = {
   bg:          '#080808',
+  card:        '#131313',
   surface:     '#131313',
   surfaceAlt:  '#1c1c1c',
   border:      '#252525',
+  overlay:     'rgba(0,0,0,0.65)',
 
   primary:     '#2563eb',
+  primaryLight:'rgba(37,99,235,0.18)',
   primaryDim:  'rgba(37,99,235,0.12)',
 
   text1:       '#f5f5f5',
@@ -24,11 +27,14 @@ export const darkTheme = {
 
 export const lightTheme = {
   bg:          '#FFFFFF',
+  card:        '#FFFFFF',
   surface:     '#F5F5F5',
   surfaceAlt:  '#FFFFFF',
   border:      '#E0E0E0',
+  overlay:     'rgba(0,0,0,0.42)',
 
   primary:     darkTheme.primary,
+  primaryLight:'rgba(37,99,235,0.10)',
   primaryDim:  'rgba(37,99,235,0.12)',
 
   text1:       '#1A1A1A',

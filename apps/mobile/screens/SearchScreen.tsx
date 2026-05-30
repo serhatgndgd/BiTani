@@ -45,6 +45,7 @@ const MIN_QUERY    = 2;
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 function SearchSkeletonList() {
+  const { colors: C } = useTheme();
   return (
     <View>
       {[0, 1, 2, 3, 4, 5, 6].map((i) => (
@@ -360,6 +361,8 @@ type DrugDetailProps = {
 };
 
 function DrugDetail({ drug, onClose }: DrugDetailProps) {
+  const { colors: C } = useTheme();
+  const styles = useMemo(() => createStyles(C), [C]);
   const openUrl = (url: string) => { void Linking.openURL(url); };
 
   return (
@@ -457,10 +460,10 @@ function createStyles(C: ThemeColors) {
 
   /* Yardım metni */
   hint:     { paddingHorizontal: 20, paddingTop: 28, alignItems: 'center' },
-  hintText: { color: C.border, fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  hintText: { color: C.text3, fontSize: 14, textAlign: 'center', lineHeight: 22 },
 
   /* Liste */
-  sep:       { height: 1, backgroundColor: C.surface, marginLeft: 16 },
+  sep:       { height: 1, backgroundColor: C.border, marginLeft: 16, opacity: 0.45 },
   listEmpty: { flex: 1 },
 
   brandRow: {
@@ -481,7 +484,7 @@ function createStyles(C: ThemeColors) {
     paddingHorizontal: 16,
     gap: 10,
   },
-  itemPressed: { backgroundColor: C.surface },
+  itemPressed: { backgroundColor: C.primaryLight },
   itemInfo:    { flex: 1 },
   variantRow: {
     flexDirection: 'row',
@@ -490,7 +493,7 @@ function createStyles(C: ThemeColors) {
     paddingLeft: 30,
     paddingRight: 16,
     gap: 10,
-    backgroundColor: C.bg,
+    backgroundColor: C.card,
   },
 
   itemTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
@@ -501,7 +504,7 @@ function createStyles(C: ThemeColors) {
   mineBadgeText: { color: C.primary, fontSize: 11, fontWeight: '700' },
 
   itemSub:   { color: C.text3, fontSize: 12, marginTop: 1 },
-  itemFirma: { color: C.border, fontSize: 11, marginTop: 2 },
+  itemFirma: { color: C.text3, fontSize: 11, marginTop: 2 },
 
   /* Footer */
   footer: { paddingVertical: 18, alignItems: 'center' },
@@ -511,10 +514,10 @@ function createStyles(C: ThemeColors) {
   backdrop:  {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: C.overlay,
   },
   sheet: {
-    backgroundColor: C.surface,
+    backgroundColor: C.card,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     paddingHorizontal: 20,
@@ -535,7 +538,7 @@ function createStyles(C: ThemeColors) {
   detailFirma:  { color: C.text3, fontSize: 13, marginTop: 3 },
   closeBtn: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: C.surfaceAlt,
+    backgroundColor: C.surface,
     justifyContent: 'center', alignItems: 'center',
   },
 
@@ -559,7 +562,7 @@ function createStyles(C: ThemeColors) {
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: 'rgba(37,99,235,0.25)',
+    borderColor: C.primaryLight,
   },
   linkBtnPressed: { opacity: 0.75 },
   linkBtnText: { color: C.primary, fontSize: 14, fontWeight: '500', flex: 1 },
