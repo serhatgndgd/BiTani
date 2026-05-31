@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1242 2688" width="1242" height="2688">
+  <rect x="0" y="0" width="1242" height="2688" fill="#0F172A"/>
+  <g transform="translate(461, 1124) scale(0.3125)">
+    
+  <defs>
+    <!-- Brand renkleri: primary #2563eb, onPrimary #ffffff -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2563eb" stop-opacity="1"/>
+      <stop offset="1" stop-color="#2563eb" stop-opacity="0.92"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="0.3" cy="0.15" r="0.9">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.10"/>
+      <stop offset="0.6" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Yuvarlak köşeli arka plan (rx = size * 0.225 = 230.4) -->
+  <rect x="0" y="0" width="1024" height="1024" rx="230.4" ry="230.4" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="230.4" ry="230.4" fill="url(#sheen)"/>
+
+  <!--
+    EKG path — Brand.tsx IconMark mantığından hesaplanmış:
+    pad = 163.84  cy = 532.48  x0 = 163.84  x1 = 860.16
+    w = 696.32    seg = 43.52  sw = 53.248
+  -->
+  <path
+    d="M 163.84 532.48
+       H 250.88
+       q 21.76 -26.112 43.52 0
+       H 381.44
+       l 26.112 21.76
+       l 21.76 -130.56
+       l 30.464 195.84
+       l 26.112 -87.04
+       l 26.112 0
+       H 642.56
+       q 32.64 -47.872 65.28 0
+       H 860.16"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="53.248"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Bitiş noktası dairesi (r = 1024 * 0.022 = 22.528) -->
+  <circle cx="860.16" cy="532.48" r="22.528" fill="#ffffff"/>
+
+  </g>
+</svg>

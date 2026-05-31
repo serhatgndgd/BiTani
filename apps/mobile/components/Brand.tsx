@@ -100,7 +100,7 @@ export function Wordmark({ height = 48, onDark = true, showIcon = true }: Wordma
     <View style={[styles.wordmarkRow, { gap }]}>
       {showIcon && (
         <View style={[styles.iconWrap, { width: iconSize, height: iconSize, borderRadius: iconSize * 0.225 }]}>
-          <IconMark size={iconSize} bg={C.primary} stroke={C.text1} />
+          <IconMark size={iconSize} bg={C.primary} stroke={C.onPrimary} />
         </View>
       )}
       <View style={styles.textRow}>
@@ -119,7 +119,7 @@ export function SplashBrand() {
   return (
     <View style={styles.splashCenter}>
       <View style={styles.splashIconWrap}>
-        <IconMark size={132} bg={C.primary} stroke={C.text1} />
+        <IconMark size={132} bg={C.primary} stroke={C.onPrimary} />
       </View>
       <View style={[styles.textRow, { marginTop: 28 }]}>
         <Text style={[styles.light, { fontSize: 42, color: C.text1 }]}>Bi</Text>
